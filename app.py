@@ -115,6 +115,22 @@ def _parse_date(value):
         return None
 
 
+def _item_published_date(item):
+    candidates = [
+        item.findtext("pubDate"),
+        item.findtext("published"),
+        item.findtext("updated"),
+        item.findtext("{http://purl.org/dc/elements/1.1/}date"),
+        item.findtext("{http://www.w3.org/2005/Atom}published"),
+        item.findtext("{http://www.w3.org/2005/Atom}updated"),
+    ]
+    for value in candidates:
+        parsed = _parse_date(value)
+        if parsed:
+            return parsed
+    return datetime.now(timezone.utc)
+
+
 def _sentiment(title):
     words = set(re.findall(r"[a-z][a-z0-9]+", title.lower()))
     positive = len(words & POSITIVE_WORDS)
@@ -149,7 +165,7 @@ def _fetch_company_news(company, days):
     for item in root.findall("./channel/item")[:25]:
         title = _clean_title(item.findtext("title"))
         link = item.findtext("link") or ""
-        published = _parse_date(item.findtext("pubDate"))
+        published = _item_published_date(item)
         if not title or not link:
             continue
         items.append({
