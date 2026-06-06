@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 
 HOST = os.environ.get("KESTRELIQ_HOST") or ("0.0.0.0" if os.environ.get("PORT") else "127.0.0.1")
@@ -18,6 +19,7 @@ PORT = int(os.environ.get("PORT") or os.environ.get("KESTRELIQ_PORT", "8787"))
 ROOT = Path(__file__).resolve().parent
 INDEX_FILE = ROOT / "templates" / "index.html"
 CACHE_SECONDS = 15 * 60
+IST = ZoneInfo("Asia/Kolkata")
 
 NEWS_CACHE = {}
 
@@ -155,6 +157,8 @@ def _fetch_company_news(company, days):
             "company": company,
             "date": published.isoformat() if published else "",
             "displayDate": published.strftime("%d %b %Y") if published else "",
+            "displayTimeIST": published.astimezone(IST).strftime("%I:%M %p IST") if published else "",
+            "publishedIST": published.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST") if published else "",
             "source": _parse_google_source(item),
             "headline": title,
             "url": link,
