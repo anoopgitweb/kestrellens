@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KestrelIQ Executive Intelligence</title>
+<style>
+*{box-sizing:border-box}html,body{height:100%;overflow:hidden}body{margin:0;font-family:Inter,"Segoe UI",Arial,sans-serif;background:#f3f6fa;color:#111827}button,input,select{font:inherit}button{cursor:pointer}.app{height:100vh;display:grid;grid-template-rows:60px 1fr}.topbar{display:flex;align-items:center;gap:22px;padding:0 22px;background:#0a1426;color:#fff;border-bottom:1px solid #24324a}.brand{display:flex;align-items:baseline;gap:10px;min-width:320px}.brand strong{font-family:Georgia,serif;font-size:24px;font-weight:500}.brand strong span{color:#18b5ad;font-style:italic}.brand small{font-size:11px;letter-spacing:.32em;color:#8390a6}.tabs{display:flex;gap:10px}.tab{min-height:36px;padding:0 16px;border:0;border-radius:7px;background:#1b2740;color:#c8d0df}.tab.active{background:#fff;color:#091326;font-weight:700}.top-meta{margin-left:auto;display:flex;align-items:center;gap:16px;color:#97a3b8;font-size:13px}.shell{display:grid;grid-template-columns:268px 1fr;min-height:0;overflow:hidden}.sidebar{background:#fff;border-right:1px solid #d9e1eb;overflow:auto}.side-block{padding:16px 14px;border-bottom:1px solid #e1e7ef}.side-block:first-child{padding-top:14px;padding-bottom:14px}.label{display:block;margin-bottom:8px;font-size:10px;letter-spacing:.18em;color:#9aa4b5;font-weight:700}.input,.select{width:100%;height:36px;border:1px solid #d9e1eb;border-radius:7px;background:#f9fbfd;color:#111827;padding:0 11px;font-size:13px}.btn{height:36px;border:1px solid #d7dee9;border-radius:7px;background:#fff;color:#111827;font-size:13px;font-weight:650}.btn.primary{background:#0a1426;color:#fff;border-color:#0a1426}.btn.teal{background:#16aaa2;color:#fff;border-color:#16aaa2}.btn.full{width:100%}.stack{display:grid;gap:8px}.watchlist{display:grid;gap:6px}.watch-item{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:6px 8px 6px 10px;border:1px solid #e2e8f0;border-radius:7px;background:#f8fafc;font-size:13px}.watch-item button{width:24px;height:24px;border:0;border-radius:6px;background:#e7edf5;color:#586477;font-size:12px}.toggle-row{display:flex;align-items:center;gap:9px;color:#465368;font-size:13px}.toggle{position:relative;width:38px;height:22px;border-radius:99px;background:#d6deea}.toggle input{display:none}.knob{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.22);transition:.18s}.toggle input:checked+.knob{left:19px}.toggle:has(input:checked){background:#16aaa2}.main{min-height:0;padding:14px 24px;overflow:hidden}#liveView{height:100%;min-height:0;display:grid;grid-template-rows:auto auto auto 1fr}.stats{display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:10px;margin-bottom:12px}.stat{min-height:64px;padding:9px 16px;border:1px solid #dae2ed;border-radius:9px;background:#fff;box-shadow:0 2px 8px rgba(17,24,39,.06)}.stat b{display:block;font-family:Georgia,serif;font-size:27px;line-height:1;font-weight:400;color:#111827}.stat span{font-size:10px;letter-spacing:.16em;color:#9aa4b5;font-weight:700}.stat .pos{color:#15965e}.stat .neg{color:#dc2626}.filters{display:grid;grid-template-columns:200px 1fr 110px;gap:12px;margin-bottom:10px}.section-title{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:8px}.section-title h1{margin:0;font-family:Georgia,serif;font-size:24px;font-weight:400}.section-title em{color:#0eaaa2}.count{color:#8792a5;font-family:Consolas,monospace}.panel{height:auto;min-height:0;border:1px solid #dae2ed;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(17,24,39,.04);overflow:auto}.table{width:100%;border-collapse:collapse;table-layout:fixed}.table th{position:sticky;top:0;z-index:2;height:34px;background:#f8fafc;color:#a0abc0;font-size:11px;letter-spacing:.16em;text-align:left;padding:0 14px}.table td{padding:7px 14px;border-top:1px solid #edf1f6;vertical-align:middle;font-size:13px;line-height:1.3}.table tbody tr{cursor:pointer}.table tbody tr:hover td{background:#f8fbff}.table a{color:#0c5fba;text-decoration:none}.table a:hover{text-decoration:underline}.col-sno{width:74px}.col-date{width:116px}.col-company{width:150px}.col-source{width:170px}.col-sentiment{width:130px}.pill{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:99px;font-size:11px;text-transform:capitalize}.positive{background:#e7f7ef;color:#13714a}.negative{background:#fdecec;color:#b91c1c}.neutral{background:#edf2f7;color:#4b5563}.empty{height:100%;min-height:200px;display:grid;place-items:center;text-align:center;color:#697386}.empty b{display:block;margin-bottom:8px;font-family:Georgia,serif;color:#111827;font-size:20px;font-weight:400}.briefing{display:none;height:100%;overflow:auto}.brief-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}.brief-card{padding:20px;border:1px solid #dae2ed;border-radius:10px;background:#fff}.brief-card h2{margin:0 0 14px;font-size:16px}.brief-line{display:grid;grid-template-columns:1fr auto;gap:12px;padding:12px 0;border-top:1px solid #edf1f6}.brief-line:first-of-type{border-top:0}.muted{color:#758196}.error{margin-bottom:10px;padding:12px 14px;border-left:3px solid #dc2626;background:#fff1f2;color:#991b1b;border-radius:8px}.loading{opacity:.65;pointer-events:none}@media(max-width:900px){html,body{overflow:auto}.app{height:auto;min-height:100vh}.shell{grid-template-columns:1fr;overflow:visible}.sidebar{border-right:0}.stats,.brief-grid{grid-template-columns:1fr}.filters{grid-template-columns:1fr}.brand{min-width:0}.brand small,.top-meta{display:none}.table{min-width:920px}.panel{height:60vh}.main{padding:24px 16px;overflow:visible}#liveView{display:block}}
+</style>
+<style>
+#liveView{grid-template-rows:auto auto auto auto 1fr!important}
+.tabs{gap:4px!important;background:#12233d;border:1px solid #213652;border-radius:7px;padding:3px}.tab{min-height:28px!important;padding:0 12px!important;border-radius:5px!important;font-size:13px!important;background:transparent!important;color:#b8c4d6!important}.tab.active{background:#fff!important;color:#0a1426!important;font-weight:700!important}.top-actions{margin-left:auto;display:flex;align-items:center;gap:8px}.top-meta{margin-left:10px!important}.clock-stack{display:grid;gap:2px;text-align:right;line-height:1.05}.clock-time{font-size:11px;color:#c6d1e2;font-variant-numeric:tabular-nums}.icon-btn{width:34px;height:34px;border:1px solid #2d3c56;border-radius:7px;background:#111e35;color:#e7eef8;font-size:15px;display:inline-grid;place-items:center}.icon-btn:hover{background:#1b2d4c}.icon-btn.primary-icon{background:#16aaa2;border-color:#16aaa2;color:#fff}.sidebar .side-block:first-child{display:none}.compact-add{display:grid;grid-template-columns:1fr 38px;gap:8px}.compact-add .btn{padding:0;font-size:18px}.watch-name{display:flex;align-items:center;gap:8px;min-width:0}.watch-num{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:5px;background:#e9eff6;color:#526174;font-size:11px;font-weight:700;flex:0 0 auto}.watch-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.filters{grid-template-columns:200px 1fr 42px!important}.filters .btn{padding:0;font-size:18px}.headline-link{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.modal-backdrop{position:fixed;inset:0;z-index:500;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(10,20,38,.45)}.modal-backdrop.open{display:flex}.news-modal{width:min(720px,100%);background:#fff;border:1px solid #d8e1ec;border-radius:12px;box-shadow:0 20px 60px rgba(10,20,38,.25);overflow:hidden}.modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:18px 20px;border-bottom:1px solid #e6ecf4}.modal-head h2{margin:0;font-size:20px;line-height:1.3}.modal-close{width:30px;height:30px;border:0;border-radius:7px;background:#eef3f8;color:#4b5563;font-size:18px}.modal-body{padding:18px 20px}.meta-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}.meta-item{padding:10px;border:1px solid #e5ebf3;border-radius:8px;background:#f8fafc}.meta-item span{display:block;margin-bottom:3px;font-size:10px;letter-spacing:.14em;color:#9aa4b5;font-weight:700}.meta-item b{font-size:13px}.gist{padding:14px 16px;border-left:3px solid #16aaa2;background:#f4fbfb;border-radius:8px;color:#314155;line-height:1.5}.modal-actions{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid #e6ecf4;background:#f8fafc}.modal-actions .btn{height:34px;padding:0 13px}.copied-note{color:#13714a;font-size:13px;align-self:center}@media(max-width:900px){.top-actions{margin-left:auto}.top-meta{display:none!important}.meta-grid{grid-template-columns:1fr 1fr}.sidebar .side-block:first-child{display:none}}
+.strategy-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.strategy-grid .wide{grid-column:1/-1}.strategy-kpis{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.strategy-kpi{padding:12px 14px;border:1px solid #dbe4ef;border-radius:9px;background:#fff}.strategy-kpi b{display:block;font-family:Georgia,serif;font-size:24px;line-height:1}.strategy-kpi span{display:block;margin-top:5px;font-size:10px;letter-spacing:.14em;color:#94a0b4;font-weight:700}.signal-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid #edf1f6;cursor:pointer}.signal-row:first-child{border-top:0}.signal-row:hover,.lens-card:hover,.action-item:hover,.heat-table tbody tr:hover{background:#f8fbff}.signal-bar{height:7px;border-radius:99px;background:#e7edf5;overflow:hidden;margin-top:6px}.signal-fill{height:100%;background:#16aaa2}.signal-desc{margin-top:4px;color:#758196;font-size:12px}.lens-list{display:grid;gap:10px}.lens-card{padding:12px;border:1px solid #e1e8f0;border-radius:8px;background:#fbfdff;cursor:pointer}.lens-card b{display:block;margin-bottom:4px}.lens-meta{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}.mini-pill{display:inline-flex;align-items:center;min-height:22px;padding:0 8px;border-radius:99px;background:#eef3f8;color:#415168;font-size:11px}.heat-table{width:100%;border-collapse:collapse;font-size:12px}.heat-table th,.heat-table td{padding:8px 10px;border-top:1px solid #edf1f6;text-align:left}.heat-table tbody tr{cursor:pointer}.heat-score{display:inline-grid;place-items:center;min-width:34px;height:24px;border-radius:6px;background:#e7f7ef;color:#13714a;font-weight:700}.heat-risk{background:#fdecec;color:#b91c1c}.heat-ai{background:#eef2ff;color:#3730a3}.action-item{padding:10px;border-top:1px solid #edf1f6;border-radius:7px;cursor:pointer}.action-item:first-child{border-top:0}.action-item b{display:block;margin-bottom:3px}.drill-list{display:grid;gap:8px;margin-top:12px}.drill-link{display:block;padding:9px 10px;border:1px solid #e1e8f0;border-radius:7px;background:#fff;color:#0c5fba;text-decoration:none}.drill-link:hover{text-decoration:underline}.priority-high{color:#b91c1c}.priority-med{color:#9a5a00}.priority-low{color:#13714a}@media(max-width:1100px){.strategy-grid,.strategy-kpis{grid-template-columns:1fr}}
+.heat-score.clickable{cursor:pointer}.heat-score.clickable:hover{outline:2px solid rgba(22,170,162,.28)}.insight-panel{margin-bottom:8px;padding:10px 12px;border:1px solid #dbe4ef;border-radius:10px;background:#fff}.insight-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.insight-head b{font-size:13px}.insight-actions{display:flex;align-items:center;gap:8px}.insight-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.insight-callout{padding:9px;border:1px solid #e5ebf3;border-radius:8px;background:#f8fafc;font-size:12px;line-height:1.35}.insight-callout span{display:block;margin-bottom:3px;color:#7b8798;font-size:10px;letter-spacing:.12em;font-weight:700}.table tbody tr.selected td{background:#ecfdfb!important;box-shadow:inset 3px 0 0 #16aaa2}.competitor-table{width:100%;border-collapse:collapse;font-size:12px}.competitor-table th,.competitor-table td{padding:9px 10px;border-top:1px solid #edf1f6;text-align:left;vertical-align:top}.competitor-table tbody tr{cursor:pointer}.competitor-table tbody tr:hover td{background:#f8fbff}.impact-risk{color:#b91c1c;font-weight:700}.impact-opportunity{color:#13714a;font-weight:700}.impact-watch{color:#415168;font-weight:700}@media(max-width:1100px){.insight-list{grid-template-columns:1fr}}
+.sidebar{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;overflow:hidden!important}.sidebar .side-block:nth-child(4){min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);padding-bottom:14px}.sidebar .watchlist{min-height:0;overflow:auto;border:1px solid #dbe4ef;border-radius:9px;background:#fbfdff;padding:6px;align-content:start}.sidebar .watch-item{background:#fff}.sidebar .watchlist::-webkit-scrollbar{width:10px}.sidebar .watchlist::-webkit-scrollbar-thumb{background:#9aa4b5;border-radius:999px;border:2px solid #fbfdff}.sidebar .watchlist::-webkit-scrollbar-track{background:#f1f5f9;border-radius:999px}
+.global-filter{width:190px;height:30px;border:1px solid #2d3c56;border-radius:7px;background:#111e35;color:#e7eef8;padding:0 10px;font-size:12px}.top-actions{margin-left:0!important}.top-meta{margin-left:0!important}.main{padding:8px 24px 14px!important}.side-block{padding:10px 10px!important}.side-block:first-child{display:none!important}.label{margin-bottom:6px!important}.input,.select{height:32px!important;font-size:12px!important}.btn{height:32px!important;font-size:12px!important}.compact-add{grid-template-columns:1fr 34px!important}.filters{grid-template-columns:1fr 38px!important;gap:8px!important;margin-bottom:8px!important}.filters .input{height:32px!important}.filters .btn{height:32px!important}.stats{margin-bottom:8px!important}.stat{min-height:58px!important}.section-title{margin-bottom:6px!important}.section-title h1{font-size:22px!important}.panel{border-radius:9px!important}.sidebar{grid-template-rows:auto auto minmax(0,1fr) auto!important}
+.tabs{flex:0 0 auto!important}.tab{font-weight:700!important;flex:0 0 auto!important;white-space:nowrap!important}.tab:nth-child(1){width:92px}.tab:nth-child(2){width:132px}.tab:nth-child(3){width:126px}.tab:nth-child(4){width:86px}.tab:nth-child(5){width:138px}.tab:focus-visible,.icon-btn:focus-visible,.global-filter:focus-visible{outline:2px solid #6aa7ff;outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><strong>Kestrel<span>IQ</span></strong><small>EXECUTIVE INTELLIGENCE</small></div>
+    <nav class="tabs">
+      <button class="tab active" data-view="live">Live Feed</button>
+      <button class="tab" data-view="briefing">Weekly Briefing</button>
+      <button class="tab" data-view="strategy">Strategy Radar</button>
+      <button class="tab" data-view="heatmap">Heat Map</button>
+      <button class="tab" data-view="competitor">Competitor Intel</button>
+    </nav>
+    <select id="companyFilter" class="global-filter" title="Filter all tabs"><option value="">All Companies</option></select>
+    <div class="top-actions">
+      <button id="refreshBtn" class="icon-btn primary-icon" title="Refresh feeds">↻</button>
+      <button id="exportBtn" class="icon-btn" title="Export settings">⇩</button>
+      <button id="importBtn" class="icon-btn" title="Import settings">⇧</button>
+      <input id="importFile" type="file" accept="application/json,.json" hidden>
+    </div>
+    <div class="top-meta"><span class="clock-stack"><span id="today"></span><span id="clockTime" class="clock-time"></span></span><span>Signed in as <b>admin</b></span></div>
+  </header>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="side-block">
+      </div>
+      <div class="side-block">
+        <label class="label" for="dateRange">DATE RANGE</label>
+        <select id="dateRange" class="select">
+          <option value="24h">Last 24 hours</option>
+          <option value="3d">Last 3 days</option>
+          <option value="7d" selected>Last 7 days</option>
+          <option value="30d">Last 30 days</option>
+        </select>
+      </div>
+      <div class="side-block">
+        <label class="label" for="companyInput">ADD COMPANY</label>
+        <div class="compact-add">
+          <input id="companyInput" class="input" placeholder="e.g. Revolut, NVIDIA...">
+          <button id="addBtn" class="btn primary" title="Add to watchlist">+</button>
+        </div>
+      </div>
+      <div class="side-block">
+        <span class="label">YOUR WATCHLIST</span>
+        <div id="watchlist" class="watchlist"></div>
+      </div>
+      <div class="side-block">
+        <span class="label">SENTIMENT</span>
+        <label class="toggle-row"><span class="toggle"><input id="sentimentToggle" type="checkbox"><span class="knob"></span></span> Show on table</label>
+      </div>
+    </aside>
+    <main class="main">
+      <section id="liveView">
+        <div class="stats">
+          <div class="stat"><b id="articleStat">0</b><span>ARTICLES</span></div>
+          <div class="stat"><b id="companyStat">0</b><span>COMPANIES</span></div>
+          <div class="stat"><b id="positiveStat" class="pos">--</b><span>POSITIVE</span></div>
+          <div class="stat"><b id="negativeStat" class="neg">--</b><span>NEGATIVE</span></div>
+        </div>
+        <div id="errorBox"></div>
+        <div class="filters">
+          <input id="searchInput" class="input" placeholder="Search headlines...">
+          <button id="clearBtn" class="btn" title="Clear filters">×</button>
+        </div>
+        <div class="section-title">
+          <h1><span id="feedTitle">All Companies</span> - <em>Latest Intelligence</em></h1>
+          <span id="countText" class="count">0 articles</span>
+        </div>
+        <div class="panel">
+          <table class="table" id="newsTable">
+            <thead><tr><th class="col-sno">S.NO</th><th class="col-date">DATE</th><th class="col-company">COMPANY</th><th class="col-source">SOURCE</th><th>HEADLINE</th><th class="sentimentCol col-sentiment">SENTIMENT</th></tr></thead>
+            <tbody id="newsBody"></tbody>
+          </table>
+          <div id="emptyState" class="empty"><div><b>No articles found</b><span>Add companies, then refresh feeds.</span></div></div>
+        </div>
+      </section>
+      <section id="briefingView" class="briefing">
+        <div class="section-title">
+          <h1>Weekly Briefing - <em>Executive Summary</em></h1>
+          <span id="briefTime" class="count"></span>
+        </div>
+        <div class="brief-grid">
+          <div class="brief-card"><h2>Company Momentum</h2><div id="briefCompanies"></div></div>
+          <div class="brief-card"><h2>Risk Watch</h2><div id="briefRisks"></div></div>
+        </div>
+      </section>
+      <section id="strategyView" class="briefing">
+        <div class="section-title">
+          <h1>Strategy Radar - <em>Concentrix Opportunity Lens</em></h1>
+          <span id="strategyCount" class="count">0 signals</span>
+        </div>
+        <div class="strategy-grid">
+          <div class="strategy-kpis">
+            <div class="strategy-kpi"><b id="kpiOpportunity">0</b><span>OPPORTUNITY</span></div>
+            <div class="strategy-kpi"><b id="kpiRisk">0</b><span>RISK SIGNALS</span></div>
+            <div class="strategy-kpi"><b id="kpiAi">0</b><span>AI SIGNALS</span></div>
+            <div class="strategy-kpi"><b id="kpiPriority">0</b><span>HIGH PRIORITY</span></div>
+          </div>
+          <div class="brief-card"><h2>Market Signal Mix</h2><div id="signalMix"></div></div>
+          <div class="brief-card"><h2>Leadership Action Queue</h2><div id="actionQueue"></div></div>
+          <div class="brief-card wide"><h2>Opportunity Lens</h2><div id="opportunityLens"></div></div>
+        </div>
+      </section>
+      <section id="heatmapView" class="briefing">
+        <div class="section-title">
+          <h1>Company Heat Map - <em>Strategic Priority View</em></h1>
+          <span class="count">Click a metric to inspect</span>
+        </div>
+        <div class="brief-card"><h2>Company Heat Map</h2><div id="heatMap"></div></div>
+      </section>
+      <section id="competitorView" class="briefing">
+        <div class="section-title">
+          <h1>Competitor Intelligence - <em>Risk & Opportunity Watch</em></h1>
+          <span class="count">Double-click a row</span>
+        </div>
+        <div class="brief-card"><h2>Smart Competitor Intelligence</h2><div id="competitorIntel"></div></div>
+      </section>
+    </main>
+  </div>
+</div>
+<div id="newsModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="news-modal">
+    <div class="modal-head">
+      <h2 id="modalTitle">News gist</h2>
+      <button id="modalClose" class="modal-close" title="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="meta-grid">
+        <div class="meta-item"><span>DATE</span><b id="modalDate"></b></div>
+        <div class="meta-item"><span>COMPANY</span><b id="modalCompany"></b></div>
+        <div class="meta-item"><span>SOURCE</span><b id="modalSource"></b></div>
+        <div class="meta-item"><span>SENTIMENT</span><b id="modalSentiment"></b></div>
+      </div>
+      <div id="modalGist" class="gist"></div>
+    </div>
+    <div class="modal-actions">
+      <span id="copyNote" class="copied-note"></span>
+      <button id="copyBtn" class="btn">Copy gist</button>
+      <button id="websiteBtn" class="btn primary">Open website</button>
+    </div>
+  </div>
+</div>
+<script>
+const state={companies:JSON.parse(localStorage.getItem("kestreliqCompanies")||"[]"),articles:[],briefing:null,loading:false,currentItems:[],selectedArticle:null,modalText:"",selectedIds:new Set()};
+const $=id=>document.getElementById(id);
+const fmt=new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"numeric",month:"short",year:"numeric"});
+const timeFmt=new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+function updateClock(){const now=new Date();$("today").textContent=fmt.format(now);$("clockTime").textContent=timeFmt.format(now)}
+updateClock();setInterval(updateClock,1000);
+function saveCompanies(){localStorage.setItem("kestreliqCompanies",JSON.stringify(state.companies))}
+function renderWatchlist(){const box=$("watchlist");box.innerHTML="";if(!state.companies.length){box.innerHTML='<p class="muted">No companies yet. Add one above.</p>'}state.companies.forEach((name,i)=>{const row=document.createElement("div");row.className="watch-item";row.innerHTML=`<span class="watch-name"><span class="watch-num">${i+1}</span><span class="watch-text">${escapeHtml(name)}</span></span><button title="Remove">x</button>`;row.querySelector("button").onclick=()=>{state.companies.splice(i,1);saveCompanies();renderAll();};box.appendChild(row)});renderCompanyFilter()}
+function renderCompanyFilter(){const select=$("companyFilter");const value=select.value;select.innerHTML='<option value="">All Companies</option>'+state.companies.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");select.value=state.companies.includes(value)?value:""}
+function scopedArticles(){const company=$("companyFilter").value.toLowerCase();return state.articles.filter(a=>!company||a.company.toLowerCase()===company)}
+function renderStats(items){$("articleStat").textContent=items.length;$("companyStat").textContent=$("companyFilter").value?1:state.companies.length;$("positiveStat").textContent=items.filter(a=>a.sentiment==="positive").length||"--";$("negativeStat").textContent=items.filter(a=>a.sentiment==="negative").length||"--"}
+function filteredArticles(){const search=$("searchInput").value.trim().toLowerCase();return scopedArticles().filter(a=>!search||`${a.headline} ${a.source} ${a.company}`.toLowerCase().includes(search))}
+function selectedArticles(){return state.currentItems.filter(a=>state.selectedIds.has(a.id))}
+function topTerms(items){const stop=new Set(["the","and","for","with","from","that","this","into","says","new","over","after","will","about","their","its","has","are","was","you","your","why","how"]);const counts={};items.forEach(a=>String(a.headline).toLowerCase().match(/[a-z][a-z0-9]{2,}/g)?.forEach(w=>{if(!stop.has(w))counts[w]=(counts[w]||0)+1}));return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5).map(x=>x[0])}
+function renderQuickInsights(){const selected=selectedArticles();const basis=selected.length?selected:state.currentItems;const scope=selected.length?`${selected.length} selected article${selected.length===1?"":"s"}`:`${basis.length} filtered article${basis.length===1?"":"s"}`;$("insightScope").textContent=basis.length?`Using ${scope}`:"No articles";if(!basis.length){$("quickInsights").innerHTML='<div class="insight-callout"><span>CALLOUT</span>Add companies and refresh feeds to generate insights.</div>';return}const risks=basis.filter(a=>a.sentiment==="negative"||classifySignal(a).includes("risk"));const ai=basis.filter(a=>classifySignal(a).includes("AI"));const opportunities=basis.filter(a=>!classifySignal(a).includes("risk"));const terms=topTerms(basis);const lead=basis[0];$("quickInsights").innerHTML=`<div class="insight-callout"><span>MAJOR CALLOUT</span>${escapeHtml(lead.company)} is showing ${basis.length} current signal${basis.length===1?"":"s"}; recurring themes include ${escapeHtml(terms.join(", ")||"market movement")}.</div><div class="insight-callout"><span>RISK / WATCH</span>${risks.length?`${risks.length} risk signal${risks.length===1?"":"s"} found. Review: ${escapeHtml(risks[0].headline)}`:"No clear risk signal in the selected set."}</div><div class="insight-callout"><span>CONCENTRIX ANGLE</span>${ai.length?"AI/CX transformation angle is visible. Consider agent assist, automation advisory, analytics, and knowledge operations.":opportunities.length?"Potential opportunity for account planning, transformation support, digital operations, or CX advisory.":"Monitor for follow-up."}</div>`}
+function renderTable(){const items=filteredArticles();state.currentItems=items;renderStats(scopedArticles());$("feedTitle").textContent=$("companyFilter").value||"All Companies";$("countText").textContent=`${items.length} article${items.length===1?"":"s"}`;$("emptyState").style.display=items.length?"none":"grid";$("newsTable").style.display=items.length?"table":"none";document.querySelectorAll(".sentimentCol").forEach(el=>el.style.display=$("sentimentToggle").checked?"table-cell":"none");$("newsBody").innerHTML=items.map((a,i)=>`<tr data-index="${i}" title="Double-click for gist."><td>${i+1}</td><td>${escapeHtml(a.displayDate||"")}</td><td>${escapeHtml(a.company)}</td><td>${escapeHtml(a.source)}</td><td><a class="headline-link" href="${escapeHtml(a.url)}" title="${escapeHtml(a.headline)}" target="_blank" rel="noopener">${escapeHtml(a.headline)}</a></td><td class="sentimentCol"><span class="pill ${a.sentiment}">${a.sentiment}</span></td></tr>`).join("");document.querySelectorAll("#newsBody tr").forEach(row=>row.ondblclick=()=>openNewsModal(state.currentItems[Number(row.dataset.index)]));document.querySelectorAll("#newsBody .sentimentCol").forEach(el=>el.style.display=$("sentimentToggle").checked?"table-cell":"none")}
+function renderBriefing(){const articles=scopedArticles();const byCompany={};articles.forEach(a=>{byCompany[a.company]??={company:a.company,count:0,positive:0,negative:0,lead:a};byCompany[a.company].count++;if(a.sentiment==="positive")byCompany[a.company].positive++;if(a.sentiment==="negative")byCompany[a.company].negative++});const companies=Object.values(byCompany).sort((a,b)=>b.count-a.count);const risks=articles.filter(a=>a.sentiment==="negative"||classifySignal(a).includes("risk")).slice(0,8);$("briefTime").textContent=articles.length?`Generated ${new Date().toLocaleString()}`:"";$("briefCompanies").innerHTML=companies.length?companies.map(item=>`<div class="brief-line"><div><b>${escapeHtml(item.company)}</b><div class="muted">${item.lead?escapeHtml(item.lead.headline):"No lead story"}</div></div><span class="count">${item.count}</span></div>`).join(""):'<p class="muted">Refresh feeds to generate a briefing.</p>';$("briefRisks").innerHTML=risks.length?risks.map(item=>`<div class="brief-line"><div><b>${escapeHtml(item.company)}</b><div><a href="${item.url}" target="_blank" rel="noopener">${escapeHtml(item.headline)}</a></div><div class="muted">${escapeHtml(item.source)}</div></div></div>`).join(""):'<p class="muted">No negative risk headlines detected.</p>'}
+function classifySignal(article){const text=`${article.headline} ${article.source}`.toLowerCase();const rules=[["AI automation signal",[" ai ","agentic","automation","robot","model","copilot","chatbot","nvidia"]],["Regulatory or risk signal",["lawsuit","regulator","fine","breach","fraud","probe","warning","sanction","risk"]],["Partnership or M&A signal",["partner","partnership","acquire","acquisition","merger","collaboration","alliance"]],["Cost pressure signal",["layoff","cut","restructure","cost","margin","profit","loss","slowdown"]],["CX disruption signal",["customer","experience","support","contact center","service","loyalty","complaint"]],["Growth or expansion signal",["launch","expand","growth","new market","funding","investment","record"]]];for(const [label,words] of rules){if(words.some(word=>text.includes(word)))return label}return article.sentiment==="negative"?"Regulatory or risk signal":"Market watch signal"}
+function capabilityFor(signal){return {"AI automation signal":"AI CX, agent assist, automation advisory, knowledge operations","Regulatory or risk signal":"Trust, compliance operations, quality monitoring, risk response","Partnership or M&A signal":"Integration support, operating model design, transformation PMO","Cost pressure signal":"Cost-to-serve reduction, process optimization, digital operations","CX disruption signal":"Customer journey redesign, omnichannel service, VOC analytics","Growth or expansion signal":"Scale operations, multilingual support, sales and onboarding support","Market watch signal":"Executive monitoring, insight briefings, account planning"}[signal]||"Insight monitoring"}
+function signalDescription(signal){return {"AI automation signal":"Automation, agentic AI, AI infrastructure, or intelligent-assist moves that can reshape CX operations.","Regulatory or risk signal":"Legal, compliance, security, or public risk events that may create urgency for control and trust programs.","Partnership or M&A signal":"Ecosystem, acquisition, and alliance moves that may change operating models or vendor strategy.","Cost pressure signal":"Margin, restructuring, or efficiency pressure that may create transformation demand.","CX disruption signal":"Customer experience, loyalty, support, or service model shifts relevant to Concentrix offerings.","Growth or expansion signal":"Expansion and launch signals that may require scalable operating support.","Market watch signal":"General market movement worth monitoring for account context."}[signal]||"Strategic signal"}
+function priorityFor(article){let score=35;const signal=article.signal||classifySignal(article);if(signal.includes("risk"))score+=30;if(signal.includes("AI"))score+=25;if(signal.includes("Cost"))score+=18;if(signal.includes("CX"))score+=18;if(article.sentiment==="negative")score+=20;if(article.sentiment==="positive")score+=8;return Math.min(100,score)}
+function priorityLabel(score){return score>=75?"High":score>=55?"Medium":"Watch"}
+function competitorImpact(article){const signal=article.signal||classifySignal(article);if(signal.includes("AI")||signal.includes("Partnership"))return {type:"Risk",cls:"impact-risk",response:"Competitor capability may pressure Concentrix positioning. Prepare AI/CX differentiation and proof points."};if(signal.includes("risk")||article.sentiment==="negative")return {type:"Opportunity",cls:"impact-opportunity",response:"Competitor/client disruption may open a trust, quality, or operating resilience conversation."};if(signal.includes("Cost"))return {type:"Opportunity",cls:"impact-opportunity",response:"Cost pressure can support an efficiency, automation, and digital operations pitch."};return {type:"Watch",cls:"impact-watch",response:"Monitor for account relevance and possible client conversation starter."}}
+function articleListHtml(items){return `<div class="drill-list">${items.slice(0,8).map(a=>`<a class="drill-link" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">${escapeHtml(a.company)} - ${escapeHtml(a.headline)}</a>`).join("")}</div>`}
+function openStrategyDrilldown(title,summary,items){state.selectedArticle=items&&items[0]||null;state.modalText=`${title}\n\n${summary}\n\n${items.map(a=>`${a.company}: ${a.headline}`).join("\n")}`;$("modalTitle").textContent=title;$("modalDate").textContent=`${items.length} item${items.length===1?"":"s"}`;$("modalCompany").textContent=[...new Set(items.map(a=>a.company))].slice(0,3).join(", ")||"--";$("modalSource").textContent=[...new Set(items.map(a=>a.source))].slice(0,3).join(", ")||"--";$("modalSentiment").textContent="Strategy";$("modalGist").innerHTML=`${escapeHtml(summary)}${articleListHtml(items)}`;$("copyNote").textContent="";$("newsModal").classList.add("open")}
+function renderStrategy(){
+  const articles=scopedArticles();
+  $("strategyCount").textContent=`${articles.length} signal${articles.length===1?"":"s"}`;
+  if(!articles.length){
+    $("kpiOpportunity").textContent=0;$("kpiRisk").textContent=0;$("kpiAi").textContent=0;$("kpiPriority").textContent=0;
+    $("signalMix").innerHTML='<p class="muted">Refresh feeds to populate strategic signals.</p>';
+    $("actionQueue").innerHTML='<p class="muted">No actions yet.</p>';
+    $("opportunityLens").innerHTML='<p class="muted">No opportunity lens available.</p>';
+    $("heatMap").innerHTML='<p class="muted">No companies to score yet.</p>';
+    $("competitorIntel").innerHTML='<p class="muted">No competitor intelligence yet.</p>';
+    return;
+  }
+  const enriched=articles.map(a=>({...a,signal:classifySignal(a)})).map(a=>({...a,priority:priorityFor(a)}));
+  const counts={};enriched.forEach(a=>counts[a.signal]=(counts[a.signal]||0)+1);
+  const max=Math.max(...Object.values(counts));
+  $("kpiOpportunity").textContent=enriched.filter(a=>!a.signal.includes("risk")).length;
+  $("kpiRisk").textContent=enriched.filter(a=>a.signal.includes("risk")||a.sentiment==="negative").length;
+  $("kpiAi").textContent=enriched.filter(a=>a.signal.includes("AI")).length;
+  $("kpiPriority").textContent=enriched.filter(a=>a.priority>=75).length;
+  $("signalMix").innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([label,count])=>`<div class="signal-row" data-signal="${escapeHtml(label)}" title="Double-click to inspect ${escapeHtml(label)}"><div><b>${escapeHtml(label)}</b><div class="signal-desc">${escapeHtml(signalDescription(label))}</div><div class="signal-bar"><div class="signal-fill" style="width:${Math.round(count/max*100)}%"></div></div></div><span class="count">${count}</span></div>`).join("");
+  document.querySelectorAll("#signalMix .signal-row").forEach(row=>row.ondblclick=()=>{const signal=row.dataset.signal;const items=enriched.filter(a=>a.signal===signal);openStrategyDrilldown(signal,`${signalDescription(signal)} Concentrix angle: ${capabilityFor(signal)}.`,items)});
+  const top=[...enriched].sort((a,b)=>b.priority-a.priority).slice(0,8);
+  $("opportunityLens").innerHTML=`<div class="lens-list">${top.map((a,i)=>`<div class="lens-card" data-lens="${i}" title="Double-click to inspect opportunity"><b>${escapeHtml(a.company)}</b><div>${escapeHtml(a.headline)}</div><div class="lens-meta"><span class="mini-pill">${escapeHtml(a.signal)}</span><span class="mini-pill ${a.priority>=75?"priority-high":a.priority>=55?"priority-med":"priority-low"}">${priorityLabel(a.priority)} ${a.priority}</span><span class="mini-pill">${escapeHtml(a.source)}</span></div><div class="muted">Concentrix angle: ${escapeHtml(capabilityFor(a.signal))}.</div></div>`).join("")}</div>`;
+  document.querySelectorAll("#opportunityLens .lens-card").forEach(card=>card.ondblclick=()=>{const a=top[Number(card.dataset.lens)];openStrategyDrilldown(`${a.company} opportunity lens`,`Recommended angle: ${capabilityFor(a.signal)}. Suggested leader question: how can Concentrix help this client respond to this market signal?`,[a])});
+  const actions=top.slice(0,6).map((a,i)=>({idx:i,article:a,company:a.company,action:a.signal.includes("risk")?"Flag for account/risk review":a.signal.includes("AI")?"Explore AI transformation conversation":a.signal.includes("Cost")?"Position efficiency and automation levers":"Add to client opportunity discussion",detail:capabilityFor(a.signal)}));
+  $("actionQueue").innerHTML=actions.map(a=>`<div class="action-item" data-action="${a.idx}" title="Double-click to inspect action"><b>${escapeHtml(a.company)} - ${escapeHtml(a.action)}</b><span class="muted">${escapeHtml(a.detail)}</span></div>`).join("");
+  document.querySelectorAll("#actionQueue .action-item").forEach(row=>row.ondblclick=()=>{const a=actions[Number(row.dataset.action)];openStrategyDrilldown(a.action,`Suggested next step for ${a.company}: ${a.detail}. Use this as an account-planning prompt.`,[a.article])});
+  const byCompany={};
+  enriched.forEach(a=>{byCompany[a.company]??={count:0,risk:0,ai:0,opp:0,priority:0,items:[]};byCompany[a.company].count++;byCompany[a.company].items.push(a);byCompany[a.company].priority=Math.max(byCompany[a.company].priority,a.priority);if(a.signal.includes("risk")||a.sentiment==="negative")byCompany[a.company].risk++;if(a.signal.includes("AI"))byCompany[a.company].ai++;if(!a.signal.includes("risk"))byCompany[a.company].opp++});
+  $("heatMap").innerHTML=`<table class="heat-table"><thead><tr><th>Company</th><th>Signals</th><th>Opportunity</th><th>AI</th><th>Risk</th><th>Priority</th></tr></thead><tbody>${Object.entries(byCompany).sort((a,b)=>b[1].priority-a[1].priority).map(([name,v])=>`<tr data-company="${escapeHtml(name)}" title="Double-click row to inspect company"><td>${escapeHtml(name)}</td><td><span class="heat-score clickable" data-metric="signals">${v.count}</span></td><td><span class="heat-score clickable" data-metric="opportunity">${v.opp}</span></td><td><span class="heat-score heat-ai clickable" data-metric="ai">${v.ai}</span></td><td><span class="heat-score heat-risk clickable" data-metric="risk">${v.risk}</span></td><td><span class="heat-score clickable" data-metric="priority">${v.priority}</span></td></tr>`).join("")}</tbody></table>`;
+  function metricItems(group,metric){if(metric==="risk")return group.items.filter(a=>a.signal.includes("risk")||a.sentiment==="negative");if(metric==="ai")return group.items.filter(a=>a.signal.includes("AI"));if(metric==="opportunity")return group.items.filter(a=>!a.signal.includes("risk"));return group.items}
+  document.querySelectorAll("#heatMap .heat-score").forEach(cell=>cell.onclick=e=>{e.stopPropagation();const row=cell.closest("tr");const name=row.dataset.company;const metric=cell.dataset.metric;const group=byCompany[name];const items=metricItems(group,metric);openStrategyDrilldown(`${name} ${metric} drilldown`,`This shows the ${metric} articles behind the ${cell.textContent} value for ${name}.`,items)});
+  document.querySelectorAll("#heatMap tbody tr").forEach(row=>row.ondblclick=()=>{const name=row.dataset.company;const group=byCompany[name];openStrategyDrilldown(`${name} strategy heat map`,`Priority ${group.priority}. ${name} has ${group.count} signals, ${group.opp} opportunity signals, ${group.ai} AI signals, and ${group.risk} risk signals.`,group.items)});
+  const competitorRows=enriched.filter(a=>a.company.toLowerCase()!=="concentrix").sort((a,b)=>b.priority-a.priority).slice(0,10);
+  $("competitorIntel").innerHTML=competitorRows.length?`<table class="competitor-table"><thead><tr><th>Company</th><th>Move Detected</th><th>Signal</th><th>Impact</th><th>Suggested Response</th></tr></thead><tbody>${competitorRows.map((a,i)=>{const impact=competitorImpact(a);return `<tr data-compintel="${i}" title="Double-click to inspect competitor signal"><td>${escapeHtml(a.company)}</td><td>${escapeHtml(a.headline)}</td><td>${escapeHtml(a.signal)}</td><td class="${impact.cls}">${impact.type}</td><td>${escapeHtml(impact.response)}</td></tr>`}).join("")}</tbody></table>`:'<p class="muted">No non-Concentrix competitor/client signals in the current feed.</p>';
+  document.querySelectorAll("#competitorIntel tbody tr").forEach(row=>row.ondblclick=()=>{const a=competitorRows[Number(row.dataset.compintel)];const impact=competitorImpact(a);openStrategyDrilldown(`${a.company} competitor intelligence`,`${impact.type} for Concentrix: ${impact.response}`, [a])});
+}
+function renderErrors(errors){$("errorBox").innerHTML=errors&&errors.length?`<div class="error">Some feeds could not be fetched: ${errors.map(e=>escapeHtml(e.company)).join(", ")}</div>`:""}
+function renderAll(){renderWatchlist();renderTable();renderBriefing();renderStrategy()}
+async function refreshFeeds(){if(!state.companies.length){renderAll();return}state.loading=true;document.body.classList.add("loading");$("refreshBtn").textContent="…";$("refreshBtn").disabled=true;try{const res=await fetch("/api/news",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({companies:state.companies,dateRange:$("dateRange").value})});const data=await res.json();state.articles=data.articles||[];state.briefing=data.briefing||null;renderErrors(data.errors||[]);renderAll()}catch(err){$("errorBox").innerHTML=`<div class="error">Could not reach the KestrelIQ server. ${escapeHtml(err.message)}</div>`}finally{state.loading=false;document.body.classList.remove("loading");$("refreshBtn").textContent="↻";$("refreshBtn").disabled=false}}
+function addCompany(){const raw=$("companyInput").value.trim();if(!raw)return;raw.split(",").map(x=>x.trim()).filter(Boolean).forEach(name=>{if(!state.companies.some(c=>c.toLowerCase()===name.toLowerCase()))state.companies.push(name)});$("companyInput").value="";saveCompanies();renderAll()}
+function gistFor(article){const sentiment=article.sentiment==="negative"?"potential risk signal":article.sentiment==="positive"?"positive momentum signal":"neutral monitoring item";return `${article.company} appeared in ${article.source} on ${article.displayDate||"an unknown date"}. The headline is: "${article.headline}". Treat this as a ${sentiment}; review the source article for full context before taking action.`}
+function openNewsModal(article){if(!article)return;state.selectedArticle=article;state.modalText=gistFor(article);$("modalTitle").textContent=article.headline;$("modalDate").textContent=article.displayDate||"--";$("modalCompany").textContent=article.company;$("modalSource").textContent=article.source;$("modalSentiment").textContent=article.sentiment;$("modalGist").textContent=state.modalText;$("copyNote").textContent="";$("newsModal").classList.add("open")}
+function closeNewsModal(){$("newsModal").classList.remove("open")}
+function exportSettings(){const settings={version:1,exportedAt:new Date().toISOString(),companies:state.companies,dateRange:$("dateRange").value,showSentiment:$("sentimentToggle").checked};const blob=new Blob([JSON.stringify(settings,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download="kestreliq-settings.json";link.click();URL.revokeObjectURL(url)}
+function importSettings(file){const reader=new FileReader();reader.onload=()=>{try{const settings=JSON.parse(reader.result);if(!Array.isArray(settings.companies))throw new Error("No companies list found.");state.companies=[...new Set(settings.companies.map(x=>String(x).trim()).filter(Boolean))];if(settings.dateRange)$("dateRange").value=settings.dateRange;$("sentimentToggle").checked=Boolean(settings.showSentiment);saveCompanies();renderAll()}catch(err){alert(`Could not import settings: ${err.message}`)}};reader.readAsText(file)}
+function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[ch]))}
+$("addBtn").onclick=addCompany;$("companyInput").addEventListener("keydown",e=>{if(e.key==="Enter")addCompany()});$("refreshBtn").onclick=refreshFeeds;$("exportBtn").onclick=exportSettings;$("importBtn").onclick=()=>$("importFile").click();$("importFile").onchange=e=>{const file=e.target.files[0];if(file)importSettings(file);e.target.value=""};$("companyFilter").onchange=()=>{state.selectedIds.clear();renderAll()};$("searchInput").oninput=()=>{state.selectedIds.clear();renderTable()};$("sentimentToggle").onchange=renderTable;$("clearBtn").onclick=()=>{$("searchInput").value="";state.selectedIds.clear();renderTable()};$("modalClose").onclick=closeNewsModal;$("newsModal").onclick=e=>{if(e.target.id==="newsModal")closeNewsModal()};$("websiteBtn").onclick=()=>{if(state.selectedArticle)window.open(state.selectedArticle.url,"_blank","noopener")};$("copyBtn").onclick=async()=>{if(!state.modalText)return;await navigator.clipboard.writeText(state.modalText);$("copyNote").textContent="Copied"};document.addEventListener("keydown",e=>{if(e.key==="Escape")closeNewsModal()});document.querySelectorAll(".tab").forEach(btn=>btn.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));btn.classList.add("active");const view=btn.dataset.view;$("liveView").style.display=view==="live"?"grid":"none";$("briefingView").style.display=view==="briefing"?"block":"none";$("strategyView").style.display=view==="strategy"?"block":"none";$("heatmapView").style.display=view==="heatmap"?"block":"none";$("competitorView").style.display=view==="competitor"?"block":"none"});
+renderAll();
+</script>
+</body>
+</html>
