@@ -74,12 +74,19 @@ def _date_range_to_days(value):
 
 
 def _rss_url(company, days):
-    query = f'"{company}" when:{days}d'
+    company_query = _preferred_company_query(company)
+    business_context = (
+        "company OR business OR CEO OR earnings OR revenue OR partnership OR "
+        "acquisition OR AI OR customer OR launch OR investment OR lawsuit OR "
+        "regulatory OR expansion OR layoffs OR stock OR shares OR outage"
+    )
+    query = f'"{company_query}" ({business_context}) when:{days}d'
     params = urllib.parse.urlencode({
         "q": query,
         "hl": "en-IN",
         "gl": "IN",
         "ceid": "IN:en",
+        "scoring": "n",
     })
     return f"https://news.google.com/rss/search?{params}"
 
@@ -148,6 +155,88 @@ def _clean_title(value):
     return value
 
 
+def _normalize_text(value):
+    return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
+
+
+def _company_terms(company):
+    raw = (company or "").strip()
+    lower = raw.lower()
+    terms = {lower}
+    normalized = _normalize_text(raw)
+    if normalized:
+        terms.add(normalized)
+
+    aliases = {
+        "airbnb": ["airbnb", "air bnb", "airbnb inc"],
+        "airbnbinc": ["airbnb", "air bnb", "airbnb inc"],
+        "openai": ["openai", "open ai"],
+        "scotiabank": ["scotiabank", "scotia bank", "bank of nova scotia"],
+        "db": ["d&b", "dnb", "dun & bradstreet", "dun and bradstreet", "dun bradstreet"],
+        "dnb": ["d&b", "dnb", "dun & bradstreet", "dun and bradstreet", "dun bradstreet"],
+        "lloyds": ["lloyds", "lloyds banking group", "lloyds bank"],
+        "netapp": ["netapp", "net app"],
+    }
+    for alias in aliases.get(normalized, []):
+        terms.add(alias)
+        terms.add(_normalize_text(alias))
+    return {term for term in terms if term}
+
+
+def _preferred_company_query(company):
+    normalized = _normalize_text(company)
+    preferred = {
+        "airbnb": "Airbnb",
+        "airbnbinc": "Airbnb",
+        "db": "Dun & Bradstreet",
+        "dnb": "Dun & Bradstreet",
+        "openai": "OpenAI",
+        "scotiabank": "Scotiabank",
+    }
+    return preferred.get(normalized, company)
+
+
+def _has_company_term(company, text):
+    lower = (text or "").lower()
+    normalized = _normalize_text(text)
+    for term in _company_terms(company):
+        if len(term) <= 2:
+            continue
+        if term in lower or term in normalized:
+            return True
+    return False
+
+
+def _is_company_relevant(company, title, source):
+    text = f"{title} {source}"
+    if not _has_company_term(company, text):
+        return False
+
+    lower = text.lower()
+    business_words = {
+        "acquires", "acquisition", "ai", "agentic", "analyst", "appoints",
+        "banking", "business", "ceo", "cloud", "company", "contract",
+        "customer", "earnings", "executive", "expands", "funding", "growth",
+        "investment", "launches", "lawsuit", "market", "merger", "outage",
+        "partner", "partnership", "platform", "profit", "regulator",
+        "revenue", "shares", "stock", "strategy", "valuation",
+    }
+    if any(re.search(rf"\b{re.escape(word)}\b", lower) for word in business_words):
+        return True
+
+    consumer_patterns = (
+        r"\bshould i\b",
+        r"\bhow to\b",
+        r"\bbest\b",
+        r"\bguide\b",
+        r"\bclass\b",
+        r"\bbecome a host\b",
+        r"\blisting\b",
+        r"\bhomeowner\b",
+    )
+    return not any(re.search(pattern, lower) for pattern in consumer_patterns)
+
+
 def _article_id(company, title, link):
     base = f"{company}|{title}|{link}"
     return str(abs(hash(base)))
@@ -162,11 +251,14 @@ def _fetch_company_news(company, days):
     xml_bytes = _fetch_url(_rss_url(company, days))
     root = ET.fromstring(xml_bytes)
     items = []
-    for item in root.findall("./channel/item")[:25]:
+    for item in root.findall("./channel/item"):
         title = _clean_title(item.findtext("title"))
         link = item.findtext("link") or ""
+        source = _parse_google_source(item)
         published = _item_published_date(item)
         if not title or not link:
+            continue
+        if not _is_company_relevant(company, title, source):
             continue
         items.append({
             "id": _article_id(company, title, link),
@@ -175,7 +267,7 @@ def _fetch_company_news(company, days):
             "displayDate": published.strftime("%d %b %Y") if published else "",
             "displayTimeIST": published.astimezone(IST).strftime("%I:%M %p IST") if published else "",
             "publishedIST": published.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST") if published else "",
-            "source": _parse_google_source(item),
+            "source": source,
             "headline": title,
             "url": link,
             "sentiment": _sentiment(title),
