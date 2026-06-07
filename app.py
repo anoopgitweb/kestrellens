@@ -8,7 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -73,14 +73,16 @@ def _date_range_to_days(value):
     return ranges.get(value, 7)
 
 
-def _rss_url(company, days):
+def _rss_url(company, days, contextual=False):
     company_query = _preferred_company_query(company)
-    business_context = (
-        "company OR business OR CEO OR earnings OR revenue OR partnership OR "
-        "acquisition OR AI OR customer OR launch OR investment OR lawsuit OR "
-        "regulatory OR expansion OR layoffs OR stock OR shares OR outage"
-    )
-    query = f'"{company_query}" ({business_context}) when:{days}d'
+    query = f'"{company_query}" when:{days}d'
+    if contextual:
+        business_context = (
+            "company OR business OR CEO OR earnings OR revenue OR partnership OR "
+            "acquisition OR AI OR customer OR launch OR investment OR lawsuit OR "
+            "regulatory OR expansion OR layoffs OR stock OR shares OR outage"
+        )
+        query = f'"{company_query}" ({business_context}) when:{days}d'
     params = urllib.parse.urlencode({
         "q": query,
         "hl": "en-IN",
@@ -89,6 +91,13 @@ def _rss_url(company, days):
         "scoring": "n",
     })
     return f"https://news.google.com/rss/search?{params}"
+
+
+def _rss_urls(company, days):
+    return [
+        _rss_url(company, days),
+        _rss_url(company, days, contextual=True),
+    ]
 
 
 def _fetch_url(url):
@@ -147,6 +156,48 @@ def _sentiment(title):
     if negative > positive:
         return "negative"
     return "neutral"
+
+
+def _vertical(company, title):
+    normalized = _normalize_text(company)
+    company_verticals = {
+        "revolut": "BFSI",
+        "scotiabank": "BFSI",
+        "westpac": "BFSI",
+        "dhanalaxmibank": "BFSI",
+        "lloyds": "BFSI",
+        "db": "Data & Risk",
+        "dnb": "Data & Risk",
+        "dunbradstreet": "Data & Risk",
+        "cisco": "Technology",
+        "netapp": "Technology",
+        "openai": "AI & Technology",
+        "anthropic": "AI & Technology",
+        "oracle": "Technology",
+        "adobe": "Technology",
+        "accenture": "IT Services",
+        "concentrix": "CX / BPO",
+        "airbnb": "Travel & Hospitality",
+        "airbnbinc": "Travel & Hospitality",
+    }
+    if normalized in company_verticals:
+        return company_verticals[normalized]
+
+    text = f"{company} {title}".lower()
+    rules = [
+        ("BFSI", ["bank", "banking", "fintech", "insurance", "payments", "lending", "credit", "wealth"]),
+        ("Retail & Ecommerce", ["retail", "ecommerce", "commerce", "store", "shopping"]),
+        ("Travel & Hospitality", ["travel", "hotel", "airline", "hospitality", "booking", "host"]),
+        ("Healthcare", ["health", "hospital", "patient", "pharma", "medical"]),
+        ("Technology", ["software", "cloud", "cyber", "security", "data", "network", "platform"]),
+        ("AI & Technology", [" ai ", "agentic", "genai", "model", "automation", "chatbot"]),
+        ("CX / BPO", ["customer experience", "contact center", "bpo", "outsourcing", "support"]),
+    ]
+    padded = f" {text} "
+    for vertical, words in rules:
+        if any(word in padded for word in words):
+            return vertical
+    return "Market"
 
 
 def _clean_title(value):
@@ -248,30 +299,42 @@ def _fetch_company_news(company, days):
     if cached and time.time() - cached["time"] < CACHE_SECONDS:
         return cached["items"]
 
-    xml_bytes = _fetch_url(_rss_url(company, days))
-    root = ET.fromstring(xml_bytes)
     items = []
-    for item in root.findall("./channel/item"):
-        title = _clean_title(item.findtext("title"))
-        link = item.findtext("link") or ""
-        source = _parse_google_source(item)
-        published = _item_published_date(item)
-        if not title or not link:
-            continue
-        if not _is_company_relevant(company, title, source):
-            continue
-        items.append({
-            "id": _article_id(company, title, link),
-            "company": company,
-            "date": published.isoformat() if published else "",
-            "displayDate": published.strftime("%d %b %Y") if published else "",
-            "displayTimeIST": published.astimezone(IST).strftime("%I:%M %p IST") if published else "",
-            "publishedIST": published.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST") if published else "",
-            "source": source,
-            "headline": title,
-            "url": link,
-            "sentiment": _sentiment(title),
-        })
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    seen = set()
+    for url in _rss_urls(company, days):
+        xml_bytes = _fetch_url(url)
+        root = ET.fromstring(xml_bytes)
+        for item in root.findall("./channel/item"):
+            title = _clean_title(item.findtext("title"))
+            link = item.findtext("link") or ""
+            source = _parse_google_source(item)
+            published = _item_published_date(item)
+            if published and published < cutoff:
+                continue
+            if not title or not link:
+                continue
+            if not _is_company_relevant(company, title, source):
+                continue
+            key = (title.lower(), source.lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            items.append({
+                "id": _article_id(company, title, link),
+                "company": company,
+                "vertical": _vertical(company, title),
+                "date": published.isoformat() if published else "",
+                "displayDate": published.strftime("%d %b %Y") if published else "",
+                "displayTimeIST": published.astimezone(IST).strftime("%I:%M %p IST") if published else "",
+                "publishedIST": published.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST") if published else "",
+                "source": source,
+                "headline": title,
+                "url": link,
+                "sentiment": _sentiment(title),
+            })
+
+    items.sort(key=lambda item: item.get("date") or "", reverse=True)
 
     NEWS_CACHE[cache_key] = {"time": time.time(), "items": items}
     return items
