@@ -63,7 +63,6 @@
       <button id="importBtn" class="icon-btn" title="Import settings">⇧</button>
       <input id="importFile" type="file" accept="application/json,.json" hidden>
     </div>
-    <div class="top-meta"><span class="clock-stack"><span id="today"></span><span id="clockTime" class="clock-time"></span></span><span class="meta-divider"></span><span class="login-stack"><span>Signed in as</span><b>admin</b></span></div>
   </header>
   <div class="shell">
     <aside class="sidebar">
@@ -199,7 +198,7 @@ const state={companies:JSON.parse(localStorage.getItem("kestreliqCompanies")||"[
 const $=id=>document.getElementById(id);
 const fmt=new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"numeric",month:"short",year:"numeric"});
 const timeFmt=new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
-function updateClock(){const now=new Date();$("today").textContent=fmt.format(now);$("clockTime").textContent=timeFmt.format(now)}
+function updateClock(){const todayEl=$("today");const timeEl=$("clockTime");if(!todayEl||!timeEl)return;const now=new Date();todayEl.textContent=fmt.format(now);timeEl.textContent=timeFmt.format(now)}
 updateClock();setInterval(updateClock,1000);
 function saveCompanies(){localStorage.setItem("kestreliqCompanies",JSON.stringify(state.companies))}
 function renderWatchlist(){const box=$("watchlist");box.innerHTML="";if(!state.companies.length){box.innerHTML='<p class="muted">No companies yet. Add one above.</p>'}state.companies.forEach((name,i)=>{const row=document.createElement("div");row.className="watch-item";row.innerHTML=`<span class="watch-name"><span class="watch-num">${i+1}</span><span class="watch-text">${escapeHtml(name)}</span></span><button title="Remove">x</button>`;row.querySelector("button").onclick=()=>{state.companies.splice(i,1);saveCompanies();renderAll();};box.appendChild(row)});renderCompanyFilter()}
