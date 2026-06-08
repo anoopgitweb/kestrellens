@@ -73,15 +73,34 @@ def _date_range_to_days(value):
     return ranges.get(value, 7)
 
 
-def _rss_url(company, days, contextual=False):
-    company_query = _preferred_company_query(company)
+def _preferred_interest_query(interest):
+    normalized = _normalize_text(interest)
+    preferred = {
+        "claude": "Anthropic Claude AI",
+        "chatgpt": "OpenAI ChatGPT",
+        "gemini": "Google Gemini AI",
+        "grok": "xAI Grok",
+        "agenticai": "agentic AI",
+        "genai": "generative AI",
+    }
+    return preferred.get(normalized, str(interest).strip())
+
+
+def _rss_url(company, days, contextual=False, mode="companies"):
+    company_query = _preferred_company_query(company) if mode != "interests" else _preferred_interest_query(company)
     query = f'"{company_query}" when:{days}d'
     if contextual:
-        business_context = (
-            "company OR business OR CEO OR earnings OR revenue OR partnership OR "
-            "acquisition OR AI OR customer OR launch OR investment OR lawsuit OR "
-            "regulatory OR expansion OR layoffs OR stock OR shares OR outage"
-        )
+        if mode == "interests":
+            business_context = (
+                "news OR latest OR analysis OR research OR launch OR AI OR "
+                "technology OR customer OR business OR regulation OR market OR trend"
+            )
+        else:
+            business_context = (
+                "company OR business OR CEO OR earnings OR revenue OR partnership OR "
+                "acquisition OR AI OR customer OR launch OR investment OR lawsuit OR "
+                "regulatory OR expansion OR layoffs OR stock OR shares OR outage"
+            )
         query = f'"{company_query}" ({business_context}) when:{days}d'
     params = urllib.parse.urlencode({
         "q": query,
@@ -93,10 +112,10 @@ def _rss_url(company, days, contextual=False):
     return f"https://news.google.com/rss/search?{params}"
 
 
-def _rss_urls(company, days):
+def _rss_urls(company, days, mode="companies"):
     return [
-        _rss_url(company, days),
-        _rss_url(company, days, contextual=True),
+        _rss_url(company, days, mode=mode),
+        _rss_url(company, days, contextual=True, mode=mode),
     ]
 
 
@@ -288,13 +307,62 @@ def _is_company_relevant(company, title, source):
     return not any(re.search(pattern, lower) for pattern in consumer_patterns)
 
 
+def _interest_terms(interest):
+    raw = (interest or "").strip().lower()
+    terms = {raw, _normalize_text(raw)}
+    aliases = {
+        "chatgpt": ["chatgpt", "chat gpt", "openai chatgpt"],
+        "claude": ["claude", "anthropic claude"],
+        "gemini": ["gemini", "google gemini"],
+        "agenticai": ["agentic ai", "ai agents", "agentic"],
+        "genai": ["genai", "generative ai"],
+    }
+    for alias in aliases.get(_normalize_text(raw), []):
+        terms.add(alias)
+        terms.add(_normalize_text(alias))
+    return {term for term in terms if len(term) > 2}
+
+
+def _is_interest_relevant(interest, title, source):
+    text = f"{title} {source}"
+    lower = text.lower()
+    normalized = _normalize_text(text)
+    if not any(term in lower or term in normalized for term in _interest_terms(interest)):
+        return False
+
+    ai_topics = {"claude", "chatgpt", "gemini", "grok", "openai", "anthropic"}
+    ai_context = (
+        "ai", "anthropic", "openai", "google", "xai", "chatbot", "model",
+        "llm", "opus", "sonnet", "haiku", "gpt", "coding", "code",
+        "artificial intelligence", "machine learning", "agents", "agentic",
+        "api", "developer", "cybersecurity",
+    )
+    if _normalize_text(interest) in ai_topics and not any(term in lower for term in ai_context):
+        return False
+
+    noise_patterns = (
+        r"\bquiz\b",
+        r"\bmovie\b",
+        r"\bsong\b",
+        r"\bcelebrity\b",
+        r"\bhoroscope\b",
+        r"\bobituary\b",
+        r"\bfuneral\b",
+        r"\bstanley cup\b",
+        r"\bnhl\b",
+        r"\bdeath certificate\b",
+        r"\bfound dead\b",
+    )
+    return not any(re.search(pattern, lower) for pattern in noise_patterns)
+
+
 def _article_id(company, title, link):
     base = f"{company}|{title}|{link}"
     return str(abs(hash(base)))
 
 
-def _fetch_company_news(company, days):
-    cache_key = (company.lower(), days)
+def _fetch_company_news(company, days, mode="companies"):
+    cache_key = (mode, company.lower(), days)
     cached = NEWS_CACHE.get(cache_key)
     if cached and time.time() - cached["time"] < CACHE_SECONDS:
         return cached["items"]
@@ -302,7 +370,7 @@ def _fetch_company_news(company, days):
     items = []
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     seen = set()
-    for url in _rss_urls(company, days):
+    for url in _rss_urls(company, days, mode=mode):
         xml_bytes = _fetch_url(url)
         root = ET.fromstring(xml_bytes)
         for item in root.findall("./channel/item"):
@@ -314,7 +382,8 @@ def _fetch_company_news(company, days):
                 continue
             if not title or not link:
                 continue
-            if not _is_company_relevant(company, title, source):
+            relevant = _is_interest_relevant(company, title, source) if mode == "interests" else _is_company_relevant(company, title, source)
+            if not relevant:
                 continue
             key = (title.lower(), source.lower())
             if key in seen:
@@ -340,7 +409,7 @@ def _fetch_company_news(company, days):
     return items
 
 
-def _fetch_news(companies, date_range):
+def _fetch_news(companies, date_range, mode="companies"):
     days = _date_range_to_days(date_range)
     articles = []
     errors = []
@@ -349,7 +418,7 @@ def _fetch_news(companies, date_range):
         if not name:
             continue
         try:
-            articles.extend(_fetch_company_news(name, days))
+            articles.extend(_fetch_company_news(name, days, mode=mode))
         except (urllib.error.URLError, TimeoutError, ET.ParseError, OSError) as exc:
             errors.append({"company": name, "error": str(exc)})
 
@@ -417,7 +486,8 @@ class Handler(BaseHTTPRequestHandler):
             payload = _read_json(self)
             companies = payload.get("companies") or []
             date_range = payload.get("dateRange") or "7d"
-            articles, errors = _fetch_news(companies, date_range)
+            mode = payload.get("mode") or "companies"
+            articles, errors = _fetch_news(companies, date_range, mode=mode)
             _json_response(self, 200, {
                 "articles": articles,
                 "briefing": _briefing(articles),
