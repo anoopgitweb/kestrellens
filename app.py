@@ -65,6 +65,7 @@ def _read_json(handler):
 
 def _date_range_to_days(value):
     ranges = {
+        "all": None,
         "24h": 1,
         "3d": 3,
         "7d": 7,
@@ -88,7 +89,8 @@ def _preferred_interest_query(interest):
 
 def _rss_url(company, days, contextual=False, mode="companies"):
     company_query = _preferred_company_query(company) if mode != "interests" else _preferred_interest_query(company)
-    query = f'"{company_query}" when:{days}d'
+    date_clause = f" when:{days}d" if days else ""
+    query = f'"{company_query}"{date_clause}'
     if contextual:
         if mode == "interests":
             business_context = (
@@ -101,7 +103,7 @@ def _rss_url(company, days, contextual=False, mode="companies"):
                 "acquisition OR AI OR customer OR launch OR investment OR lawsuit OR "
                 "regulatory OR expansion OR layoffs OR stock OR shares OR outage"
             )
-        query = f'"{company_query}" ({business_context}) when:{days}d'
+        query = f'"{company_query}" ({business_context}){date_clause}'
     params = urllib.parse.urlencode({
         "q": query,
         "hl": "en-IN",
@@ -368,7 +370,7 @@ def _fetch_company_news(company, days, mode="companies"):
         return cached["items"]
 
     items = []
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
     seen = set()
     for url in _rss_urls(company, days, mode=mode):
         xml_bytes = _fetch_url(url)
@@ -378,7 +380,7 @@ def _fetch_company_news(company, days, mode="companies"):
             link = item.findtext("link") or ""
             source = _parse_google_source(item)
             published = _item_published_date(item)
-            if published and published < cutoff:
+            if cutoff and published and published < cutoff:
                 continue
             if not title or not link:
                 continue
