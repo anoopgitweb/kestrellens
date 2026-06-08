@@ -376,6 +376,8 @@ def _empty_scan_stats(companies, date_range, mode):
         "errorsCount": 0,
         "scanTimestamp": datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST"),
         "perTarget": [],
+        "rssUrls": [],
+        "uniqueSources": [],
         "topSources": [],
     }
 
@@ -385,7 +387,12 @@ def _fetch_company_news(company, days, mode="companies", stats=None):
     cached = NEWS_CACHE.get(cache_key)
     if cached and time.time() - cached["time"] < CACHE_SECONDS:
         if stats is not None:
-            stats["rssUrlsRequested"] += len(_rss_urls(company, days, mode=mode))
+            urls = _rss_urls(company, days, mode=mode)
+            stats["rssUrlsRequested"] += len(urls)
+            stats["rssUrls"].extend([
+                {"target": company, "type": "Baseline" if i == 0 else "Contextual", "url": url, "cacheHit": True}
+                for i, url in enumerate(urls)
+            ])
             stats["relevantItemsKept"] += len(cached["items"])
             stats["perTarget"].append({
                 "name": company,
@@ -402,9 +409,15 @@ def _fetch_company_news(company, days, mode="companies", stats=None):
     cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
     seen = set()
     target_stats = {"name": company, "rssUrls": 0, "rawItems": 0, "keptItems": 0, "sources": set(), "latestUpdate": "", "cacheHit": False}
-    for url in _rss_urls(company, days, mode=mode):
+    for index, url in enumerate(_rss_urls(company, days, mode=mode)):
         if stats is not None:
             stats["rssUrlsRequested"] += 1
+            stats["rssUrls"].append({
+                "target": company,
+                "type": "Baseline" if index == 0 else "Contextual",
+                "url": url,
+                "cacheHit": False,
+            })
         target_stats["rssUrls"] += 1
         xml_bytes = _fetch_url(url)
         root = ET.fromstring(xml_bytes)
@@ -487,6 +500,7 @@ def _fetch_news(companies, date_range, mode="companies"):
     for article in sorted_articles:
         source_counts[article.get("source") or "Unknown"] = source_counts.get(article.get("source") or "Unknown", 0) + 1
     stats["uniqueSourcesCount"] = len(source_counts)
+    stats["uniqueSources"] = [{"source": source, "count": count} for source, count in sorted(source_counts.items(), key=lambda x: x[0].lower())]
     stats["topSources"] = [{"source": source, "count": count} for source, count in sorted(source_counts.items(), key=lambda x: x[1], reverse=True)[:8]]
     stats["relevantItemsKept"] = len(sorted_articles)
     return sorted_articles, errors, stats
