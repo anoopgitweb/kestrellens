@@ -363,19 +363,55 @@ def _article_id(company, title, link):
     return str(abs(hash(base)))
 
 
-def _fetch_company_news(company, days, mode="companies"):
+def _empty_scan_stats(companies, date_range, mode):
+    return {
+        "mode": mode,
+        "dateRange": date_range,
+        "trackedCount": len([c for c in companies if str(c).strip()]),
+        "rssUrlsRequested": 0,
+        "rawItemsScanned": 0,
+        "relevantItemsKept": 0,
+        "duplicateCount": 0,
+        "uniqueSourcesCount": 0,
+        "errorsCount": 0,
+        "scanTimestamp": datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST"),
+        "perTarget": [],
+        "topSources": [],
+    }
+
+
+def _fetch_company_news(company, days, mode="companies", stats=None):
     cache_key = (mode, company.lower(), days)
     cached = NEWS_CACHE.get(cache_key)
     if cached and time.time() - cached["time"] < CACHE_SECONDS:
+        if stats is not None:
+            stats["rssUrlsRequested"] += len(_rss_urls(company, days, mode=mode))
+            stats["relevantItemsKept"] += len(cached["items"])
+            stats["perTarget"].append({
+                "name": company,
+                "rssUrls": len(_rss_urls(company, days, mode=mode)),
+                "rawItems": 0,
+                "keptItems": len(cached["items"]),
+                "sources": sorted({item.get("source", "") for item in cached["items"] if item.get("source")}),
+                "latestUpdate": cached["items"][0].get("publishedIST", "") if cached["items"] else "",
+                "cacheHit": True,
+            })
         return cached["items"]
 
     items = []
     cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
     seen = set()
+    target_stats = {"name": company, "rssUrls": 0, "rawItems": 0, "keptItems": 0, "sources": set(), "latestUpdate": "", "cacheHit": False}
     for url in _rss_urls(company, days, mode=mode):
+        if stats is not None:
+            stats["rssUrlsRequested"] += 1
+        target_stats["rssUrls"] += 1
         xml_bytes = _fetch_url(url)
         root = ET.fromstring(xml_bytes)
         for item in root.findall("./channel/item"):
+            if stats is not None:
+                stats["rawItemsScanned"] += 1
+            target_stats["rawItems"] += 1
             title = _clean_title(item.findtext("title"))
             link = item.findtext("link") or ""
             source = _parse_google_source(item)
@@ -389,8 +425,11 @@ def _fetch_company_news(company, days, mode="companies"):
                 continue
             key = (title.lower(), source.lower())
             if key in seen:
+                if stats is not None:
+                    stats["duplicateCount"] += 1
                 continue
             seen.add(key)
+            target_stats["sources"].add(source)
             items.append({
                 "id": _article_id(company, title, link),
                 "company": company,
@@ -406,6 +445,12 @@ def _fetch_company_news(company, days, mode="companies"):
             })
 
     items.sort(key=lambda item: item.get("date") or "", reverse=True)
+    target_stats["keptItems"] = len(items)
+    target_stats["latestUpdate"] = items[0].get("publishedIST", "") if items else ""
+    if stats is not None:
+        stats["relevantItemsKept"] += len(items)
+        target_stats["sources"] = sorted(target_stats["sources"])
+        stats["perTarget"].append(target_stats)
 
     NEWS_CACHE[cache_key] = {"time": time.time(), "items": items}
     return items
@@ -413,6 +458,7 @@ def _fetch_company_news(company, days, mode="companies"):
 
 def _fetch_news(companies, date_range, mode="companies"):
     days = _date_range_to_days(date_range)
+    stats = _empty_scan_stats(companies, date_range, mode)
     articles = []
     errors = []
     for company in companies:
@@ -420,13 +466,16 @@ def _fetch_news(companies, date_range, mode="companies"):
         if not name:
             continue
         try:
-            articles.extend(_fetch_company_news(name, days, mode=mode))
+            articles.extend(_fetch_company_news(name, days, mode=mode, stats=stats))
         except (urllib.error.URLError, TimeoutError, ET.ParseError, OSError) as exc:
             errors.append({"company": name, "error": str(exc)})
+            stats["errorsCount"] += 1
 
     deduped = {}
     for article in articles:
         key = (article["headline"].lower(), article["source"].lower())
+        if key in deduped:
+            stats["duplicateCount"] += 1
         deduped.setdefault(key, article)
 
     sorted_articles = sorted(
@@ -434,7 +483,13 @@ def _fetch_news(companies, date_range, mode="companies"):
         key=lambda item: item.get("date") or "",
         reverse=True,
     )
-    return sorted_articles, errors
+    source_counts = {}
+    for article in sorted_articles:
+        source_counts[article.get("source") or "Unknown"] = source_counts.get(article.get("source") or "Unknown", 0) + 1
+    stats["uniqueSourcesCount"] = len(source_counts)
+    stats["topSources"] = [{"source": source, "count": count} for source, count in sorted(source_counts.items(), key=lambda x: x[1], reverse=True)[:8]]
+    stats["relevantItemsKept"] = len(sorted_articles)
+    return sorted_articles, errors, stats
 
 
 def _briefing(articles):
@@ -489,11 +544,28 @@ class Handler(BaseHTTPRequestHandler):
             companies = payload.get("companies") or []
             date_range = payload.get("dateRange") or "7d"
             mode = payload.get("mode") or "companies"
-            articles, errors = _fetch_news(companies, date_range, mode=mode)
+            articles, errors, scan = _fetch_news(companies, date_range, mode=mode)
             _json_response(self, 200, {
                 "articles": articles,
                 "briefing": _briefing(articles),
                 "errors": errors,
+                "scan": scan,
+            })
+            return
+        if self.path == "/api/scan-test":
+            payload = _read_json(self)
+            keyword = str(payload.get("keyword") or "").strip()
+            if not keyword:
+                _json_response(self, 400, {"error": "Keyword is required."})
+                return
+            date_range = payload.get("dateRange") or "7d"
+            mode = payload.get("mode") or "interests"
+            articles, errors, scan = _fetch_news([keyword], date_range, mode=mode)
+            _json_response(self, 200, {
+                "keyword": keyword,
+                "articles": articles[:20],
+                "errors": errors,
+                "scan": scan,
             })
             return
         _json_response(self, 404, {"error": "Not found"})
