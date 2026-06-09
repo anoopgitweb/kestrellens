@@ -9,6 +9,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
+from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -131,6 +132,84 @@ def _fetch_url(url):
     )
     with urllib.request.urlopen(request, timeout=20) as response:
         return response.read()
+
+
+class _ArticleTextParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.skip_depth = 0
+        self.capture = None
+        self.current = []
+        self.title = ""
+        self.description = ""
+        self.blocks = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag in {"script", "style", "noscript", "svg", "nav", "footer", "header", "aside", "form"}:
+            self.skip_depth += 1
+            return
+        if self.skip_depth:
+            return
+        if tag == "meta":
+            key = (attrs.get("name") or attrs.get("property") or "").lower()
+            if key in {"description", "og:description", "twitter:description"} and attrs.get("content"):
+                self.description = self.description or attrs["content"].strip()
+        if tag in {"title", "h1", "h2", "p", "li"}:
+            self.capture = tag
+            self.current = []
+
+    def handle_endtag(self, tag):
+        if self.skip_depth:
+            if tag in {"script", "style", "noscript", "svg", "nav", "footer", "header", "aside", "form"}:
+                self.skip_depth = max(0, self.skip_depth - 1)
+            return
+        if tag == self.capture:
+            text = re.sub(r"\s+", " ", " ".join(self.current)).strip()
+            if text:
+                if tag == "title" and not self.title:
+                    self.title = text
+                elif len(text) > 45:
+                    self.blocks.append(text)
+            self.capture = None
+            self.current = []
+
+    def handle_data(self, data):
+        if not self.skip_depth and self.capture:
+            self.current.append(data)
+
+
+def _article_text_from_url(url, fallback_title="", fallback_source=""):
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("Only http and https article links can be viewed.")
+    raw = _fetch_url(url)
+    text = raw.decode("utf-8", errors="replace")
+    parser = _ArticleTextParser()
+    parser.feed(text)
+    seen = set()
+    blocks = []
+    for block in parser.blocks:
+        normalized = block.lower()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        blocks.append(block)
+    if not blocks and parser.description:
+        blocks.append(parser.description)
+    if not blocks and fallback_title:
+        blocks.append(fallback_title)
+    body = "\n\n".join(blocks[:12]).strip()
+    max_chars = 4500
+    truncated = len(body) > max_chars
+    if truncated:
+        body = body[:max_chars].rsplit(" ", 1)[0].strip() + "..."
+    return {
+        "title": parser.title or fallback_title or "Article text",
+        "source": fallback_source,
+        "text": body or "Readable article text was not available from this source.",
+        "truncated": truncated,
+    }
 
 
 def _parse_google_source(item):
@@ -665,6 +744,25 @@ class Handler(BaseHTTPRequestHandler):
                 "errors": errors,
                 "scan": scan,
             })
+            return
+        if self.path == "/api/article-text":
+            payload = _read_json(self)
+            url = str(payload.get("url") or "").strip()
+            if not url:
+                _json_response(self, 400, {"error": "Article URL is required."})
+                return
+            try:
+                article = _article_text_from_url(
+                    url,
+                    fallback_title=str(payload.get("headline") or ""),
+                    fallback_source=str(payload.get("source") or ""),
+                )
+                _json_response(self, 200, article)
+            except (urllib.error.URLError, TimeoutError, OSError, UnicodeError, ValueError) as exc:
+                _json_response(self, 502, {
+                    "error": "Could not fetch readable article text.",
+                    "detail": str(exc),
+                })
             return
         _json_response(self, 404, {"error": "Not found"})
 
