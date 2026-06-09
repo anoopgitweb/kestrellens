@@ -213,10 +213,40 @@ class _ArticleTextParser(HTMLParser):
             self.current.append(data)
 
 
+GOOGLE_NEWS_BOILERPLATE = "Comprehensive, up-to-date news coverage, aggregated from sources all over the world by Google News."
+
+
+def _fallback_article_preview(fallback_title="", fallback_source=""):
+    headline = (fallback_title or "Article headline unavailable").strip()
+    source = (fallback_source or "Google News feed").strip()
+    return {
+        "title": headline,
+        "source": source,
+        "text": (
+            f"{headline}\n\n"
+            f"Source: {source}\n\n"
+            "Google News RSS provides this item as a news headline and source reference. "
+            "The full publisher body text is not exposed through the RSS wrapper, so KestrelIQ is showing the article preview instead of Google's generic page description."
+        ),
+        "truncated": False,
+        "previewOnly": True,
+    }
+
+
+def _is_google_boilerplate(title, body):
+    combined = f"{title or ''} {body or ''}".strip()
+    return (
+        GOOGLE_NEWS_BOILERPLATE.lower() in combined.lower()
+        or combined.lower() == "google news"
+    )
+
+
 def _article_text_from_url(url, fallback_title="", fallback_source=""):
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in {"http", "https"}:
         raise ValueError("Only http and https article links can be viewed.")
+    if parsed.netloc.lower().endswith("news.google.com"):
+        return _fallback_article_preview(fallback_title, fallback_source)
     raw = _fetch_url(url)
     text = raw.decode("utf-8", errors="replace")
     parser = _ArticleTextParser()
@@ -229,11 +259,13 @@ def _article_text_from_url(url, fallback_title="", fallback_source=""):
             continue
         seen.add(normalized)
         blocks.append(block)
-    if not blocks and parser.description:
+    if not blocks and parser.description and not _is_google_boilerplate(parser.title, parser.description):
         blocks.append(parser.description)
     if not blocks and fallback_title:
         blocks.append(fallback_title)
     body = "\n\n".join(blocks[:12]).strip()
+    if _is_google_boilerplate(parser.title, body):
+        return _fallback_article_preview(fallback_title, fallback_source)
     max_chars = 4500
     truncated = len(body) > max_chars
     if truncated:
