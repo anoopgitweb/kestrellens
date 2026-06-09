@@ -24,6 +24,12 @@ IST = ZoneInfo("Asia/Kolkata")
 
 NEWS_CACHE = {}
 
+DEFAULT_COMPANY_KEYWORDS = [
+    "company", "business", "CEO", "earnings", "revenue", "partnership",
+    "acquisition", "AI", "customer", "launch", "investment", "lawsuit",
+    "regulatory", "expansion", "layoffs", "stock", "shares", "outage",
+]
+
 POSITIVE_WORDS = {
     "acquires", "acquisition", "award", "beats", "breakthrough", "expands",
     "growth", "launches", "partnership", "profit", "raises", "record",
@@ -88,7 +94,36 @@ def _preferred_interest_query(interest):
     return preferred.get(normalized, str(interest).strip())
 
 
-def _rss_url(company, days, contextual=False, mode="companies"):
+def _search_keywords(config, mode="companies"):
+    if mode == "interests":
+        return []
+    if isinstance(config, dict) and not config.get("useDefault", True):
+        raw_terms = config.get("terms") or []
+        terms = [str(term).strip() for term in raw_terms if str(term).strip()]
+    else:
+        terms = DEFAULT_COMPANY_KEYWORDS
+    clean = []
+    seen = set()
+    for term in terms:
+        normalized = _normalize_text(term)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        clean.append(term[:40])
+    return clean[:30] or DEFAULT_COMPANY_KEYWORDS
+
+
+def _rss_keyword_clause(config, mode="companies"):
+    parts = []
+    for term in _search_keywords(config, mode=mode):
+        safe = str(term).replace('"', "").strip()
+        if not safe:
+            continue
+        parts.append(f'"{safe}"' if re.search(r"\s", safe) else safe)
+    return " OR ".join(parts)
+
+
+def _rss_url(company, days, contextual=False, mode="companies", keyword_config=None):
     company_query = _preferred_company_query(company) if mode != "interests" else _preferred_interest_query(company)
     date_clause = f" when:{days}d" if days else ""
     query = f'"{company_query}"{date_clause}'
@@ -99,11 +134,7 @@ def _rss_url(company, days, contextual=False, mode="companies"):
                 "technology OR customer OR business OR regulation OR market OR trend"
             )
         else:
-            business_context = (
-                "company OR business OR CEO OR earnings OR revenue OR partnership OR "
-                "acquisition OR AI OR customer OR launch OR investment OR lawsuit OR "
-                "regulatory OR expansion OR layoffs OR stock OR shares OR outage"
-            )
+            business_context = _rss_keyword_clause(keyword_config, mode=mode)
         query = f'"{company_query}" ({business_context}){date_clause}'
     params = urllib.parse.urlencode({
         "q": query,
@@ -115,11 +146,14 @@ def _rss_url(company, days, contextual=False, mode="companies"):
     return f"https://news.google.com/rss/search?{params}"
 
 
-def _rss_urls(company, days, mode="companies"):
-    return [
-        _rss_url(company, days, mode=mode),
-        _rss_url(company, days, contextual=True, mode=mode),
-    ]
+def _rss_urls(company, days, mode="companies", keyword_config=None):
+    if mode == "interests":
+        return [_rss_url(company, days, mode=mode)]
+    return [_rss_url(company, days, contextual=True, mode=mode, keyword_config=keyword_config)]
+
+
+def _rss_type(index, mode):
+    return "Baseline" if mode == "interests" else "Contextual"
 
 
 def _fetch_url(url):
@@ -456,15 +490,20 @@ SCAN_THEMES = [
     ("Layoffs / Restructuring", ("layoff", "layoffs", "restructuring", "job cuts", "cuts", "cost cutting")),
 ]
 
+def _scan_terms(mode="companies", keyword_config=None):
+    if mode == "interests":
+        return SCAN_THEMES
+    return [(term, (term.lower(),)) for term in _search_keywords(keyword_config, mode=mode)]
 
-def _scan_theme_counts_template():
-    return {label: {"raw": 0, "kept": 0} for label, _ in SCAN_THEMES}
+
+def _scan_theme_counts_template(mode="companies", keyword_config=None):
+    return {label: {"raw": 0, "kept": 0} for label, _ in _scan_terms(mode, keyword_config)}
 
 
-def _scan_themes_for_title(title):
+def _scan_themes_for_title(title, mode="companies", keyword_config=None):
     text = f" {str(title or '').lower()} "
     matches = []
-    for label, keywords in SCAN_THEMES:
+    for label, keywords in _scan_terms(mode, keyword_config):
         if any(keyword in text for keyword in keywords):
             matches.append(label)
     return matches or ["Market Watch"]
@@ -491,15 +530,16 @@ def _empty_scan_stats(companies, date_range, mode):
     }
 
 
-def _fetch_company_news(company, days, mode="companies", stats=None):
-    cache_key = (mode, company.lower(), days)
+def _fetch_company_news(company, days, mode="companies", stats=None, keyword_config=None):
+    keyword_key = tuple(_search_keywords(keyword_config, mode=mode))
+    cache_key = (mode, company.lower(), days, keyword_key)
     cached = NEWS_CACHE.get(cache_key)
     if cached and time.time() - cached["time"] < CACHE_SECONDS:
         if stats is not None:
-            urls = _rss_urls(company, days, mode=mode)
+            urls = _rss_urls(company, days, mode=mode, keyword_config=keyword_config)
             stats["rssUrlsRequested"] += len(urls)
             stats["rssUrls"].extend([
-                {"target": company, "type": "Baseline" if i == 0 else "Contextual", "url": url, "cacheHit": True}
+                {"target": company, "type": _rss_type(i, mode), "url": url, "cacheHit": True}
                 for i, url in enumerate(urls)
             ])
             stats["relevantItemsKept"] += len(cached["items"])
@@ -510,14 +550,14 @@ def _fetch_company_news(company, days, mode="companies", stats=None):
                 stats["duplicateCount"] += int(cached_target.get("duplicateItems") or 0)
                 stats["perTarget"].append(cached_target)
             else:
-                theme_counts = _scan_theme_counts_template()
+                theme_counts = _scan_theme_counts_template(mode, keyword_config)
                 theme_counts["Market Watch"] = {"raw": 0, "kept": 0}
                 for item in cached["items"]:
-                    for theme in _scan_themes_for_title(item.get("headline", "")):
+                    for theme in _scan_themes_for_title(item.get("headline", ""), mode, keyword_config):
                         theme_counts.setdefault(theme, {"raw": 0, "kept": 0})["kept"] += 1
                 stats["perTarget"].append({
                     "name": company,
-                    "rssUrls": len(_rss_urls(company, days, mode=mode)),
+                    "rssUrls": len(_rss_urls(company, days, mode=mode, keyword_config=keyword_config)),
                     "rawItems": 0,
                     "keptItems": len(cached["items"]),
                     "sources": sorted({item.get("source", "") for item in cached["items"] if item.get("source")}),
@@ -539,14 +579,14 @@ def _fetch_company_news(company, days, mode="companies", stats=None):
         "sources": set(),
         "latestUpdate": "",
         "cacheHit": False,
-        "themeCounts": {**_scan_theme_counts_template(), "Market Watch": {"raw": 0, "kept": 0}},
+        "themeCounts": {**_scan_theme_counts_template(mode, keyword_config), "Market Watch": {"raw": 0, "kept": 0}},
     }
-    for index, url in enumerate(_rss_urls(company, days, mode=mode)):
+    for index, url in enumerate(_rss_urls(company, days, mode=mode, keyword_config=keyword_config)):
         if stats is not None:
             stats["rssUrlsRequested"] += 1
             stats["rssUrls"].append({
                 "target": company,
-                "type": "Baseline" if index == 0 else "Contextual",
+                "type": _rss_type(index, mode),
                 "url": url,
                 "cacheHit": False,
             })
@@ -558,7 +598,7 @@ def _fetch_company_news(company, days, mode="companies", stats=None):
                 stats["rawItemsScanned"] += 1
             target_stats["rawItems"] += 1
             title = _clean_title(item.findtext("title"))
-            raw_themes = _scan_themes_for_title(title)
+            raw_themes = _scan_themes_for_title(title, mode, keyword_config)
             for theme in raw_themes:
                 target_stats["themeCounts"].setdefault(theme, {"raw": 0, "kept": 0})["raw"] += 1
             link = item.findtext("link") or ""
@@ -607,7 +647,7 @@ def _fetch_company_news(company, days, mode="companies", stats=None):
     return items
 
 
-def _fetch_news(companies, date_range, mode="companies"):
+def _fetch_news(companies, date_range, mode="companies", keyword_config=None):
     days = _date_range_to_days(date_range)
     stats = _empty_scan_stats(companies, date_range, mode)
     articles = []
@@ -617,7 +657,7 @@ def _fetch_news(companies, date_range, mode="companies"):
         if not name:
             continue
         try:
-            articles.extend(_fetch_company_news(name, days, mode=mode, stats=stats))
+            articles.extend(_fetch_company_news(name, days, mode=mode, stats=stats, keyword_config=keyword_config))
         except (urllib.error.URLError, TimeoutError, ET.ParseError, OSError) as exc:
             errors.append({"company": name, "error": str(exc)})
             stats["errorsCount"] += 1
@@ -721,7 +761,8 @@ class Handler(BaseHTTPRequestHandler):
             companies = payload.get("companies") or []
             date_range = payload.get("dateRange") or "7d"
             mode = payload.get("mode") or "companies"
-            articles, errors, scan = _fetch_news(companies, date_range, mode=mode)
+            keyword_config = payload.get("keywordConfig") or {}
+            articles, errors, scan = _fetch_news(companies, date_range, mode=mode, keyword_config=keyword_config)
             _json_response(self, 200, {
                 "articles": articles,
                 "briefing": _briefing(articles),
@@ -737,7 +778,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             date_range = payload.get("dateRange") or "7d"
             mode = payload.get("mode") or "interests"
-            articles, errors, scan = _fetch_news([keyword], date_range, mode=mode)
+            keyword_config = payload.get("keywordConfig") or {}
+            articles, errors, scan = _fetch_news([keyword], date_range, mode=mode, keyword_config=keyword_config)
             _json_response(self, 200, {
                 "keyword": keyword,
                 "articles": articles[:20],
