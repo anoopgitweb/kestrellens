@@ -363,6 +363,34 @@ def _article_id(company, title, link):
     return str(abs(hash(base)))
 
 
+SCAN_THEMES = [
+    ("CEO / Leadership", ("ceo", "chief executive", "executive", "leader", "leadership", "cto", "cfo", "chairman")),
+    ("Earnings / Revenue", ("earnings", "revenue", "profit", "loss", "quarter", "q1", "q2", "q3", "q4", "results")),
+    ("Partnership", ("partnership", "partner", "alliance", "collaboration", "teams up")),
+    ("Acquisition / M&A", ("acquisition", "acquires", "acquire", "merger", "m&a", "deal", "takeover")),
+    ("AI / Technology", (" ai ", "artificial intelligence", "agentic", "automation", "technology", "cloud", "data")),
+    ("Customer / CX", ("customer", "client", "experience", "service", "support", "outage", "complaint")),
+    ("Launch / Product", ("launch", "launches", "unveils", "introduces", "rolls out", "product", "platform")),
+    ("Investment / Funding", ("investment", "invests", "funding", "raises", "valuation", "stake", "shares", "stock")),
+    ("Risk / Regulatory", ("lawsuit", "regulatory", "regulator", "probe", "fine", "breach", "risk", "warning")),
+    ("Expansion / Growth", ("expansion", "expands", "growth", "market", "opens", "new business", "international")),
+    ("Layoffs / Restructuring", ("layoff", "layoffs", "restructuring", "job cuts", "cuts", "cost cutting")),
+]
+
+
+def _scan_theme_counts_template():
+    return {label: {"raw": 0, "kept": 0} for label, _ in SCAN_THEMES}
+
+
+def _scan_themes_for_title(title):
+    text = f" {str(title or '').lower()} "
+    matches = []
+    for label, keywords in SCAN_THEMES:
+        if any(keyword in text for keyword in keywords):
+            matches.append(label)
+    return matches or ["Market Watch"]
+
+
 def _empty_scan_stats(companies, date_range, mode):
     return {
         "mode": mode,
@@ -379,6 +407,8 @@ def _empty_scan_stats(companies, date_range, mode):
         "rssUrls": [],
         "uniqueSources": [],
         "topSources": [],
+        "keywordBreakdown": [],
+        "keywordTotals": [],
     }
 
 
@@ -394,21 +424,44 @@ def _fetch_company_news(company, days, mode="companies", stats=None):
                 for i, url in enumerate(urls)
             ])
             stats["relevantItemsKept"] += len(cached["items"])
-            stats["perTarget"].append({
-                "name": company,
-                "rssUrls": len(_rss_urls(company, days, mode=mode)),
-                "rawItems": 0,
-                "keptItems": len(cached["items"]),
-                "sources": sorted({item.get("source", "") for item in cached["items"] if item.get("source")}),
-                "latestUpdate": cached["items"][0].get("publishedIST", "") if cached["items"] else "",
-                "cacheHit": True,
-            })
+            cached_target = dict(cached.get("targetStats") or {})
+            if cached_target:
+                cached_target["cacheHit"] = True
+                stats["rawItemsScanned"] += int(cached_target.get("rawItems") or 0)
+                stats["duplicateCount"] += int(cached_target.get("duplicateItems") or 0)
+                stats["perTarget"].append(cached_target)
+            else:
+                theme_counts = _scan_theme_counts_template()
+                theme_counts["Market Watch"] = {"raw": 0, "kept": 0}
+                for item in cached["items"]:
+                    for theme in _scan_themes_for_title(item.get("headline", "")):
+                        theme_counts.setdefault(theme, {"raw": 0, "kept": 0})["kept"] += 1
+                stats["perTarget"].append({
+                    "name": company,
+                    "rssUrls": len(_rss_urls(company, days, mode=mode)),
+                    "rawItems": 0,
+                    "keptItems": len(cached["items"]),
+                    "sources": sorted({item.get("source", "") for item in cached["items"] if item.get("source")}),
+                    "latestUpdate": cached["items"][0].get("publishedIST", "") if cached["items"] else "",
+                    "cacheHit": True,
+                    "themeCounts": theme_counts,
+                })
         return cached["items"]
 
     items = []
     cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
     seen = set()
-    target_stats = {"name": company, "rssUrls": 0, "rawItems": 0, "keptItems": 0, "sources": set(), "latestUpdate": "", "cacheHit": False}
+    target_stats = {
+        "name": company,
+        "rssUrls": 0,
+        "rawItems": 0,
+        "keptItems": 0,
+        "duplicateItems": 0,
+        "sources": set(),
+        "latestUpdate": "",
+        "cacheHit": False,
+        "themeCounts": {**_scan_theme_counts_template(), "Market Watch": {"raw": 0, "kept": 0}},
+    }
     for index, url in enumerate(_rss_urls(company, days, mode=mode)):
         if stats is not None:
             stats["rssUrlsRequested"] += 1
@@ -426,6 +479,9 @@ def _fetch_company_news(company, days, mode="companies", stats=None):
                 stats["rawItemsScanned"] += 1
             target_stats["rawItems"] += 1
             title = _clean_title(item.findtext("title"))
+            raw_themes = _scan_themes_for_title(title)
+            for theme in raw_themes:
+                target_stats["themeCounts"].setdefault(theme, {"raw": 0, "kept": 0})["raw"] += 1
             link = item.findtext("link") or ""
             source = _parse_google_source(item)
             published = _item_published_date(item)
@@ -440,8 +496,11 @@ def _fetch_company_news(company, days, mode="companies", stats=None):
             if key in seen:
                 if stats is not None:
                     stats["duplicateCount"] += 1
+                target_stats["duplicateItems"] += 1
                 continue
             seen.add(key)
+            for theme in raw_themes:
+                target_stats["themeCounts"].setdefault(theme, {"raw": 0, "kept": 0})["kept"] += 1
             target_stats["sources"].add(source)
             items.append({
                 "id": _article_id(company, title, link),
@@ -460,12 +519,12 @@ def _fetch_company_news(company, days, mode="companies", stats=None):
     items.sort(key=lambda item: item.get("date") or "", reverse=True)
     target_stats["keptItems"] = len(items)
     target_stats["latestUpdate"] = items[0].get("publishedIST", "") if items else ""
+    target_stats["sources"] = sorted(target_stats["sources"])
     if stats is not None:
         stats["relevantItemsKept"] += len(items)
-        target_stats["sources"] = sorted(target_stats["sources"])
         stats["perTarget"].append(target_stats)
 
-    NEWS_CACHE[cache_key] = {"time": time.time(), "items": items}
+    NEWS_CACHE[cache_key] = {"time": time.time(), "items": items, "targetStats": target_stats}
     return items
 
 
@@ -503,6 +562,31 @@ def _fetch_news(companies, date_range, mode="companies"):
     stats["uniqueSources"] = [{"source": source, "count": count} for source, count in sorted(source_counts.items(), key=lambda x: x[0].lower())]
     stats["topSources"] = [{"source": source, "count": count} for source, count in sorted(source_counts.items(), key=lambda x: x[1], reverse=True)[:8]]
     stats["relevantItemsKept"] = len(sorted_articles)
+    breakdown = []
+    totals = {}
+    for target in stats["perTarget"]:
+        for theme, counts in (target.get("themeCounts") or {}).items():
+            raw = int(counts.get("raw") or 0)
+            kept = int(counts.get("kept") or 0)
+            if not raw and not kept:
+                continue
+            breakdown.append({
+                "target": target.get("name", ""),
+                "theme": theme,
+                "raw": raw,
+                "kept": kept,
+            })
+            totals.setdefault(theme, {"raw": 0, "kept": 0})
+            totals[theme]["raw"] += raw
+            totals[theme]["kept"] += kept
+    stats["keywordBreakdown"] = sorted(
+        breakdown,
+        key=lambda row: (str(row["target"]).lower(), -row["kept"], -row["raw"], str(row["theme"]).lower()),
+    )
+    stats["keywordTotals"] = [
+        {"theme": theme, "raw": counts["raw"], "kept": counts["kept"]}
+        for theme, counts in sorted(totals.items(), key=lambda x: (-x[1]["kept"], -x[1]["raw"], x[0].lower()))
+    ]
     return sorted_articles, errors, stats
 
 
