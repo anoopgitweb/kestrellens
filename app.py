@@ -46,6 +46,9 @@ def _json_response(handler, status, payload):
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))
+    handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+    handler.send_header("Pragma", "no-cache")
+    handler.send_header("Expires", "0")
     handler.send_header("Access-Control-Allow-Origin", "*")
     handler.send_header("Access-Control-Allow-Headers", "Content-Type")
     handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -58,6 +61,9 @@ def _html_response(handler, status, text):
     handler.send_response(status)
     handler.send_header("Content-Type", "text/html; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))
+    handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+    handler.send_header("Pragma", "no-cache")
+    handler.send_header("Expires", "0")
     handler.end_headers()
     handler.wfile.write(body)
 
@@ -216,6 +222,20 @@ class _ArticleTextParser(HTMLParser):
 GOOGLE_NEWS_BOILERPLATE = "Comprehensive, up-to-date news coverage, aggregated from sources all over the world by Google News."
 
 
+def _clean_rss_summary(value="", title=""):
+    text = html.unescape(str(value or ""))
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text or _is_google_boilerplate(title, text):
+        return ""
+    title_text = re.sub(r"\s+", " ", str(title or "")).strip()
+    if title_text and text.lower().startswith(title_text.lower()):
+        text = text[len(title_text):].lstrip(" .:-")
+    if len(text) < 45:
+        return ""
+    return text[:520].rsplit(" ", 1)[0].strip()
+
+
 def _fallback_article_preview(fallback_title="", fallback_source=""):
     headline = (fallback_title or "Article headline unavailable").strip()
     source = (fallback_source or "Google News feed").strip()
@@ -340,6 +360,80 @@ def _article_text_from_url(url, fallback_title="", fallback_source=""):
         "truncated": truncated,
         "resolvedUrl": url,
     }
+
+
+EXECUTIVE_SUMMARY_PROMPT = """You are an Executive Communications Assistant for business users.
+
+Review the provided KestrelIQ briefing text, extract the most important factual insights, and generate a polished, concise, VP-ready executive summary.
+
+Use only factual, verifiable information from the provided text. Do not invent or assume details, metrics, dates, conclusions, or strategic claims. Do not include raw extraction text. If the file content is unclear or cannot be extracted, respond exactly with: Sorry, I cannot find the answer. Can you please ask in a different way?
+
+Use this structure:
+Title: Executive Summary: [Document Topic or Company Name]
+
+Section 1: Executive Summary
+- 3 to 5 short paragraphs in VP-ready language
+
+Section 2: Key Messages for Leadership
+- 3 to 5 bullet points
+
+Section 3: Distinct News
+- 5 to 7 news in a clear table format with date (DD/MM/YYYY, HH:MM:SS) and source
+
+Section 4: New Launches/Acquisitions/Partnerships
+- 5 to 7 news related to new launches, acquisitions, or partnerships in a clear table format with date (DD/MM/YYYY, HH:MM:SS) and source
+
+Section 5: Recommended VP Takeaway
+- 1 short paragraph with the main leadership takeaway
+
+Return clean HTML only, using h1, h2, p, ul, li, and table tags. Keep the tone professional, concise, polished, and leadership-ready.
+"""
+
+
+def _call_openai_summary(api_key, document_text):
+    body = json.dumps({
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": EXECUTIVE_SUMMARY_PROMPT},
+            {"role": "user", "content": document_text[:60000]},
+        ],
+        "temperature": 0.2,
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/chat/completions",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=90) as response:
+        payload = json.loads(response.read().decode("utf-8", errors="replace"))
+    return payload["choices"][0]["message"]["content"]
+
+
+def _call_claude_summary(api_key, document_text):
+    body = json.dumps({
+        "model": "claude-3-5-sonnet-20241022",
+        "max_tokens": 3500,
+        "temperature": 0.2,
+        "system": EXECUTIVE_SUMMARY_PROMPT,
+        "messages": [{"role": "user", "content": document_text[:60000]}],
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=body,
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=90) as response:
+        payload = json.loads(response.read().decode("utf-8", errors="replace"))
+    return "\n".join(part.get("text", "") for part in payload.get("content", []) if part.get("type") == "text").strip()
 
 
 def _parse_google_source(item):
@@ -694,6 +788,7 @@ def _fetch_company_news(company, days, mode="companies", stats=None, keyword_con
                 stats["rawItemsScanned"] += 1
             target_stats["rawItems"] += 1
             title = _clean_title(item.findtext("title"))
+            rss_summary = _clean_rss_summary(item.findtext("description"), title)
             raw_themes = _scan_themes_for_title(title, mode, keyword_config)
             for theme in raw_themes:
                 target_stats["themeCounts"].setdefault(theme, {"raw": 0, "kept": 0})["raw"] += 1
@@ -727,6 +822,7 @@ def _fetch_company_news(company, days, mode="companies", stats=None, keyword_con
                 "publishedIST": published.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST") if published else "",
                 "source": source,
                 "headline": title,
+                "articleSummary": rss_summary,
                 "url": link,
                 "sentiment": _sentiment(title),
                 "scanThemes": raw_themes,
@@ -900,6 +996,32 @@ class Handler(BaseHTTPRequestHandler):
             except (urllib.error.URLError, TimeoutError, OSError, UnicodeError, ValueError) as exc:
                 _json_response(self, 502, {
                     "error": "Could not fetch readable article text.",
+                    "detail": str(exc),
+                })
+            return
+        if self.path == "/api/executive-summary":
+            payload = _read_json(self)
+            provider = str(payload.get("provider") or "").strip().lower()
+            api_key = str(payload.get("apiKey") or "").strip()
+            document_text = str(payload.get("documentText") or "").strip()
+            if provider not in {"openai", "claude"}:
+                _json_response(self, 400, {"error": "Provider must be openai or claude."})
+                return
+            if not api_key:
+                _json_response(self, 400, {"error": "API key is required."})
+                return
+            if len(document_text) < 200:
+                _json_response(self, 400, {"error": "Briefing text is too short to summarize."})
+                return
+            try:
+                if provider == "openai":
+                    summary_html = _call_openai_summary(api_key, document_text)
+                else:
+                    summary_html = _call_claude_summary(api_key, document_text)
+                _json_response(self, 200, {"summaryHtml": summary_html})
+            except (urllib.error.URLError, TimeoutError, OSError, KeyError, IndexError, json.JSONDecodeError) as exc:
+                _json_response(self, 502, {
+                    "error": "Could not generate the executive summary.",
                     "detail": str(exc),
                 })
             return
