@@ -156,12 +156,12 @@ def _rss_type(index, mode):
     return "Baseline" if mode == "interests" else "Contextual"
 
 
-def _fetch_url(url):
+def _fetch_url(url, accept="application/rss+xml, application/xml, text/xml, text/html"):
     request = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "KestrelIQ/1.0 (+local executive intelligence app)",
-            "Accept": "application/rss+xml, application/xml, text/xml",
+            "User-Agent": "Mozilla/5.0 (compatible; KestrelIQ/1.0; +local executive intelligence app)",
+            "Accept": accept,
         },
     )
     with urllib.request.urlopen(request, timeout=20) as response:
@@ -241,13 +241,76 @@ def _is_google_boilerplate(title, body):
     )
 
 
+def _resolve_google_news_url(url):
+    parsed = urllib.parse.urlparse(url)
+    if not parsed.netloc.lower().endswith("news.google.com"):
+        return url
+    html_text = _fetch_url(url, accept="text/html, application/xhtml+xml").decode("utf-8", errors="replace")
+    match = re.search(
+        r'data-n-a-id="([^"]+)"\s+data-n-a-ts="([^"]+)"\s+data-n-a-sg="([^"]+)"',
+        html_text,
+    )
+    if not match:
+        return ""
+    article_id, timestamp, signature = match.groups()
+    request_args = [
+        "garturlreq",
+        [
+            [
+                "en-IN", "IN", ["FINANCE_TOP_INDICES", "WEB_TEST_1_0_0"],
+                None, None, 1, 1, "IN:en", None, 180,
+                None, None, None, None, None, 0, None, None,
+                [1608992183, 723341000],
+            ],
+            "en-IN", "IN", 1, [2, 3, 4, 8], 1, 0,
+            "655000234", 0, 0, None, 0,
+        ],
+        article_id,
+        int(timestamp),
+        signature,
+    ]
+    rpc_payload = [[[
+        "Fbv4je",
+        json.dumps(request_args, separators=(",", ":")),
+        None,
+        "generic",
+    ]]]
+    data = urllib.parse.urlencode({
+        "f.req": json.dumps(rpc_payload, separators=(",", ":")),
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        "https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je",
+        data=data,
+        headers={
+            "User-Agent": "Mozilla/5.0 (compatible; KestrelIQ/1.0)",
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "Accept": "application/json, text/plain, */*",
+        },
+    )
+    response_text = urllib.request.urlopen(request, timeout=20).read().decode("utf-8", errors="replace")
+    json_line = next((line for line in response_text.splitlines() if line.startswith("[[")), "")
+    if not json_line:
+        return ""
+    outer = json.loads(json_line)
+    inner = json.loads(outer[0][2])
+    resolved = inner[1] if len(inner) > 1 else ""
+    return resolved if str(resolved).startswith(("http://", "https://")) else ""
+
+
 def _article_text_from_url(url, fallback_title="", fallback_source=""):
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in {"http", "https"}:
         raise ValueError("Only http and https article links can be viewed.")
     if parsed.netloc.lower().endswith("news.google.com"):
-        return _fallback_article_preview(fallback_title, fallback_source)
-    raw = _fetch_url(url)
+        try:
+            resolved = _resolve_google_news_url(url)
+            if resolved:
+                url = resolved
+            else:
+                return _fallback_article_preview(fallback_title, fallback_source)
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError, IndexError, TypeError):
+            return _fallback_article_preview(fallback_title, fallback_source)
+    raw = _fetch_url(url, accept="text/html, application/xhtml+xml")
     text = raw.decode("utf-8", errors="replace")
     parser = _ArticleTextParser()
     parser.feed(text)
@@ -275,6 +338,7 @@ def _article_text_from_url(url, fallback_title="", fallback_source=""):
         "source": fallback_source,
         "text": body or "Readable article text was not available from this source.",
         "truncated": truncated,
+        "resolvedUrl": url,
     }
 
 
@@ -665,6 +729,7 @@ def _fetch_company_news(company, days, mode="companies", stats=None, keyword_con
                 "headline": title,
                 "url": link,
                 "sentiment": _sentiment(title),
+                "scanThemes": raw_themes,
             })
 
     items.sort(key=lambda item: item.get("date") or "", reverse=True)
