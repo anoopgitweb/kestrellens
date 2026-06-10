@@ -3,6 +3,7 @@ import html
 import json
 import os
 import re
+import socket
 import time
 import urllib.error
 import urllib.parse
@@ -23,6 +24,17 @@ CACHE_SECONDS = 15 * 60
 IST = ZoneInfo("Asia/Kolkata")
 
 NEWS_CACHE = {}
+
+_ORIGINAL_GETADDRINFO = socket.getaddrinfo
+
+
+def _prefer_ipv4_getaddrinfo(*args, **kwargs):
+    results = _ORIGINAL_GETADDRINFO(*args, **kwargs)
+    ipv4 = [item for item in results if item[0] == socket.AF_INET]
+    return ipv4 or results
+
+
+socket.getaddrinfo = _prefer_ipv4_getaddrinfo
 
 DEFAULT_COMPANY_KEYWORDS = [
     "company", "business", "CEO", "earnings", "revenue", "partnership",
@@ -155,14 +167,19 @@ def _rss_url(company, days, contextual=False, mode="companies", keyword_config=N
 def _rss_urls(company, days, mode="companies", keyword_config=None):
     if mode == "interests":
         return [_rss_url(company, days, mode=mode)]
-    return [_rss_url(company, days, contextual=True, mode=mode, keyword_config=keyword_config)]
+    return [
+        _rss_url(company, days, contextual=True, mode=mode, keyword_config=keyword_config),
+        _rss_url(company, days, contextual=False, mode=mode, keyword_config=keyword_config),
+    ]
 
 
 def _rss_type(index, mode):
-    return "Baseline" if mode == "interests" else "Contextual"
+    if mode == "interests":
+        return "Baseline"
+    return "Contextual" if index == 0 else "Baseline fallback"
 
 
-def _fetch_url(url, accept="application/rss+xml, application/xml, text/xml, text/html"):
+def _fetch_url(url, accept="application/rss+xml, application/xml, text/xml, text/html", timeout=10):
     request = urllib.request.Request(
         url,
         headers={
@@ -170,7 +187,7 @@ def _fetch_url(url, accept="application/rss+xml, application/xml, text/xml, text
             "Accept": accept,
         },
     )
-    with urllib.request.urlopen(request, timeout=20) as response:
+    with urllib.request.urlopen(request, timeout=timeout) as response:
         return response.read()
 
 
@@ -771,7 +788,9 @@ def _fetch_company_news(company, days, mode="companies", stats=None, keyword_con
         "cacheHit": False,
         "themeCounts": {**_scan_theme_counts_template(mode, keyword_config), "Market Watch": {"raw": 0, "kept": 0}},
     }
-    for index, url in enumerate(_rss_urls(company, days, mode=mode, keyword_config=keyword_config)):
+    urls = _rss_urls(company, days, mode=mode, keyword_config=keyword_config)
+    last_fetch_error = None
+    for index, url in enumerate(urls):
         if stats is not None:
             stats["rssUrlsRequested"] += 1
             stats["rssUrls"].append({
@@ -781,8 +800,16 @@ def _fetch_company_news(company, days, mode="companies", stats=None, keyword_con
                 "cacheHit": False,
             })
         target_stats["rssUrls"] += 1
-        xml_bytes = _fetch_url(url)
-        root = ET.fromstring(xml_bytes)
+        try:
+            xml_bytes = _fetch_url(url, timeout=8)
+            root = ET.fromstring(xml_bytes)
+        except (urllib.error.URLError, TimeoutError, ET.ParseError, OSError) as exc:
+            last_fetch_error = exc
+            if index < len(urls) - 1:
+                continue
+            if not items:
+                raise
+            break
         for item in root.findall("./channel/item"):
             if stats is not None:
                 stats["rawItemsScanned"] += 1
@@ -827,6 +854,9 @@ def _fetch_company_news(company, days, mode="companies", stats=None, keyword_con
                 "sentiment": _sentiment(title),
                 "scanThemes": raw_themes,
             })
+
+    if last_fetch_error and not items:
+        raise last_fetch_error
 
     items.sort(key=lambda item: item.get("date") or "", reverse=True)
     target_stats["keptItems"] = len(items)
