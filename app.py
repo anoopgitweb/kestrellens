@@ -1,4 +1,4 @@
-import email.utils
+﻿import email.utils
 import html
 import json
 import os
@@ -192,6 +192,9 @@ def _fetch_url(url, accept="application/rss+xml, application/xml, text/xml, text
 
 
 class _ArticleTextParser(HTMLParser):
+    BLOCK_TAGS = {"title", "h1", "h2", "h3", "p", "li", "blockquote", "figcaption"}
+    SKIP_TAGS = {"style", "noscript", "svg", "nav", "footer", "header", "aside", "form", "iframe"}
+
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.skip_depth = 0
@@ -200,10 +203,19 @@ class _ArticleTextParser(HTMLParser):
         self.title = ""
         self.description = ""
         self.blocks = []
+        self.json_ld = []
+        self._script_type = ""
+        self._script_data = []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-        if tag in {"script", "style", "noscript", "svg", "nav", "footer", "header", "aside", "form"}:
+        if tag == "script":
+            self._script_type = (attrs.get("type") or "").lower()
+            self._script_data = []
+            if self._script_type != "application/ld+json":
+                self.skip_depth += 1
+            return
+        if tag in self.SKIP_TAGS:
             self.skip_depth += 1
             return
         if self.skip_depth:
@@ -211,29 +223,124 @@ class _ArticleTextParser(HTMLParser):
         if tag == "meta":
             key = (attrs.get("name") or attrs.get("property") or "").lower()
             if key in {"description", "og:description", "twitter:description"} and attrs.get("content"):
-                self.description = self.description or attrs["content"].strip()
-        if tag in {"title", "h1", "h2", "p", "li"}:
+                self.description = self.description or _clean_article_block(attrs["content"])
+        if tag in self.BLOCK_TAGS:
             self.capture = tag
             self.current = []
 
     def handle_endtag(self, tag):
+        if tag == "script":
+            if self._script_type == "application/ld+json":
+                data = "".join(self._script_data).strip()
+                if data:
+                    self.json_ld.append(data)
+                self._script_type = ""
+                self._script_data = []
+                return
+            if self.skip_depth:
+                self.skip_depth = max(0, self.skip_depth - 1)
+                return
         if self.skip_depth:
-            if tag in {"script", "style", "noscript", "svg", "nav", "footer", "header", "aside", "form"}:
+            if tag in self.SKIP_TAGS:
                 self.skip_depth = max(0, self.skip_depth - 1)
             return
         if tag == self.capture:
-            text = re.sub(r"\s+", " ", " ".join(self.current)).strip()
+            text = _clean_article_block(" ".join(self.current))
             if text:
                 if tag == "title" and not self.title:
                     self.title = text
-                elif len(text) > 45:
+                elif len(text) > 35:
                     self.blocks.append(text)
             self.capture = None
             self.current = []
 
     def handle_data(self, data):
+        if self._script_type == "application/ld+json":
+            self._script_data.append(data)
+            return
         if not self.skip_depth and self.capture:
             self.current.append(data)
+
+
+def _clean_article_block(value):
+    text = html.unescape(str(value or ""))
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _json_ld_type(value):
+    raw = value.get("@type") if isinstance(value, dict) else ""
+    if isinstance(raw, list):
+        return " ".join(str(item) for item in raw).lower()
+    return str(raw or "").lower()
+
+
+def _json_ld_text_candidates(value):
+    candidates = []
+    if isinstance(value, dict):
+        graph = value.get("@graph")
+        if isinstance(graph, list):
+            for item in graph:
+                candidates.extend(_json_ld_text_candidates(item))
+        ld_type = _json_ld_type(value)
+        article_like = any(kind in ld_type for kind in ("article", "newsarticle", "blogposting", "report"))
+        for key in ("articleBody", "description", "headline"):
+            item = value.get(key)
+            if isinstance(item, str) and (article_like or key == "articleBody"):
+                cleaned = _clean_article_block(item)
+                if len(cleaned) > 45:
+                    candidates.append(cleaned)
+        main = value.get("mainEntity") or value.get("mainEntityOfPage")
+        if isinstance(main, (dict, list)):
+            candidates.extend(_json_ld_text_candidates(main))
+    elif isinstance(value, list):
+        for item in value:
+            candidates.extend(_json_ld_text_candidates(item))
+    return candidates
+
+
+def _extract_json_ld_blocks(parser):
+    blocks = []
+    for raw in parser.json_ld:
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        blocks.extend(_json_ld_text_candidates(payload))
+    return blocks
+
+
+ARTICLE_NOISE_PATTERNS = (
+    "subscribe", "sign up", "newsletter", "advertisement", "cookies", "privacy policy",
+    "all rights reserved", "terms of use", "enable javascript", "share this article",
+    "read more", "follow us", "download our app", "skip to", "comments", "login",
+)
+
+
+def _is_article_noise(block):
+    lower = block.lower()
+    if len(block) < 36:
+        return True
+    if _is_google_boilerplate("", block):
+        return True
+    if any(pattern in lower for pattern in ARTICLE_NOISE_PATTERNS) and len(block) < 180:
+        return True
+    return False
+
+
+def _dedupe_article_blocks(blocks):
+    seen = set()
+    clean = []
+    for block in blocks:
+        value = _clean_article_block(block)
+        if not value or _is_article_noise(value):
+            continue
+        normalized = re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        clean.append(value)
+    return clean
 
 
 GOOGLE_NEWS_BOILERPLATE = "Comprehensive, up-to-date news coverage, aggregated from sources all over the world by Google News."
@@ -338,11 +445,13 @@ def _article_text_from_url(url, fallback_title="", fallback_source=""):
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in {"http", "https"}:
         raise ValueError("Only http and https article links can be viewed.")
+    extraction_method = "publisher-html"
     if parsed.netloc.lower().endswith("news.google.com"):
         try:
             resolved = _resolve_google_news_url(url)
             if resolved:
                 url = resolved
+                extraction_method = "google-news-resolved"
             else:
                 return _fallback_article_preview(fallback_title, fallback_source)
         except (urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError, IndexError, TypeError):
@@ -351,22 +460,18 @@ def _article_text_from_url(url, fallback_title="", fallback_source=""):
     text = raw.decode("utf-8", errors="replace")
     parser = _ArticleTextParser()
     parser.feed(text)
-    seen = set()
-    blocks = []
-    for block in parser.blocks:
-        normalized = block.lower()
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        blocks.append(block)
+    json_ld_blocks = _extract_json_ld_blocks(parser)
+    blocks = _dedupe_article_blocks(json_ld_blocks + parser.blocks)
     if not blocks and parser.description and not _is_google_boilerplate(parser.title, parser.description):
         blocks.append(parser.description)
+        extraction_method = "meta-description"
     if not blocks and fallback_title:
         blocks.append(fallback_title)
-    body = "\n\n".join(blocks[:12]).strip()
+        extraction_method = "headline-fallback"
+    body = "\n\n".join(blocks[:24]).strip()
     if _is_google_boilerplate(parser.title, body):
         return _fallback_article_preview(fallback_title, fallback_source)
-    max_chars = 4500
+    max_chars = 12000
     truncated = len(body) > max_chars
     if truncated:
         body = body[:max_chars].rsplit(" ", 1)[0].strip() + "..."
@@ -376,8 +481,10 @@ def _article_text_from_url(url, fallback_title="", fallback_source=""):
         "text": body or "Readable article text was not available from this source.",
         "truncated": truncated,
         "resolvedUrl": url,
+        "extractionMethod": extraction_method,
+        "extractedChars": len(body),
+        "blockCount": len(blocks),
     }
-
 
 EXECUTIVE_SUMMARY_PROMPT = """You are an Executive Communications Assistant for business users.
 
@@ -453,6 +560,296 @@ def _call_claude_summary(api_key, document_text):
     return "\n".join(part.get("text", "") for part in payload.get("content", []) if part.get("type") == "text").strip()
 
 
+SIGNAL_INTELLIGENCE_PROMPT = """You are a business-signal extraction engine for KestrelIQ.
+
+Extract only factual events from the supplied article for the supplied account and signal taxonomy. Return valid JSON only with this shape:
+{"events":[{"signal_id":"...","signal_label":"...","event_name":"...","status":"Confirmed|Planned / reported|Needs review","count":0,"count_type":"people|events|money|unknown","date_or_period":"...","evidence":"short exact supporting sentence","confidence":0.0,"is_account_actor":true}]}
+
+Rules:
+- Use only the article text. Do not invent products, partners, dates, counts, companies, or status.
+- For launches, partnerships, and M&A, include the event only when the watched account is the actor or a clearly named party, not merely mentioned near another company's event.
+- For layoffs and AI workforce impact, separate confirmed layoffs from planned, reported, expected, or claimed cuts. Put people counts in count. If the article says planned or coming, status must be "Planned / reported".
+- For non-headcount signals, count should be 1 per distinct event and count_type should be "events" unless a better factual numeric metric is explicitly present.
+- If there is no reliable event, return {"events":[]}.
+- Evidence must be a concise sentence or clause from the article that proves the extraction.
+"""
+
+
+def _article_signal_text(article):
+    parts = [article.get("company", ""), article.get("headline", ""), article.get("source", ""), article.get("articleSummary", ""), article.get("fullArticleText", "")]
+    return _clean_article_block(". ".join(str(part or "") for part in parts))[:60000]
+
+
+
+
+def _provider_error_detail(exc):
+    if isinstance(exc, urllib.error.HTTPError):
+        try:
+            body = exc.read().decode("utf-8", errors="replace")
+        except Exception:
+            body = ""
+        if body:
+            try:
+                payload = json.loads(body)
+                err = payload.get("error") if isinstance(payload, dict) else None
+                if isinstance(err, dict):
+                    message = err.get("message") or err.get("type") or body
+                    code = err.get("code") or err.get("type")
+                    return f"HTTP {exc.code}: {message}" + (f" ({code})" if code else "")
+                if isinstance(err, str):
+                    return f"HTTP {exc.code}: {err}"
+            except json.JSONDecodeError:
+                pass
+            return f"HTTP {exc.code}: {body[:500]}"
+        return f"HTTP {exc.code}: {exc.reason}"
+    return str(exc)
+
+def _json_from_model_text(text):
+    raw = str(text or "").strip()
+    raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.I | re.S).strip()
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start >= 0 and end >= start:
+        raw = raw[start:end + 1]
+    return json.loads(raw)
+
+
+def _coerce_float(value, default=0.0):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return max(0.0, min(1.0, number))
+
+
+def _coerce_count(value):
+    if isinstance(value, (int, float)):
+        return max(0, int(round(value)))
+    text = str(value or "").lower().replace(",", "")
+    match = re.search(r"(\d+(?:\.\d+)?)\s*(k|m|thousand|million)?", text)
+    if not match:
+        return 0
+    number = float(match.group(1))
+    unit = match.group(2) or ""
+    if unit in {"k", "thousand"}:
+        number *= 1000
+    if unit in {"m", "million"}:
+        number *= 1000000
+    return max(0, int(round(number)))
+
+
+def _extract_people_count(sentence):
+    patterns = [
+        r"(\d[\d,]*(?:\.\d+)?\s*(?:k|m|thousand|million)?)(?:\s+more)?[^a-z0-9]{0,20}(?:jobs?|roles?|employees?|workers?|staff|positions?|people|job cuts?)",
+        r"(?:lay(?:s|ing)? off|laid off|cut(?:s|ting)?|job cuts?|headcount reduction|workforce reduction)[^.]{0,120}?(\d[\d,]*(?:\.\d+)?\s*(?:k|m|thousand|million)?)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, sentence, re.I)
+        if match:
+            return _coerce_count(match.group(1))
+    return 0
+
+
+def _normalize_signal_events(payload, provider, article, signals):
+    signal_map = {str(item.get("id") or ""): item for item in signals if isinstance(item, dict)}
+    raw_events = payload.get("events", payload if isinstance(payload, list) else []) if isinstance(payload, (dict, list)) else []
+    clean = []
+    seen = set()
+    for event in raw_events[:30]:
+        if not isinstance(event, dict):
+            continue
+        signal_id = str(event.get("signal_id") or event.get("signalId") or event.get("id") or "").strip()
+        if signal_id not in signal_map:
+            continue
+        signal = signal_map[signal_id]
+        evidence = _clean_article_block(str(event.get("evidence") or event.get("sentence") or ""))[:500]
+        if not evidence:
+            continue
+        status = str(event.get("status") or "Needs review").strip()
+        if status.lower() in {"confirmed", "complete", "announced"}:
+            status = "Confirmed"
+        elif re.search(r"planned|reported|expected|claim|could|may|might|coming", status, re.I):
+            status = "Planned / reported"
+        else:
+            status = "Needs review"
+        count = _coerce_count(event.get("count"))
+        if signal.get("metric") == "layoffHeadcount" and not count:
+            count = _extract_people_count(evidence)
+        if signal.get("metric") != "layoffHeadcount" and not count:
+            count = 1
+        name = _clean_signal_event_name(str(event.get("event_name") or event.get("eventName") or event.get("label") or ""), article) or _clean_signal_event_name(evidence, article) or str(signal.get("label") or signal_id)[:160]
+        key = (signal_id, name.lower(), evidence[:120].lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        clean.append({
+            "provider": provider,
+            "signal_id": signal_id,
+            "signal_label": str(event.get("signal_label") or event.get("signalLabel") or signal.get("label") or signal_id),
+            "event_name": name,
+            "status": status,
+            "count": count,
+            "count_type": str(event.get("count_type") or event.get("countType") or ("people" if signal.get("metric") == "layoffHeadcount" else "events")),
+            "date_or_period": str(event.get("date_or_period") or event.get("dateOrPeriod") or "Unspecified")[:80],
+            "evidence": evidence,
+            "confidence": _coerce_float(event.get("confidence"), 0.55),
+            "is_account_actor": bool(event.get("is_account_actor", event.get("isAccountActor", True))),
+            "articleId": article.get("id") or "",
+        })
+    return clean
+
+
+def _company_aliases_dynamic(company):
+    raw = str(company or "").strip()
+    if not raw:
+        return []
+    spaced = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", raw)
+    variants = {raw, spaced, raw.replace(" ", ""), spaced.replace(" ", "")}
+    suffix_re = re.compile(r"\b(inc|inc\.|corp|corp\.|corporation|co|co\.|company|ltd|ltd\.|limited|plc|llc|technologies|technology|tech|systems|services|group|holdings)\b", re.I)
+    for variant in list(variants):
+        trimmed = suffix_re.sub("", variant).strip(" ,.-")
+        if trimmed:
+            variants.add(trimmed)
+            variants.add(trimmed.replace(" ", ""))
+        if re.search(r"\btech\b", variant, re.I):
+            variants.add(re.sub(r"\btech\b", "Technologies", variant, flags=re.I))
+    return sorted({item for item in variants if len(item.strip()) >= 2}, key=len, reverse=True)
+
+
+def _split_signal_sentences(text):
+    compact = re.sub(r"\s+", " ", str(text or "")).strip()
+    parts = re.split(r"(?<=[.!?;])\s+|\n+", compact)
+    return [part.strip(" -") for part in parts if len(part.strip()) >= 25]
+
+
+def _actor_trigger(signal_id):
+    return {"productLaunches": r"launch(?:es|ed)?|unveil(?:s|ed)?|introduc(?:es|ed)?|rolls? out", "aiProductLaunches": r"launch(?:es|ed)?|unveil(?:s|ed)?|introduc(?:es|ed)?|rolls? out", "partnerships": r"partner(?:s|ed)?|teams up|collaborat(?:es|ed|ion)|alliance|joint venture", "aiPartnerships": r"partner(?:s|ed)?|teams up|collaborat(?:es|ed|ion)|alliance|joint venture", "ma": r"acquir(?:es|ed)?|buy(?:s|ing)?|merger|takeover|deal to buy"}.get(signal_id)
+
+
+def _mentions_alias(sentence, aliases):
+    lower = sentence.lower()
+    return any(re.search(r"\b" + re.escape(alias.lower()) + r"\b", lower) for alias in aliases)
+
+
+def _account_is_actor_local(sentence, aliases, signal_id):
+    trigger = _actor_trigger(signal_id)
+    if not trigger:
+        return _mentions_alias(sentence, aliases)
+    for alias in aliases:
+        escaped = re.escape(alias)
+        if re.search(r"\b" + escaped + r"\b[^.;:]{0,70}\b(?:" + trigger + r")\b", sentence, re.I):
+            return True
+        if re.search(r"\b(?:partnership|alliance|collaboration|merger)\b[^.;:]{0,90}\b" + escaped + r"\b", sentence, re.I):
+            return True
+    return False
+
+
+def _local_status(sentence):
+    lower = sentence.lower()
+    if re.search(r"\b(report claims|reportedly|sources said|could|may|might|expected|likely|planning|plans to|set to|coming|proposed|considering|aims to|forecast|rumou?r)\b", lower):
+        return "Planned / reported"
+    if re.search(r"\b(announced|confirmed|said it has|said it will|launched|unveiled|introduced|rolled out|completed|signed|partnered|acquired|reported|cut|laid off|eliminated)\b", lower):
+        return "Confirmed"
+    return "Needs review"
+
+
+
+def _clean_signal_event_name(value, article=None):
+    text = _clean_article_block(value)
+    company = str((article or {}).get("company") or "").strip()
+    if company:
+        text = re.sub(r"^" + re.escape(company) + r"\s+", "", text, flags=re.I)
+    text = re.sub(r"^\(?[A-Z]{1,6}\)?\s+", "", text)
+    text = re.sub(r"\b(today|announces?|launches?|launched|unveils?|unveiled|introduces?|introduced|rolls out|rolled out|partners?|partnered|acquires?|acquired|reports?|reported|says|said)\b", "", text, flags=re.I)
+    text = re.sub(r"\s+", " ", text).strip(" ,:;.-")
+    text = re.sub(r"\s+(as|to|for|after|before|despite|amid|while|when|with)\s+.{45,}$", "", text, flags=re.I).strip(" ,:;.-")
+    weak = (not text or len(text) < 4 or re.search(r"^(new|company|offerings?|platform|solution|service|product|experience|cloud|have|has|had|with|for|to|as|and|the|a|an)\b", text, re.I) or re.search(r"\b(have|has|had|coincided|barely existed|stock|shares|target price|cmp|52-week|despite|amid)\b", text, re.I) or len(text.split()) > 12)
+    if weak:
+        return ""
+    return text[:160]
+
+def _event_name_from_sentence(sentence, signal, article=None):
+    signal_id = str(signal.get("id") or "")
+    if signal_id in {"productLaunches", "aiProductLaunches"}:
+        patterns = [
+            r"\b(?:launches|launched|unveils|unveiled|introduces|introduced|rolls out|rolled out)\s+(?:(?:an?|the|its|new)\s+)?([^.;:]{3,140})",
+            r"\bnew\s+(?:ai\s+)?(?:product|platform|service|feature|tool|solution|assistant|agent)\s+([^.;:]{3,120})",
+        ]
+    elif signal_id in {"partnerships", "aiPartnerships"}:
+        patterns = [
+            r"\b(?:partners|partnered|teams up|collaborates|collaboration|alliance)\s+(?:with|between)?\s*([^.;:]{3,140})",
+            r"\bpartnership\s+(?:with|between)?\s*([^.;:]{3,140})",
+        ]
+    elif signal_id == "ma":
+        patterns = [
+            r"\b(?:acquires|acquired|buying|to buy|merger with|takeover of)\s+([^.;:]{3,140})",
+            r"\bacquisition\s+of\s+([^.;:]{3,140})",
+        ]
+    else:
+        patterns = []
+    for pattern in patterns:
+        match = re.search(pattern, sentence, re.I)
+        if match:
+            name = _clean_signal_event_name(match.group(1), article)
+            if name:
+                return name
+    return _clean_signal_event_name(sentence, article) or _clean_article_block(sentence)[:120]
+def _local_signal_intelligence(article, signals):
+    account = str(article.get("company") or "").strip()
+    aliases = _company_aliases_dynamic(account)
+    sentences = _split_signal_sentences(_article_signal_text(article))
+    raw_events = []
+    seen = set()
+    for signal in signals:
+        signal_id = str(signal.get("id") or "")
+        keywords = [str(keyword or "").lower() for keyword in signal.get("keywords") or []]
+        for sentence in sentences:
+            lower = sentence.lower()
+            if not any(keyword in lower for keyword in keywords):
+                continue
+            if re.search(r"\b(also read|read more|stock to buy|hold|target price|cmp:|52-week low)\b", sentence, re.I):
+                continue
+            actor_ok = _account_is_actor_local(sentence, aliases, signal_id)
+            if _actor_trigger(signal_id) and not actor_ok:
+                continue
+            if not actor_ok and account and account.lower() not in str(article.get("headline", "")).lower():
+                continue
+            count = _extract_people_count(sentence) if signal.get("metric") == "layoffHeadcount" else 1
+            if signal.get("metric") == "layoffHeadcount" and not count:
+                continue
+            name = _event_name_from_sentence(sentence, signal, article)
+            key = (signal_id, name.lower(), sentence[:100].lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            status = _local_status(sentence)
+            confidence = 0.78 if actor_ok else 0.58
+            if status == "Needs review":
+                confidence -= 0.15
+            raw_events.append({"signal_id": signal_id, "signal_label": signal.get("label") or signal_id, "event_name": name, "status": status, "count": count, "count_type": "people" if signal.get("metric") == "layoffHeadcount" else "events", "date_or_period": "Unspecified", "evidence": sentence[:500], "confidence": confidence, "is_account_actor": actor_ok})
+            break
+    return _normalize_signal_events({"events": raw_events}, "local", article, signals)
+
+
+def _signal_intelligence_payload(article, signals):
+    return json.dumps({"account": article.get("company") or "", "headline": article.get("headline") or "", "source": article.get("source") or "", "published": article.get("displayDate") or article.get("date") or "", "url": article.get("url") or "", "article_text": _article_signal_text(article), "signals": signals}, ensure_ascii=False)
+
+
+def _call_openai_signal_intelligence(api_key, article, signals):
+    body = json.dumps({"model": os.environ.get("KESTRELIQ_OPENAI_SIGNAL_MODEL", "gpt-4o-mini"), "messages": [{"role": "system", "content": SIGNAL_INTELLIGENCE_PROMPT}, {"role": "user", "content": _signal_intelligence_payload(article, signals)}], "temperature": 0.0, "response_format": {"type": "json_object"}}).encode("utf-8")
+    req = urllib.request.Request("https://api.openai.com/v1/chat/completions", data=body, headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=90) as response:
+        payload = json.loads(response.read().decode("utf-8", errors="replace"))
+    return _normalize_signal_events(_json_from_model_text(payload["choices"][0]["message"]["content"]), "openai", article, signals)
+
+
+def _call_claude_signal_intelligence(api_key, article, signals):
+    body = json.dumps({"model": os.environ.get("KESTRELIQ_CLAUDE_SIGNAL_MODEL", "claude-3-5-sonnet-20241022"), "max_tokens": 2500, "temperature": 0.0, "system": SIGNAL_INTELLIGENCE_PROMPT, "messages": [{"role": "user", "content": _signal_intelligence_payload(article, signals)}]}).encode("utf-8")
+    req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=body, headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=90) as response:
+        payload = json.loads(response.read().decode("utf-8", errors="replace"))
+    text = "\n".join(part.get("text", "") for part in payload.get("content", []) if part.get("type") == "text").strip()
+    return _normalize_signal_events(_json_from_model_text(text), "claude", article, signals)
 def _parse_google_source(item):
     source = item.find("source")
     if source is not None and source.text:
@@ -688,6 +1085,9 @@ SCAN_THEMES = [
     ("Earnings / Revenue", ("earnings", "revenue", "profit", "loss", "quarter", "q1", "q2", "q3", "q4", "results")),
     ("Partnership", ("partnership", "partner", "alliance", "collaboration", "teams up")),
     ("Acquisition / M&A", ("acquisition", "acquires", "acquire", "merger", "m&a", "deal", "takeover")),
+    ("Generative AI", ("generative ai", "genai", "llm", "large language model", "gpt", "claude", "gemini", "copilot")),
+    ("Agentic AI", ("agentic ai", "ai agent", "autonomous agent", "multi-agent", "workflow agent", "agent platform")),
+    ("AI New Launches", ("ai launch", "ai product", "launches ai", "unveils ai", "introduces ai", "new ai", "ai assistant", "ai agent")),
     ("AI / Technology", (" ai ", "artificial intelligence", "agentic", "automation", "technology", "cloud", "data")),
     ("Customer / CX", ("customer", "client", "experience", "service", "support", "outage", "complaint")),
     ("Launch / Product", ("launch", "launches", "unveils", "introduces", "rolls out", "product", "platform")),
@@ -979,6 +1379,36 @@ class Handler(BaseHTTPRequestHandler):
         _json_response(self, 404, {"error": "Not found"})
 
     def do_POST(self):
+        post_path = self.path.split("?", 1)[0].rstrip("/")
+        if post_path == "/api/signal-intelligence":
+            payload = _read_json(self)
+            provider = str(payload.get("provider") or "local").strip().lower()
+            api_key = str(payload.get("apiKey") or "").strip()
+            article = payload.get("article") or {}
+            signals = payload.get("signals") or []
+            if provider not in {"local", "openai", "claude"}:
+                _json_response(self, 400, {"error": "Provider must be local, openai, or claude."})
+                return
+            if provider in {"openai", "claude"} and not api_key:
+                _json_response(self, 400, {"error": "API key is required for this intelligence engine."})
+                return
+            if not isinstance(article, dict) or not str(article.get("headline") or "").strip():
+                _json_response(self, 400, {"error": "Article is required."})
+                return
+            if not isinstance(signals, list) or not signals:
+                _json_response(self, 400, {"error": "Signal taxonomy is required."})
+                return
+            try:
+                if provider == "local":
+                    events = _local_signal_intelligence(article, signals)
+                elif provider == "openai":
+                    events = _call_openai_signal_intelligence(api_key, article, signals)
+                else:
+                    events = _call_claude_signal_intelligence(api_key, article, signals)
+                _json_response(self, 200, {"provider": provider, "events": events})
+            except (urllib.error.URLError, TimeoutError, OSError, KeyError, IndexError, json.JSONDecodeError, ValueError) as exc:
+                _json_response(self, 502, {"error": "Could not extract signal intelligence.", "detail": _provider_error_detail(exc)})
+            return
         if self.path == "/api/news":
             payload = _read_json(self)
             companies = payload.get("companies") or []
@@ -1066,3 +1496,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
