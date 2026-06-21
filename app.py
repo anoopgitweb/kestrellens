@@ -9,6 +9,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,7 +21,11 @@ HOST = os.environ.get("KESTRELIQ_HOST") or ("0.0.0.0" if os.environ.get("PORT") 
 PORT = int(os.environ.get("PORT") or os.environ.get("KESTRELIQ_PORT", "8787"))
 ROOT = Path(__file__).resolve().parent
 INDEX_FILE = ROOT / "templates" / "index.html"
+ASSET_DIR = ROOT / "assets"
+FORTUNE_FILE = ASSET_DIR / "fortune500-2026.json"
+LLM_RANKINGS_URL = "https://artificialanalysis.ai/leaderboards/models"
 CACHE_SECONDS = 15 * 60
+QUOTE_CACHE_SECONDS = 60
 IST = ZoneInfo("Asia/Kolkata")
 
 NEWS_CACHE = {}
@@ -176,7 +181,69 @@ def _rss_urls(company, days, mode="companies", keyword_config=None):
 def _rss_type(index, mode):
     if mode == "interests":
         return "Baseline"
+    if mode == "agency":
+        return "Agency RSS" if index == 0 else "Agency fallback"
     return "Contextual" if index == 0 else "Baseline fallback"
+
+
+AGENCY_FEEDS = {
+    "forrester": {
+        "name": "Forrester",
+        "domains": ["forrester.com"],
+        "feeds": [
+            "https://www.forrester.com/blogs/feed/",
+            "https://www.forrester.com/feed/",
+        ],
+    },
+    "gartner": {
+        "name": "Gartner",
+        "domains": ["gartner.com"],
+        "resolve_links": True,
+        "feeds": [
+            "https://news.google.com/rss/search?q=site%3Agartner.com%2Fen%2Fnewsroom%20when%3A30d&hl=en-US&gl=US&ceid=US%3Aen",
+        ],
+    },
+    "everestgroup": {
+        "name": "Everest Group",
+        "domains": ["everestgrp.com"],
+        "resolve_links": True,
+        "feeds": [
+            "https://news.google.com/rss/search?q=site%3Aeverestgrp.com%20when%3A30d&hl=en-US&gl=US&ceid=US%3Aen",
+        ],
+    },
+    "nelsonhall": {
+        "name": "NelsonHall",
+        "domains": ["nelson-hall.com"],
+        "resolve_links": True,
+        "feeds": [
+            "https://news.google.com/rss/search?q=site%3Anelson-hall.com%20when%3A30d&hl=en-US&gl=US&ceid=US%3Aen",
+        ],
+    },
+    "frostsullivan": {
+        "name": "Frost & Sullivan",
+        "domains": ["frost.com"],
+        "resolve_links": True,
+        "feeds": [
+            "https://news.google.com/rss/search?q=site%3Afrost.com%20when%3A30d&hl=en-US&gl=US&ceid=US%3Aen",
+        ],
+    },
+    "isg": {
+        "name": "ISG",
+        "domains": ["isg-one.com"],
+        "resolve_links": True,
+        "feeds": [
+            "https://news.google.com/rss/search?q=site%3Aisg-one.com%20when%3A30d&hl=en-US&gl=US&ceid=US%3Aen",
+        ],
+    },
+    "hfsresearch": {
+        "name": "HFS Research",
+        "domains": ["hfsresearch.com"],
+        "resolve_links": True,
+        "feeds": [
+            "https://news.google.com/rss/search?q=site%3Ahfsresearch.com%20when%3A30d&hl=en-US&gl=US&ceid=US%3Aen",
+        ],
+    },
+}
 
 
 def _fetch_url(url, accept="application/rss+xml, application/xml, text/xml, text/html", timeout=10):
@@ -1270,20 +1337,229 @@ def _fetch_company_news(company, days, mode="companies", stats=None, keyword_con
     return items
 
 
+def _agency_meta(name):
+    normalized = _normalize_text(name)
+    if normalized in {"forrester", "forester"}:
+        normalized = "forrester"
+    if normalized in {"gartner", "garner"}:
+        normalized = "gartner"
+    if normalized in {"everest", "everestgroup"}:
+        normalized = "everestgroup"
+    if normalized in {"nelsonhall"}:
+        normalized = "nelsonhall"
+    if normalized in {"frostandsullivan", "frostsullivan"}:
+        normalized = "frostsullivan"
+    if normalized in {"informationservicesgroup", "isg"}:
+        normalized = "isg"
+    if normalized in {"hfs", "hfsresearch"}:
+        normalized = "hfsresearch"
+    return AGENCY_FEEDS.get(normalized)
+
+
+def _is_allowed_agency_url(url, meta):
+    parsed = urllib.parse.urlparse(str(url or "").strip())
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    if parsed.scheme not in {"http", "https"} or not hostname:
+        return False
+    return any(
+        hostname == domain or hostname.endswith(f".{domain}")
+        for domain in meta.get("domains", [])
+    )
+
+
+def _agency_article_brief(article):
+    fallback = _clean_article_block(article.get("articleSummary", ""))
+    try:
+        extracted = _article_text_from_url(
+            article.get("url", ""),
+            article.get("headline", ""),
+            article.get("source", ""),
+        )
+        body = _clean_article_block(extracted.get("text", ""))
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return fallback
+
+    headline = _clean_article_block(article.get("headline", ""))
+    if headline and body.lower().startswith(headline.lower()):
+        body = body[len(headline):].lstrip(" :-")
+    sentences = re.split(r"(?<=[.!?])\s+", body)
+    selected = []
+    seen = set()
+    total = 0
+    for sentence in sentences:
+        sentence = _clean_article_block(sentence)
+        normalized = re.sub(r"[^a-z0-9]+", " ", sentence.lower()).strip()
+        if len(sentence) < 45 or not normalized or normalized in seen or _is_article_noise(sentence):
+            continue
+        if total + len(sentence) > 1100 and selected:
+            break
+        selected.append(sentence)
+        seen.add(normalized)
+        total += len(sentence) + 1
+        if len(selected) >= 7:
+            break
+    return " ".join(selected) or fallback
+
+
+def _fetch_agency_news(name, days, stats=None):
+    meta = _agency_meta(name)
+    if not meta:
+        raise ValueError(f"Unknown agency source: {name}")
+    agency = meta["name"]
+    cache_key = ("agency", agency.lower(), days)
+    cached = NEWS_CACHE.get(cache_key)
+    if cached and time.time() - cached["time"] < CACHE_SECONDS:
+        if stats is not None:
+            feeds = meta.get("feeds") or []
+            stats["rssUrlsRequested"] += len(feeds)
+            stats["rssUrls"].extend([
+                {"target": agency, "type": _rss_type(i, "agency"), "url": url, "cacheHit": True}
+                for i, url in enumerate(feeds)
+            ])
+            stats["relevantItemsKept"] += len(cached["items"])
+            cached_target = dict(cached.get("targetStats") or {})
+            if cached_target:
+                cached_target["cacheHit"] = True
+                stats["rawItemsScanned"] += int(cached_target.get("rawItems") or 0)
+                stats["duplicateCount"] += int(cached_target.get("duplicateItems") or 0)
+                stats["perTarget"].append(cached_target)
+        return cached["items"]
+
+    items = []
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
+    seen = set()
+    target_stats = {
+        "name": agency,
+        "rssUrls": 0,
+        "rawItems": 0,
+        "keptItems": 0,
+        "duplicateItems": 0,
+        "relevanceDiscarded": 0,
+        "sources": set(),
+        "latestUpdate": "",
+        "cacheHit": False,
+        "themeCounts": {**_scan_theme_counts_template("interests"), "Market Watch": {"raw": 0, "kept": 0}},
+    }
+    last_fetch_error = None
+    for index, url in enumerate(meta.get("feeds") or []):
+        if stats is not None:
+            stats["rssUrlsRequested"] += 1
+            stats["rssUrls"].append({
+                "target": agency,
+                "type": _rss_type(index, "agency"),
+                "url": url,
+                "cacheHit": False,
+            })
+        target_stats["rssUrls"] += 1
+        try:
+            xml_bytes = _fetch_url(url, timeout=10)
+            root = ET.fromstring(xml_bytes)
+        except (urllib.error.URLError, TimeoutError, ET.ParseError, OSError) as exc:
+            last_fetch_error = exc
+            continue
+        for item in root.findall("./channel/item")[:12]:
+            if stats is not None:
+                stats["rawItemsScanned"] += 1
+            target_stats["rawItems"] += 1
+            title = _clean_title(item.findtext("title"))
+            link = item.findtext("link") or ""
+            published = _item_published_date(item)
+            rss_summary = _clean_rss_summary(item.findtext("description"), title)
+            if meta.get("resolve_links"):
+                try:
+                    link = _resolve_google_news_url(link)
+                except (urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError, IndexError, TypeError):
+                    continue
+            raw_themes = _scan_themes_for_title(title, "interests")
+            for theme in raw_themes:
+                target_stats["themeCounts"].setdefault(theme, {"raw": 0, "kept": 0})["raw"] += 1
+            if cutoff and published and published < cutoff:
+                continue
+            if not title or not link:
+                continue
+            if not _is_allowed_agency_url(link, meta):
+                if stats is not None:
+                    stats["relevanceDiscarded"] += 1
+                target_stats["relevanceDiscarded"] += 1
+                continue
+            key = (title.lower(), link.lower())
+            if key in seen:
+                if stats is not None:
+                    stats["duplicateCount"] += 1
+                target_stats["duplicateItems"] += 1
+                continue
+            seen.add(key)
+            for theme in raw_themes:
+                target_stats["themeCounts"].setdefault(theme, {"raw": 0, "kept": 0})["kept"] += 1
+            target_stats["sources"].add(agency)
+            items.append({
+                "id": _article_id(agency, title, link),
+                "company": agency,
+                "vertical": "Research",
+                "date": published.isoformat() if published else "",
+                "displayDate": published.strftime("%d %b %Y") if published else "",
+                "displayTimeIST": published.astimezone(IST).strftime("%I:%M %p IST") if published else "",
+                "publishedIST": published.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST") if published else "",
+                "source": agency,
+                "headline": title,
+                "articleSummary": rss_summary,
+                "url": link,
+                "sentiment": _sentiment(title),
+                "scanThemes": raw_themes,
+            })
+
+    if last_fetch_error and not items:
+        raise last_fetch_error
+
+    items.sort(key=lambda item: item.get("date") or "", reverse=True)
+    if items:
+        with ThreadPoolExecutor(max_workers=min(4, len(items))) as executor:
+            briefs = list(executor.map(_agency_article_brief, items))
+        for article, brief in zip(items, briefs):
+            if brief:
+                article["articleSummary"] = brief
+    target_stats["keptItems"] = len(items)
+    target_stats["latestUpdate"] = items[0].get("publishedIST", "") if items else ""
+    target_stats["sources"] = sorted(target_stats["sources"])
+    if stats is not None:
+        stats["relevantItemsKept"] += len(items)
+        stats["perTarget"].append(target_stats)
+
+    NEWS_CACHE[cache_key] = {"time": time.time(), "items": items, "targetStats": target_stats}
+    return items
+
+
 def _fetch_news(companies, date_range, mode="companies", keyword_config=None):
     days = _date_range_to_days(date_range)
+    if mode == "agency":
+        days = max(days or 0, 30)
     stats = _empty_scan_stats(companies, date_range, mode)
     articles = []
     errors = []
-    for company in companies:
-        name = str(company).strip()
-        if not name:
-            continue
-        try:
-            articles.extend(_fetch_company_news(name, days, mode=mode, stats=stats, keyword_config=keyword_config))
-        except (urllib.error.URLError, TimeoutError, ET.ParseError, OSError) as exc:
-            errors.append({"company": name, "error": str(exc)})
-            stats["errorsCount"] += 1
+    names = [str(company).strip() for company in companies if str(company).strip()]
+    if mode == "agency":
+        with ThreadPoolExecutor(max_workers=min(7, len(names) or 1)) as executor:
+            jobs = [(name, executor.submit(_fetch_agency_news, name, days, None)) for name in names]
+            for name, job in jobs:
+                try:
+                    source_items = job.result()
+                    articles.extend(source_items)
+                    stats["perTarget"].append({
+                        "name": name,
+                        "keptItems": len(source_items),
+                        "sources": sorted({item.get("source") for item in source_items if item.get("source")}),
+                        "themeCounts": {},
+                    })
+                except (urllib.error.URLError, TimeoutError, ET.ParseError, OSError, ValueError) as exc:
+                    errors.append({"company": name, "error": str(exc)})
+                    stats["errorsCount"] += 1
+    else:
+        for name in names:
+            try:
+                articles.extend(_fetch_company_news(name, days, mode=mode, stats=stats, keyword_config=keyword_config))
+            except (urllib.error.URLError, TimeoutError, ET.ParseError, OSError, ValueError) as exc:
+                errors.append({"company": name, "error": str(exc)})
+                stats["errorsCount"] += 1
 
     deduped = {}
     for article in articles:
@@ -1297,6 +1573,19 @@ def _fetch_news(companies, date_range, mode="companies", keyword_config=None):
         key=lambda item: item.get("date") or "",
         reverse=True,
     )
+    if mode == "agency":
+        source_order = [str(name).strip().lower() for name in companies if str(name).strip()]
+        buckets = {
+            source: [item for item in sorted_articles if str(item.get("source") or "").lower() == source]
+            for source in source_order
+        }
+        interleaved = []
+        while any(buckets.values()):
+            for source in source_order:
+                if buckets.get(source):
+                    interleaved.append(buckets[source].pop(0))
+        known_ids = {item["id"] for item in interleaved}
+        sorted_articles = interleaved + [item for item in sorted_articles if item["id"] not in known_ids]
     source_counts = {}
     for article in sorted_articles:
         source_counts[article.get("source") or "Unknown"] = source_counts.get(article.get("source") or "Unknown", 0) + 1
@@ -1359,6 +1648,188 @@ def _briefing(articles):
     }
 
 
+def _fortune_news_url(companies, days=2):
+    company_clause = " OR ".join(f'"{name}"' for name in companies)
+    query = f"({company_clause}) (AI OR technology OR cloud OR digital OR partnership OR launch OR regulation OR cybersecurity OR automation) when:{days}d"
+    params = urllib.parse.urlencode({
+        "q": query,
+        "hl": "en-US",
+        "gl": "US",
+        "ceid": "US:en",
+        "scoring": "n",
+    })
+    return f"https://news.google.com/rss/search?{params}"
+
+
+def _match_fortune_company(title, company_rows):
+    for row in sorted(company_rows, key=lambda item: len(item["name"]), reverse=True):
+        if row["name"] in {"Target", "UPS"}:
+            if re.search(r"\b" + re.escape(row["name"]) + r"\b", title):
+                return row
+            continue
+        if any(re.search(r"\b" + re.escape(alias) + r"\b", title, re.I) for alias in _company_aliases_dynamic(row["name"])):
+            return row
+    return None
+
+
+def _fetch_fortune_news(company_rows, days=2):
+    cache_key = ("fortune50", days)
+    cached = NEWS_CACHE.get(cache_key)
+    if cached and time.time() - cached["time"] < CACHE_SECONDS:
+        return cached["items"]
+    batches = [company_rows[index:index + 10] for index in range(0, len(company_rows), 10)]
+
+    def fetch_batch(batch):
+        root = ET.fromstring(_fetch_url(_fortune_news_url([row["name"] for row in batch], days), timeout=15))
+        found = []
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        for item in root.findall("./channel/item")[:35]:
+            title = _clean_title(item.findtext("title"))
+            published = _item_published_date(item)
+            source = _parse_google_source(item)
+            link = item.findtext("link") or ""
+            company = _match_fortune_company(title, batch)
+            if not title or not link or not company or (published and published < cutoff):
+                continue
+            text = f"{title} {source}".lower()
+            if re.search(r"motley fool|yahoo finance|barchart|simplywall|simply wall|thestreet|investor'?s business daily|benzinga|marketbeat|stocktwits|seeking alpha|quiver quantitative|24/7 wall|tradingview|basenor", text):
+                continue
+            if re.search(r"\bstock\b|\bshares?\b|buy or sell|price target|dividend|undervalued|overvalued|technical analysis|market cap|wall street|analyst upgrades?", text):
+                continue
+            if not re.search(r"\b(ai|artificial intelligence|agentic|llm|claude|model|technology|cloud|digital|platform|chip|semiconductor|data cent(?:er|re)|cyber|security|automation|robot|copilot|generative)\b", title, re.I):
+                continue
+            found.append({
+                "id": _article_id(company["name"], title, link),
+                "company": company["name"],
+                "companyRank": company["rank"],
+                "vertical": company.get("sector") or "Fortune 500",
+                "date": published.isoformat() if published else "",
+                "displayDate": published.strftime("%d %b %Y") if published else "",
+                "displayTimeIST": published.astimezone(IST).strftime("%I:%M %p IST") if published else "",
+                "publishedIST": published.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST") if published else "",
+                "source": source,
+                "headline": title,
+                "articleSummary": _clean_rss_summary(item.findtext("description"), title),
+                "url": link,
+                "sentiment": _sentiment(title),
+                "scanThemes": _scan_themes_for_title(title, "interests"),
+            })
+        return found
+
+    articles = []
+    with ThreadPoolExecutor(max_workers=len(batches) or 1) as executor:
+        jobs = [executor.submit(fetch_batch, batch) for batch in batches]
+        for job in jobs:
+            try:
+                articles.extend(job.result())
+            except (urllib.error.URLError, TimeoutError, ET.ParseError, OSError):
+                continue
+    deduped = {}
+    for article in articles:
+        deduped.setdefault((article["headline"].lower(), article["source"].lower()), article)
+    result = sorted(deduped.values(), key=lambda item: item.get("date") or "", reverse=True)[:16]
+    NEWS_CACHE[cache_key] = {"time": time.time(), "items": result}
+    return result
+
+
+def _fetch_llm_rankings():
+    cache_key = ("llm-rankings", "artificial-analysis")
+    cached = NEWS_CACHE.get(cache_key)
+    if cached and time.time() - cached["time"] < CACHE_SECONDS:
+        return cached["items"]
+    raw = _fetch_url(LLM_RANKINGS_URL, accept="text/html, application/xhtml+xml", timeout=20)
+    page = raw.decode("utf-8", errors="replace")
+    providers = ("Anthropic", "OpenAI", "Google", "xAI", "Meta", "DeepSeek", "Alibaba", "Mistral", "Moonshot", "Zhipu")
+    rows = []
+    seen = set()
+    for match in re.finditer(r"<tr[^>]*>.*?</tr>", page, re.S):
+        text = html.unescape(re.sub(r"<[^>]+>", " ", match.group(0)))
+        text = re.sub(r"\s+", " ", text).strip()
+        provider_match = re.search(r"\b(" + "|".join(re.escape(item) for item in providers) + r")\b", text)
+        context_match = re.search(r"\b\d+(?:\.\d+)?[kKmM]\b", text)
+        if not provider_match or not context_match or context_match.start() >= provider_match.start():
+            continue
+        model = text[:context_match.start()].strip()
+        context = text[context_match.start():context_match.end()]
+        creator = provider_match.group(1)
+        metrics = text[provider_match.end():].strip()
+        intelligence_match = re.search(r"\b\d{1,3}\b\s*\*?", metrics)
+        if not model or not intelligence_match:
+            continue
+        intelligence = intelligence_match.group(0).replace("*", "").strip()
+        metric_tail = metrics[intelligence_match.end():]
+        metric_values = re.findall(r"\$\s*[\d.]+|--|[\d.]+", metric_tail)
+        price = metric_values[0].replace(" ", "") if len(metric_values) > 0 else "--"
+        speed = metric_values[1] if len(metric_values) > 1 else "--"
+        latency = metric_values[2] if len(metric_values) > 2 else "--"
+        response_time = metric_values[3] if len(metric_values) > 3 else "--"
+        key = (model.lower(), creator.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append({
+            "rank": len(rows) + 1,
+            "model": model,
+            "creator": creator,
+            "context": context.upper(),
+            "intelligence": intelligence,
+            "price": price,
+            "speed": speed,
+            "latency": latency,
+            "responseTime": response_time,
+        })
+        if len(rows) >= 30:
+            break
+    NEWS_CACHE[cache_key] = {"time": time.time(), "items": rows}
+    return rows
+
+
+def _fetch_stock_quote(symbol="CNXC"):
+    ticker = re.sub(r"[^A-Za-z0-9.^-]", "", str(symbol or "CNXC")).upper() or "CNXC"
+    cache_key = ("stock-quote", ticker)
+    cached = NEWS_CACHE.get(cache_key)
+    if cached and time.time() - cached["time"] < QUOTE_CACHE_SECONDS:
+        return cached["item"]
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(ticker)}?interval=1d&range=1d"
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (compatible; KestrelIQ/1.0; +local executive intelligence app)",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=12) as response:
+        payload = json.loads(response.read().decode("utf-8", errors="replace"))
+    result = (payload.get("chart", {}).get("result") or [{}])[0]
+    meta = result.get("meta") or {}
+    price = meta.get("regularMarketPrice")
+    previous = meta.get("chartPreviousClose")
+    change = (price - previous) if isinstance(price, (int, float)) and isinstance(previous, (int, float)) else None
+    change_percent = (change / previous * 100) if change is not None and previous else None
+    market_time = meta.get("regularMarketTime")
+    updated = ""
+    if market_time:
+        try:
+            updated = datetime.fromtimestamp(int(market_time), timezone.utc).astimezone(IST).strftime("%d %b %Y, %I:%M %p IST")
+        except (OSError, ValueError, TypeError):
+            updated = ""
+    item = {
+        "symbol": meta.get("symbol") or ticker,
+        "name": meta.get("shortName") or meta.get("longName") or ticker,
+        "exchange": meta.get("fullExchangeName") or meta.get("exchangeName") or "",
+        "currency": meta.get("currency") or "USD",
+        "price": price,
+        "previousClose": previous,
+        "change": change,
+        "changePercent": change_percent,
+        "volume": meta.get("regularMarketVolume"),
+        "updatedAt": updated,
+        "source": "Yahoo Finance",
+    }
+    NEWS_CACHE[cache_key] = {"time": time.time(), "item": item}
+    return item
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         print(f"[KestrelIQ] {self.address_string()} - {fmt % args}")
@@ -1372,6 +1843,58 @@ class Handler(BaseHTTPRequestHandler):
                 _html_response(self, 500, "templates/index.html is missing.")
                 return
             _html_response(self, 200, INDEX_FILE.read_text(encoding="utf-8"))
+            return
+        if self.path.startswith("/assets/"):
+            asset = ASSET_DIR / Path(urllib.parse.urlparse(self.path).path).name
+            if asset.exists() and asset.is_file() and asset.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}:
+                mime = {".png": "image/png", ".webp": "image/webp"}.get(asset.suffix.lower(), "image/jpeg")
+                payload = asset.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", mime)
+                self.send_header("Content-Length", str(len(payload)))
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+            _json_response(self, 404, {"error": "Asset not found"})
+            return
+        if self.path == "/api/fortune-intelligence":
+            if not FORTUNE_FILE.exists():
+                _json_response(self, 503, {"error": "Fortune 500 data is unavailable."})
+                return
+            ranking = json.loads(FORTUNE_FILE.read_text(encoding="utf-8"))
+            companies = ranking.get("companies") or []
+            news = _fetch_fortune_news(companies[:50], days=2)
+            _json_response(self, 200, {
+                "year": ranking.get("year"),
+                "source": ranking.get("source"),
+                "sourceUrl": ranking.get("sourceUrl"),
+                "companies": companies,
+                "news": news,
+            })
+            return
+        if self.path == "/api/llm-rankings":
+            try:
+                rankings = _fetch_llm_rankings()
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                _json_response(self, 503, {"error": f"LLM rankings are temporarily unavailable. {exc}"})
+                return
+            _json_response(self, 200, {
+                "source": "Artificial Analysis",
+                "sourceUrl": LLM_RANKINGS_URL,
+                "updatedAt": datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST"),
+                "rankings": rankings,
+            })
+            return
+        if self.path.startswith("/api/stock-quote"):
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            symbol = (query.get("symbol") or ["CNXC"])[0]
+            try:
+                quote = _fetch_stock_quote(symbol)
+            except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": f"Stock quote is temporarily unavailable. {exc}"})
+                return
+            _json_response(self, 200, quote)
             return
         if self.path == "/api/health":
             _json_response(self, 200, {"ok": True, "service": "KestrelIQ"})
