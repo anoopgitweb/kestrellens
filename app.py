@@ -100,6 +100,7 @@ def _date_range_to_days(value):
         "3d": 3,
         "7d": 7,
         "30d": 30,
+        "60d": 60,
     }
     return ranges.get(value, 7)
 
@@ -241,6 +242,46 @@ AGENCY_FEEDS = {
         "resolve_links": True,
         "feeds": [
             "https://news.google.com/rss/search?q=site%3Ahfsresearch.com%20when%3A30d&hl=en-US&gl=US&ceid=US%3Aen",
+        ],
+    },
+    "techcrunchai": {
+        "name": "TechCrunch AI",
+        "domains": ["techcrunch.com"],
+        "brief_articles": False,
+        "feeds": [
+            "https://techcrunch.com/category/artificial-intelligence/feed/",
+        ],
+    },
+    "venturebeatai": {
+        "name": "VentureBeat AI",
+        "domains": ["venturebeat.com"],
+        "brief_articles": False,
+        "feeds": [
+            "https://venturebeat.com/category/ai/feed/",
+        ],
+    },
+    "mittechreview": {
+        "name": "MIT Technology Review",
+        "domains": ["technologyreview.com"],
+        "brief_articles": False,
+        "feeds": [
+            "https://www.technologyreview.com/feed/",
+        ],
+    },
+    "thevergeai": {
+        "name": "The Verge AI",
+        "domains": ["theverge.com"],
+        "brief_articles": False,
+        "feeds": [
+            "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+        ],
+    },
+    "zdnetai": {
+        "name": "ZDNET AI",
+        "domains": ["zdnet.com"],
+        "brief_articles": False,
+        "feeds": [
+            "https://www.zdnet.com/topic/artificial-intelligence/rss.xml",
         ],
     },
 }
@@ -1512,7 +1553,7 @@ def _fetch_agency_news(name, days, stats=None):
         raise last_fetch_error
 
     items.sort(key=lambda item: item.get("date") or "", reverse=True)
-    if items:
+    if items and meta.get("brief_articles", True):
         with ThreadPoolExecutor(max_workers=min(4, len(items))) as executor:
             briefs = list(executor.map(_agency_article_brief, items))
         for article, brief in zip(items, briefs):
@@ -1830,6 +1871,123 @@ def _fetch_stock_quote(symbol="CNXC"):
     return item
 
 
+def _wikidata_claim_value(entity, prop):
+    claims = ((entity or {}).get("claims") or {}).get(prop) or []
+    if not claims:
+        return None
+    mainsnak = claims[0].get("mainsnak") or {}
+    datavalue = mainsnak.get("datavalue") or {}
+    value = datavalue.get("value")
+    if isinstance(value, dict):
+        if "amount" in value:
+            try:
+                return float(str(value.get("amount", "")).lstrip("+"))
+            except ValueError:
+                return None
+        if "id" in value:
+            return value.get("id")
+        if "time" in value:
+            return str(value.get("time", "")).lstrip("+").split("-", 1)[0]
+    return value
+
+
+def _wikidata_label(qid):
+    if not qid:
+        return ""
+    cache_key = ("wikidata-label", qid)
+    cached = NEWS_CACHE.get(cache_key)
+    if cached and time.time() - cached["time"] < CACHE_SECONDS:
+        return cached["item"]
+    url = "https://www.wikidata.org/wiki/Special:EntityData/" + urllib.parse.quote(qid) + ".json"
+    payload = json.loads(_fetch_url(url, accept="application/json", timeout=10).decode("utf-8", errors="replace"))
+    entity = (payload.get("entities") or {}).get(qid) or {}
+    label = ((entity.get("labels") or {}).get("en") or {}).get("value") or ""
+    NEWS_CACHE[cache_key] = {"time": time.time(), "item": label}
+    return label
+
+
+def _format_wiki_money(value):
+    if not isinstance(value, (int, float)):
+        return ""
+    absolute = abs(value)
+    prefix = "-$" if value < 0 else "$"
+    if absolute >= 1_000_000_000:
+        return f"{prefix}{absolute / 1_000_000_000:.2f}B".replace(".00B", "B")
+    if absolute >= 1_000_000:
+        return f"{prefix}{absolute / 1_000_000:.1f}M".replace(".0M", "M")
+    return f"{prefix}{absolute:,.0f}"
+
+
+def _format_wiki_employees(value):
+    if not isinstance(value, (int, float)):
+        return ""
+    if value >= 1_000_000:
+        return f"{value / 1_000_000:.2f}M".replace(".00M", "M")
+    if value >= 1000:
+        return f"{value / 1000:.1f}K".replace(".0K", "K")
+    return f"{value:,.0f}"
+
+
+def _fetch_company_profile(name):
+    company = str(name or "").strip()
+    if not company:
+        raise ValueError("Company name is required.")
+    cache_key = ("company-profile", company.lower())
+    cached = NEWS_CACHE.get(cache_key)
+    if cached and time.time() - cached["time"] < CACHE_SECONDS:
+        return cached["item"]
+
+    search_url = (
+        "https://www.wikidata.org/w/api.php?"
+        + urllib.parse.urlencode({
+            "action": "wbsearchentities",
+            "search": company,
+            "language": "en",
+            "format": "json",
+            "limit": "1",
+        })
+    )
+    search = json.loads(_fetch_url(search_url, accept="application/json", timeout=12).decode("utf-8", errors="replace"))
+    result = (search.get("search") or [{}])[0]
+    qid = result.get("id")
+    entity = {}
+    if qid:
+        entity_url = "https://www.wikidata.org/wiki/Special:EntityData/" + urllib.parse.quote(qid) + ".json"
+        entity_payload = json.loads(_fetch_url(entity_url, accept="application/json", timeout=12).decode("utf-8", errors="replace"))
+        entity = (entity_payload.get("entities") or {}).get(qid) or {}
+
+    title = result.get("label") or company
+    wiki_summary = {}
+    try:
+        summary_url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + urllib.parse.quote(title.replace(" ", "_"))
+        wiki_summary = json.loads(_fetch_url(summary_url, accept="application/json", timeout=12).decode("utf-8", errors="replace"))
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
+        wiki_summary = {}
+
+    industry_qid = _wikidata_claim_value(entity, "P452")
+    hq_qid = _wikidata_claim_value(entity, "P159")
+    country_qid = _wikidata_claim_value(entity, "P17")
+    revenue = _wikidata_claim_value(entity, "P2139")
+    employees = _wikidata_claim_value(entity, "P1128")
+    profile = {
+        "name": ((entity.get("labels") or {}).get("en") or {}).get("value") or wiki_summary.get("title") or title,
+        "description": wiki_summary.get("extract") or result.get("description") or "",
+        "industry": _wikidata_label(industry_qid) if industry_qid else "",
+        "headquarters": _wikidata_label(hq_qid) if hq_qid else "",
+        "country": _wikidata_label(country_qid) if country_qid else "",
+        "founded": _wikidata_claim_value(entity, "P571") or "",
+        "revenue": _format_wiki_money(revenue),
+        "employees": _format_wiki_employees(employees),
+        "website": _wikidata_claim_value(entity, "P856") or "",
+        "wikipediaUrl": (wiki_summary.get("content_urls") or {}).get("desktop", {}).get("page") or "",
+        "wikidataUrl": f"https://www.wikidata.org/wiki/{qid}" if qid else "",
+        "source": "Wikipedia / Wikidata",
+        "verificationNote": "Public profile fallback. Please verify before executive or client-facing use.",
+    }
+    NEWS_CACHE[cache_key] = {"time": time.time(), "item": profile}
+    return profile
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         print(f"[KestrelIQ] {self.address_string()} - {fmt % args}")
@@ -1895,6 +2053,16 @@ class Handler(BaseHTTPRequestHandler):
                 _json_response(self, 503, {"error": f"Stock quote is temporarily unavailable. {exc}"})
                 return
             _json_response(self, 200, quote)
+            return
+        if self.path.startswith("/api/company-profile"):
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            name = (query.get("name") or [""])[0]
+            try:
+                profile = _fetch_company_profile(name)
+            except (ValueError, urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": f"Company profile is temporarily unavailable. {exc}"})
+                return
+            _json_response(self, 200, profile)
             return
         if self.path == "/api/health":
             _json_response(self, 200, {"ok": True, "service": "KestrelIQ"})
