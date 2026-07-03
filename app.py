@@ -48,6 +48,12 @@ DEFAULT_COMPANY_KEYWORDS = [
     "acquisition", "AI", "customer", "launch", "investment", "lawsuit",
     "regulatory", "expansion", "layoffs", "stock", "shares", "outage",
 ]
+DEFAULT_PEOPLE_KEYWORDS = [
+    "interview", "keynote", "statement", "appointment", "resignation",
+    "board", "leadership", "investment", "testimony", "lawsuit",
+    "philanthropy", "foundation", "AI", "conference", "controversy",
+    "regulation", "strategy",
+]
 
 POSITIVE_WORDS = {
     "acquires", "acquisition", "award", "beats", "breakthrough", "expands",
@@ -228,9 +234,24 @@ def _preferred_interest_query(interest):
     return preferred.get(normalized, str(interest).strip())
 
 
+def _preferred_people_query(person):
+    return str(person or "").strip()
+
+
 def _search_keywords(config, mode="companies"):
     if mode == "interests":
         return []
+    if mode == "people":
+        terms = DEFAULT_PEOPLE_KEYWORDS
+        clean = []
+        seen = set()
+        for term in terms:
+            normalized = _normalize_text(term)
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            clean.append(term[:40])
+        return clean
     if isinstance(config, dict) and not config.get("useDefault", True):
         raw_terms = config.get("terms") or []
         terms = [str(term).strip() for term in raw_terms if str(term).strip()]
@@ -258,7 +279,12 @@ def _rss_keyword_clause(config, mode="companies"):
 
 
 def _rss_url(company, days, contextual=False, mode="companies", keyword_config=None):
-    company_query = _preferred_company_query(company) if mode != "interests" else _preferred_interest_query(company)
+    if mode == "interests":
+        company_query = _preferred_interest_query(company)
+    elif mode == "people":
+        company_query = _preferred_people_query(company)
+    else:
+        company_query = _preferred_company_query(company)
     date_clause = f" when:{days}d" if days else ""
     query = f'"{company_query}"{date_clause}'
     if contextual:
@@ -267,6 +293,8 @@ def _rss_url(company, days, contextual=False, mode="companies", keyword_config=N
                 "news OR latest OR analysis OR research OR launch OR AI OR "
                 "technology OR customer OR business OR regulation OR market OR trend"
             )
+        elif mode == "people":
+            business_context = _rss_keyword_clause(keyword_config, mode=mode)
         else:
             business_context = _rss_keyword_clause(keyword_config, mode=mode)
         query = f'"{company_query}" ({business_context}){date_clause}'
@@ -292,6 +320,8 @@ def _rss_urls(company, days, mode="companies", keyword_config=None):
 def _rss_type(index, mode):
     if mode == "interests":
         return "Baseline"
+    if mode == "people":
+        return "People pulse" if index == 0 else "People baseline"
     if mode == "agency":
         return "Agency RSS" if index == 0 else "Agency fallback"
     return "Contextual" if index == 0 else "Baseline fallback"
@@ -1293,6 +1323,44 @@ def _is_interest_relevant(interest, title, source):
     return not any(re.search(pattern, lower) for pattern in noise_patterns)
 
 
+def _person_terms(person):
+    raw = (person or "").strip().lower()
+    parts = [part for part in re.split(r"\s+", raw) if len(part) > 1]
+    terms = {raw, _normalize_text(raw)}
+    if len(parts) >= 2:
+        terms.add(parts[-1])
+    return {term for term in terms if len(term) > 2}
+
+
+def _is_person_relevant(person, title, source):
+    text = f"{title} {source}"
+    lower = text.lower()
+    normalized = _normalize_text(text)
+    if not any(term in lower or term in normalized for term in _person_terms(person)):
+        return False
+
+    people_context = {
+        "ai", "appointment", "appoints", "board", "ceo", "chair", "conference",
+        "controversy", "executive", "foundation", "founder", "interview",
+        "investment", "keynote", "lawsuit", "leader", "leadership", "philanthropy",
+        "regulation", "resignation", "said", "speech", "statement", "strategy",
+        "testimony", "trial", "warns",
+    }
+    if any(re.search(rf"\b{re.escape(word)}\b", lower) for word in people_context):
+        return True
+
+    noise_patterns = (
+        r"\bquiz\b",
+        r"\bmovie\b",
+        r"\bsong\b",
+        r"\bhoroscope\b",
+        r"\bobituary\b",
+        r"\bfound dead\b",
+        r"\bdeath certificate\b",
+    )
+    return not any(re.search(pattern, lower) for pattern in noise_patterns)
+
+
 def _article_id(company, title, link):
     base = f"{company}|{title}|{link}"
     return str(abs(hash(base)))
@@ -1315,9 +1383,21 @@ SCAN_THEMES = [
     ("Layoffs / Restructuring", ("layoff", "layoffs", "restructuring", "job cuts", "cuts", "cost cutting")),
 ]
 
+PEOPLE_SCAN_THEMES = [
+    ("Interview / Statement", ("interview", "said", "says", "statement", "remarks", "speech", "keynote")),
+    ("Leadership Role", ("ceo", "founder", "chair", "board", "executive", "appointed", "resigns", "resignation")),
+    ("AI / Technology View", ("ai", "artificial intelligence", "agentic", "openai", "technology", "automation")),
+    ("Investment / Philanthropy", ("investment", "invests", "funding", "foundation", "philanthropy", "donates")),
+    ("Regulatory / Testimony", ("regulation", "regulatory", "testimony", "congress", "senate", "hearing", "probe")),
+    ("Risk / Controversy", ("lawsuit", "trial", "controversy", "criticized", "warning", "risk", "backlash")),
+    ("Conference / Public Appearance", ("conference", "summit", "forum", "event", "appears", "speaks")),
+]
+
 def _scan_terms(mode="companies", keyword_config=None):
     if mode == "interests":
         return SCAN_THEMES
+    if mode == "people":
+        return PEOPLE_SCAN_THEMES
     return [(term, (term.lower(),)) for term in _search_keywords(keyword_config, mode=mode)]
 
 
@@ -1444,7 +1524,12 @@ def _fetch_company_news(company, days, mode="companies", stats=None, keyword_con
                 continue
             if not title or not link:
                 continue
-            relevant = _is_interest_relevant(company, title, source) if mode == "interests" else _is_company_relevant(company, title, source)
+            if mode == "interests":
+                relevant = _is_interest_relevant(company, title, source)
+            elif mode == "people":
+                relevant = _is_person_relevant(company, title, source)
+            else:
+                relevant = _is_company_relevant(company, title, source)
             if not relevant:
                 continue
             key = (title.lower(), source.lower())
