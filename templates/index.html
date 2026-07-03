@@ -331,6 +331,30 @@
   .global-topbar .home-brand strong{font-size:32px!important;font-weight:400!important;letter-spacing:-.04em!important}
   .global-topbar .home-brand small{margin-top:1px!important;font-size:9px!important;font-weight:500!important;letter-spacing:.16em!important}
   .global-topbar .home-menu{margin-left:24px!important}
+  .global-topbar .dashboard-nav-link{
+    height:42px!important;
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    padding:0 20px!important;
+    border:0!important;
+    border-radius:0!important;
+    background:transparent!important;
+    color:#edf7f8!important;
+    font-family:Arial,"Helvetica Neue",sans-serif!important;
+    font-size:14px!important;
+    font-weight:400!important;
+    letter-spacing:0!important;
+    cursor:pointer!important;
+  }
+  .global-topbar .dashboard-nav-link:hover,
+  .global-topbar .dashboard-nav-link:focus-visible,
+  body.dashboard-active .global-topbar .dashboard-nav-link{
+    background:rgba(40,220,202,.1)!important;
+    box-shadow:inset 0 -3px 0 #28dcca!important;
+    color:#fff!important;
+    outline:0!important;
+  }
   .global-topbar .home-link,.global-topbar .home-dropdown summary{height:82px!important;padding:0 14px!important;font-size:14px!important;font-weight:400!important}
   .global-topbar .home-dropdown-panel{top:82px!important;width:300px!important;padding:22px 24px!important}
   .global-topbar .home-dropdown:not([open]) .home-dropdown-panel{display:none!important}
@@ -867,8 +891,15 @@
     background:rgba(255,255,255,.1)!important;
     color:#fff!important;
   }
+  .app>header.topbar,
+  .app .dashboard-menu,
+  body.dashboard-active .app>header.topbar,
+  body.dashboard-active .dashboard-menu,
+  body.dashboard-active #globalTopbar .dashboard-menu{
+    display:none!important;
+  }
   .app>header.topbar{
-    display:flex!important;
+    display:none!important;
     position:fixed!important;
     top:29px!important;
     right:292px!important;
@@ -1264,6 +1295,7 @@
         <button type="button" onclick="closeHomeMenus();openIndustryBriefing()">Technology Pulse</button>
       </div>
     </details>
+    <button class="home-link dashboard-nav-link" type="button" onclick="closeHomeMenus();enterDashboard()">Dashboard</button>
   </nav>
   <div class="global-actions">
     <button class="global-search-btn" type="button" title="Search" aria-label="Search KestrelIQ" onclick="openGlobalSearch()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4.4-4.4"></path></svg></button>
@@ -1294,6 +1326,7 @@
             <button type="button" onclick="closeHomeMenus();openIndustryBriefing()">Technology Pulse</button>
           </div>
         </details>
+        <button class="home-link dashboard-nav-link" type="button" onclick="closeHomeMenus();enterDashboard()">Dashboard</button>
       </nav>
     </header>
     <div class="home-search-panel" role="search">
@@ -1975,12 +2008,9 @@ function setupHomeMenus(){document.querySelectorAll(".home-dropdown summary").fo
 const dashboardMenuMount={parent:null,next:null};
 function mountDashboardMenu(active){
   const menu=document.querySelector(".dashboard-menu");
-  const global=$("globalTopbar");
-  if(!menu||!global)return;
+  if(!menu)return;
   if(!dashboardMenuMount.parent){dashboardMenuMount.parent=menu.parentElement;dashboardMenuMount.next=menu.nextSibling}
-  if(active){
-    if(menu.parentElement!==global)global.insertBefore(menu,global.querySelector(".home-menu")||global.firstChild);
-  }else if(dashboardMenuMount.parent&&menu.parentElement!==dashboardMenuMount.parent){
+  if(dashboardMenuMount.parent&&menu.parentElement!==dashboardMenuMount.parent){
     dashboardMenuMount.parent.insertBefore(menu,dashboardMenuMount.next);
   }
 }
