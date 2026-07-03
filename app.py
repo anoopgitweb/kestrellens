@@ -69,7 +69,7 @@ def _json_response(handler, status, payload):
     handler.send_header("Pragma", "no-cache")
     handler.send_header("Expires", "0")
     handler.send_header("Access-Control-Allow-Origin", "*")
-    handler.send_header("Access-Control-Allow-Headers", "Content-Type")
+    handler.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
     handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
     handler.end_headers()
     handler.wfile.write(body)
@@ -129,14 +129,21 @@ def _favorite_record(article):
     }
 
 
-def _supabase_request(method, query="", payload=None):
+def _bearer_token(handler):
+    header = handler.headers.get("Authorization", "")
+    if not header.lower().startswith("bearer "):
+        return ""
+    return header.split(" ", 1)[1].strip()
+
+
+def _supabase_table_request(table, method, query="", payload=None, access_token=None):
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
         raise RuntimeError("Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.")
-    url = f"{SUPABASE_URL}/rest/v1/favorites{query}"
+    url = f"{SUPABASE_URL}/rest/v1/{table}{query}"
     data = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(url, data=data, method=method)
     req.add_header("apikey", SUPABASE_ANON_KEY)
-    req.add_header("Authorization", f"Bearer {SUPABASE_ANON_KEY}")
+    req.add_header("Authorization", f"Bearer {access_token or SUPABASE_ANON_KEY}")
     req.add_header("Content-Type", "application/json")
     req.add_header("Accept", "application/json")
     if method in {"POST", "PATCH", "DELETE"}:
@@ -146,22 +153,53 @@ def _supabase_request(method, query="", payload=None):
     return json.loads(raw) if raw else []
 
 
-def _list_favorites():
-    return _supabase_request("GET", "?select=*&order=saved_at.desc")
+def _supabase_auth_user(access_token):
+    if not access_token:
+        raise PermissionError("Login is required.")
+    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+        raise RuntimeError("Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.")
+    req = urllib.request.Request(f"{SUPABASE_URL}/auth/v1/user", method="GET")
+    req.add_header("apikey", SUPABASE_ANON_KEY)
+    req.add_header("Authorization", f"Bearer {access_token}")
+    req.add_header("Accept", "application/json")
+    with urllib.request.urlopen(req, timeout=15) as response:
+        raw = response.read().decode("utf-8", errors="replace")
+    user = json.loads(raw) if raw else {}
+    if not user.get("id"):
+        raise PermissionError("Login is required.")
+    return user
 
 
-def _save_favorite(article):
+def _list_favorites(access_token):
+    return _supabase_table_request("favorites", "GET", "?select=*&order=saved_at.desc", access_token=access_token)
+
+
+def _save_favorite(article, user_id, access_token):
     record = _favorite_record(article)
-    query = "?on_conflict=article_key"
-    return _supabase_request("POST", query, [record])
+    record["user_id"] = user_id
+    query = "?on_conflict=user_id,article_key"
+    return _supabase_table_request("favorites", "POST", query, [record], access_token=access_token)
 
 
-def _delete_favorite(article_key):
+def _delete_favorite(article_key, access_token):
     key = str(article_key or "").strip()
     if not key:
         raise ValueError("Favorite article key is required.")
     encoded = urllib.parse.quote(key, safe="")
-    return _supabase_request("DELETE", f"?article_key=eq.{encoded}")
+    return _supabase_table_request("favorites", "DELETE", f"?article_key=eq.{encoded}", access_token=access_token)
+
+
+def _profile_for_user(user, access_token):
+    encoded = urllib.parse.quote(str(user.get("id") or ""), safe="")
+    rows = _supabase_table_request("profiles", "GET", f"?id=eq.{encoded}&select=*", access_token=access_token)
+    profile = rows[0] if rows else {}
+    return {
+        "id": user.get("id"),
+        "email": profile.get("email") or user.get("email") or "",
+        "full_name": profile.get("full_name") or "",
+        "company": profile.get("company") or "",
+        "created_at": profile.get("created_at") or "",
+    }
 
 
 def _date_range_to_days(value):
@@ -2136,9 +2174,30 @@ class Handler(BaseHTTPRequestHandler):
                 return
             _json_response(self, 200, profile)
             return
-        if self.path == "/api/favorites":
+        if self.path == "/api/auth-config":
+            _json_response(self, 200, {
+                "supabaseUrl": SUPABASE_URL,
+                "supabaseAnonKey": SUPABASE_ANON_KEY,
+                "configured": bool(SUPABASE_URL and SUPABASE_ANON_KEY),
+            })
+            return
+        if self.path == "/api/profile":
+            access_token = _bearer_token(self)
             try:
-                _json_response(self, 200, {"favorites": _list_favorites()})
+                user = _supabase_auth_user(access_token)
+                _json_response(self, 200, {"profile": _profile_for_user(user, access_token)})
+            except PermissionError as exc:
+                _json_response(self, 401, {"error": str(exc)})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Profile is temporarily unavailable.", "detail": str(exc)})
+            return
+        if self.path == "/api/favorites":
+            access_token = _bearer_token(self)
+            try:
+                _supabase_auth_user(access_token)
+                _json_response(self, 200, {"favorites": _list_favorites(access_token)})
+            except PermissionError as exc:
+                _json_response(self, 401, {"error": str(exc)})
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 _json_response(self, 503, {"error": "Favorites are temporarily unavailable.", "detail": str(exc)})
             return
@@ -2181,22 +2240,30 @@ class Handler(BaseHTTPRequestHandler):
         if post_path == "/api/favorites":
             payload = _read_json(self)
             article = payload.get("article") if isinstance(payload.get("article"), dict) else payload
+            access_token = _bearer_token(self)
             try:
-                favorites = _save_favorite(article)
-                _json_response(self, 200, {"favorite": favorites[0] if favorites else None, "favorites": _list_favorites()})
+                user = _supabase_auth_user(access_token)
+                favorites = _save_favorite(article, user["id"], access_token)
+                _json_response(self, 200, {"favorite": favorites[0] if favorites else None, "favorites": _list_favorites(access_token)})
             except ValueError as exc:
                 _json_response(self, 400, {"error": str(exc)})
+            except PermissionError as exc:
+                _json_response(self, 401, {"error": str(exc)})
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 _json_response(self, 503, {"error": "Could not save favorite.", "detail": str(exc)})
             return
         if post_path == "/api/favorites/delete":
             payload = _read_json(self)
             article_key = payload.get("article_key") or payload.get("articleKey")
+            access_token = _bearer_token(self)
             try:
-                _delete_favorite(article_key)
-                _json_response(self, 200, {"favorites": _list_favorites()})
+                _supabase_auth_user(access_token)
+                _delete_favorite(article_key, access_token)
+                _json_response(self, 200, {"favorites": _list_favorites(access_token)})
             except ValueError as exc:
                 _json_response(self, 400, {"error": str(exc)})
+            except PermissionError as exc:
+                _json_response(self, 401, {"error": str(exc)})
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 _json_response(self, 503, {"error": "Could not remove favorite.", "detail": str(exc)})
             return
