@@ -24,6 +24,8 @@ INDEX_FILE = ROOT / "templates" / "index.html"
 ASSET_DIR = ROOT / "assets"
 FORTUNE_FILE = ASSET_DIR / "fortune500-2026.json"
 LLM_RANKINGS_URL = "https://artificialanalysis.ai/leaderboards/models"
+SUPABASE_URL = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY") or ""
 CACHE_SECONDS = 15 * 60
 QUOTE_CACHE_SECONDS = 60
 IST = ZoneInfo("Asia/Kolkata")
@@ -91,6 +93,75 @@ def _read_json(handler):
         return {}
     raw = handler.rfile.read(length).decode("utf-8", errors="replace")
     return json.loads(raw)
+
+
+def _favorite_article_key(article):
+    key = str(article.get("article_key") or article.get("articleKey") or article.get("id") or article.get("url") or "").strip()
+    if key:
+        return key[:600]
+    return "|".join([
+        str(article.get("company") or "").strip(),
+        str(article.get("headline") or "").strip(),
+        str(article.get("displayDate") or article.get("display_date") or "").strip(),
+    ])[:600]
+
+
+def _favorite_record(article):
+    if not isinstance(article, dict):
+        raise ValueError("Favorite article is required.")
+    headline = str(article.get("headline") or "").strip()
+    article_key = _favorite_article_key(article)
+    if not headline or not article_key:
+        raise ValueError("Favorite article needs a headline and article key.")
+    return {
+        "article_key": article_key,
+        "headline": headline[:1000],
+        "company": str(article.get("company") or "").strip()[:240],
+        "source": str(article.get("source") or "").strip()[:240],
+        "url": str(article.get("url") or "").strip()[:2000],
+        "published_at": str(article.get("published_at") or article.get("date") or article.get("published") or "").strip()[:240],
+        "display_date": str(article.get("display_date") or article.get("displayDate") or "").strip()[:120],
+        "display_time_ist": str(article.get("display_time_ist") or article.get("displayTimeIST") or "").strip()[:120],
+        "sentiment": str(article.get("sentiment") or "").strip()[:80],
+        "summary": str(article.get("summary") or article.get("articleSummary") or "").strip()[:4000],
+        "notes": str(article.get("notes") or "").strip()[:4000],
+        "tags": article.get("tags") if isinstance(article.get("tags"), list) else [],
+    }
+
+
+def _supabase_request(method, query="", payload=None):
+    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+        raise RuntimeError("Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.")
+    url = f"{SUPABASE_URL}/rest/v1/favorites{query}"
+    data = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(url, data=data, method=method)
+    req.add_header("apikey", SUPABASE_ANON_KEY)
+    req.add_header("Authorization", f"Bearer {SUPABASE_ANON_KEY}")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Accept", "application/json")
+    if method in {"POST", "PATCH", "DELETE"}:
+        req.add_header("Prefer", "resolution=merge-duplicates,return=representation")
+    with urllib.request.urlopen(req, timeout=15) as response:
+        raw = response.read().decode("utf-8", errors="replace")
+    return json.loads(raw) if raw else []
+
+
+def _list_favorites():
+    return _supabase_request("GET", "?select=*&order=saved_at.desc")
+
+
+def _save_favorite(article):
+    record = _favorite_record(article)
+    query = "?on_conflict=article_key"
+    return _supabase_request("POST", query, [record])
+
+
+def _delete_favorite(article_key):
+    key = str(article_key or "").strip()
+    if not key:
+        raise ValueError("Favorite article key is required.")
+    encoded = urllib.parse.quote(key, safe="")
+    return _supabase_request("DELETE", f"?article_key=eq.{encoded}")
 
 
 def _date_range_to_days(value):
@@ -2065,6 +2136,12 @@ class Handler(BaseHTTPRequestHandler):
                 return
             _json_response(self, 200, profile)
             return
+        if self.path == "/api/favorites":
+            try:
+                _json_response(self, 200, {"favorites": _list_favorites()})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Favorites are temporarily unavailable.", "detail": str(exc)})
+            return
         if self.path == "/api/health":
             _json_response(self, 200, {"ok": True, "service": "KestrelIQ"})
             return
@@ -2100,6 +2177,28 @@ class Handler(BaseHTTPRequestHandler):
                 _json_response(self, 200, {"provider": provider, "events": events})
             except (urllib.error.URLError, TimeoutError, OSError, KeyError, IndexError, json.JSONDecodeError, ValueError) as exc:
                 _json_response(self, 502, {"error": "Could not extract signal intelligence.", "detail": _provider_error_detail(exc)})
+            return
+        if post_path == "/api/favorites":
+            payload = _read_json(self)
+            article = payload.get("article") if isinstance(payload.get("article"), dict) else payload
+            try:
+                favorites = _save_favorite(article)
+                _json_response(self, 200, {"favorite": favorites[0] if favorites else None, "favorites": _list_favorites()})
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Could not save favorite.", "detail": str(exc)})
+            return
+        if post_path == "/api/favorites/delete":
+            payload = _read_json(self)
+            article_key = payload.get("article_key") or payload.get("articleKey")
+            try:
+                _delete_favorite(article_key)
+                _json_response(self, 200, {"favorites": _list_favorites()})
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Could not remove favorite.", "detail": str(exc)})
             return
         if self.path == "/api/news":
             payload = _read_json(self)
