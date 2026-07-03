@@ -793,11 +793,79 @@
   .home-result-label{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0b2025;font-size:12.5px;font-weight:500}
   .home-result-detail{display:block;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#5c7075;font-size:10.5px}
   .app{
-    padding-top:90px!important;
+    padding-top:130px!important;
     grid-template-rows:minmax(0,1fr)!important;
     background:
       radial-gradient(circle at 86% 18%,rgba(40,220,202,.12),transparent 28%),
       linear-gradient(125deg,#002d36 0%,#003943 54%,#07533e 100%)!important;
+  }
+  .dashboard-commandbar{
+    display:none;
+  }
+  body.dashboard-active .dashboard-commandbar{
+    position:fixed!important;
+    top:78px!important;
+    left:0!important;
+    right:0!important;
+    z-index:1180!important;
+    min-height:52px!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    gap:14px!important;
+    padding:8px 18px!important;
+    border-top:1px solid rgba(40,220,202,.18)!important;
+    border-bottom:1px solid rgba(255,255,255,.1)!important;
+    background:rgba(0,31,38,.98)!important;
+    box-shadow:0 12px 28px rgba(0,0,0,.24)!important;
+  }
+  .dashboard-commandbar .dashboard-command-left,
+  .dashboard-commandbar .dashboard-command-right{
+    display:flex!important;
+    align-items:center!important;
+    gap:7px!important;
+    min-width:0!important;
+    flex-wrap:wrap!important;
+  }
+  .dashboard-commandbar .dashboard-command-left{
+    flex:1 1 auto!important;
+  }
+  .dashboard-commandbar .dashboard-command-right{
+    flex:0 0 auto!important;
+    justify-content:flex-end!important;
+  }
+  .dashboard-commandbar .tab,
+  .dashboard-commandbar .dashboard-action{
+    height:34px!important;
+    min-height:34px!important;
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:6px!important;
+    padding:0 12px!important;
+    border:1px solid rgba(255,255,255,.14)!important;
+    border-radius:8px!important;
+    background:rgba(255,255,255,.06)!important;
+    color:#dff5f5!important;
+    font-size:12px!important;
+    font-weight:600!important;
+    letter-spacing:0!important;
+    white-space:nowrap!important;
+    cursor:pointer!important;
+  }
+  .dashboard-commandbar .tab:hover,
+  .dashboard-commandbar .dashboard-action:hover,
+  .dashboard-commandbar .tab.active{
+    border-color:#28dcca!important;
+    background:#28dcca!important;
+    color:#002f3b!important;
+  }
+  .dashboard-commandbar .dashboard-action.secondary{
+    background:transparent!important;
+  }
+  .dashboard-commandbar .dashboard-action.secondary:hover{
+    background:rgba(255,255,255,.1)!important;
+    color:#fff!important;
   }
   .app>header.topbar{
     display:flex!important;
@@ -819,7 +887,7 @@
   }
   .app>header.topbar .brand{display:none!important}
   .app .shell{
-    height:calc(100vh - 90px)!important;
+    height:calc(100vh - 130px)!important;
     min-height:0!important;
     grid-template-columns:300px minmax(0,1fr)!important;
     background:transparent!important;
@@ -1153,6 +1221,10 @@
     right:auto!important;
     z-index:1251!important;
   }
+  body.dashboard-active .app>header.topbar,
+  body.dashboard-active #globalTopbar .dashboard-menu{
+    display:none!important;
+  }
   @media(max-width:900px){
     .app .topbar{align-items:flex-start;flex-wrap:wrap}.app .tabs{order:3;max-width:100%;overflow:auto}.app .shell{background:transparent!important}
     .hunt-card{border-radius:24px!important}.industry-hero{grid-template-columns:1fr 1fr}.industry-card{width:min(100% - 28px,920px)!important}.industry-card .industry-layout,.industry-card .strategy-news-grid{grid-template-columns:1fr!important}.industry-card .industry-feed,.industry-card .industry-reader,.industry-card .industry-brief.strategy-mode .industry-feed{height:auto!important;max-height:none!important}.industry-card .hunt-head{align-items:flex-start!important;flex-direction:column}.industry-card .hunt-head .kestrel-mark{display:none}
@@ -1402,6 +1474,26 @@
     <div class="hunt-add-row"><input id="baseOrgInput" class="input" placeholder="e.g. Concentrix"><button id="baseOrgContinueBtn" class="btn teal">Continue</button><button id="baseOrgSkipBtn" class="btn">Skip</button></div>
   </div>
 </section><div class="app">
+  <nav id="dashboardCommandbar" class="dashboard-commandbar" aria-label="Dashboard navigation">
+    <div class="dashboard-command-left">
+      <button class="dashboard-action secondary" type="button" onclick="openTrackingChooser()">Switch Lens</button>
+      <button class="tab" type="button" data-view="setup">Setup</button>
+      <button class="tab active" type="button" data-view="live">Live Feed</button>
+      <button class="tab" type="button" data-view="today">Summary</button>
+      <button class="tab" type="button" data-view="saved">Saved Items</button>
+      <button class="tab" type="button" data-view="articleHeatmap">Article HeatMap</button>
+      <button class="tab" type="button" data-view="themeCounts">Theme Count</button>
+      <button class="tab" type="button" data-view="share">Intelligence Brief</button>
+      <button class="tab" type="button" data-view="scan">Scan Pulse</button>
+    </div>
+    <div class="dashboard-command-right">
+      <button class="dashboard-action" type="button" onclick="exportSettingsJson()">Save IQ</button>
+      <button class="dashboard-action" type="button" onclick="refreshFeeds()">Refresh</button>
+      <button class="dashboard-action" type="button" onclick="exportSettings()">Export</button>
+      <button class="dashboard-action" type="button" onclick="$('importFile').click()">Import</button>
+      <button class="dashboard-action secondary" type="button" onclick="openIntelligenceHome()">Home</button>
+    </div>
+  </nav>
   <header class="topbar">
     <div class="brand"><span class="brand-bird" aria-hidden="true"><span class="bb-tail"></span><span class="bb-body"></span><span class="bb-head"><span class="bb-eye"></span></span></span><span class="brand-copy"><strong>Kestrel<span>IQ</span></strong><small>EXECUTIVE INTELLIGENCE</small></span></div>
     <details class="dashboard-menu">
@@ -2630,7 +2722,6 @@ $("loginForm").onsubmit=e=>{e.preventDefault();loginAndHunt()};$("latestNewsBtn"
 if($("homeSearchInput")){$("homeSearchInput").oninput=renderHomeSearchResults;$("homeSearchInput").addEventListener("focus",renderHomeSearchResults);$("homeSearchInput").addEventListener("keydown",e=>{if(e.key==="ArrowDown"){e.preventDefault();moveHomeSearchResult(1)}else if(e.key==="ArrowUp"){e.preventDefault();moveHomeSearchResult(-1)}else if(e.key==="Enter"&&$("homeSearchResults")?.classList.contains("open")){const active=document.querySelector("#homeSearchResults .home-search-result.active")||document.querySelector("#homeSearchResults .home-search-result");if(active){e.preventDefault();applyHomeSearchItem(homeSearchItems($("homeSearchInput").value)[Number(active.dataset.index)])}}else if(e.key==="Escape"){closeHomeSearch()}})}if($("homeSearchClear"))$("homeSearchClear").onclick=()=>{$("homeSearchInput").value="";closeHomeSearch();filterFortuneCompanies("");filterCEORankings("");filterLLMRankings("")};
 renderAll();
 bootstrapAuth();
-setTimeout(()=>{if($("authScreen").classList.contains("hidden")&&!$("huntScreen").classList.contains("hidden")&&$("industryBriefing").classList.contains("hidden"))openIntelligenceHome()},0);
 if(state.companies.length&&!state.articles.length){setTimeout(()=>refreshFeeds(),250)}
 </script>
 </body>
