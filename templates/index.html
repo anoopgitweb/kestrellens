@@ -1094,19 +1094,27 @@
     right:auto!important;
     width:auto!important;
     padding-left:0!important;
-    z-index:1205!important;
+    position:fixed!important;
+    z-index:2200!important;
+    pointer-events:none!important;
   }
   body.dashboard-active .dashboard-menu{
-    position:relative!important;
-    z-index:1210!important;
+    position:fixed!important;
+    top:0!important;
+    left:0!important;
+    z-index:2210!important;
+    pointer-events:auto!important;
   }
   body.dashboard-active .dashboard-menu>summary{
     min-width:112px!important;
     justify-content:center!important;
   }
   body.dashboard-active .dashboard-menu-panel{
+    position:fixed!important;
+    top:78px!important;
     left:0!important;
     right:auto!important;
+    z-index:2211!important;
   }
   @media(max-width:900px){
     .app .topbar{align-items:flex-start;flex-wrap:wrap}.app .tabs{order:3;max-width:100%;overflow:auto}.app .shell{background:transparent!important}
