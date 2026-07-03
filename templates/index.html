@@ -815,7 +815,17 @@
     background:rgba(0,36,43,.68)!important;
   }
   .app .side-block{padding:14px 16px!important;border-bottom:1px solid rgba(255,255,255,.08)!important}
-  .app .watchlist{min-height:0!important}
+  .app .sidebar .side-block:nth-child(4){
+    min-height:0!important;
+    display:grid!important;
+    grid-template-rows:auto minmax(0,1fr)!important;
+    overflow:hidden!important;
+  }
+  .app .watchlist{
+    min-height:0!important;
+    max-height:none!important;
+    height:100%!important;
+  }
   .app .main{padding:14px 18px 16px!important;overflow:hidden!important}
   .app #liveView{grid-template-rows:auto minmax(0,1fr)!important;gap:10px!important}
   .app #liveView .section-title{display:none!important}
