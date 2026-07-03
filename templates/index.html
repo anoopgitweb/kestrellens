@@ -364,6 +364,23 @@
   .global-topbar .home-dropdown-panel{top:78px!important;border-top-color:#28dcca!important;box-shadow:0 24px 54px rgba(0,0,0,.36)!important}
   .global-search-btn{border:1px solid rgba(255,255,255,.12)!important;border-radius:999px!important;background:rgba(255,255,255,.04)!important}
   .global-search-btn:hover,.global-search-btn:focus-visible{border-color:#28dcca!important;background:rgba(40,220,202,.1)!important;color:#28dcca!important}
+  .global-login{
+    max-width:168px!important;
+    min-height:38px!important;
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    padding:0 14px!important;
+    border:1px solid rgba(255,255,255,.16)!important;
+    border-radius:999px!important;
+    background:rgba(255,255,255,.04)!important;
+    color:#f6fbfb!important;
+    line-height:1!important;
+    white-space:nowrap!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+  }
+  .global-login:hover,.global-login:focus-visible{border-color:#28dcca!important;background:rgba(40,220,202,.1)!important;color:#28dcca!important}
   .global-cta{border-radius:999px!important;border-color:rgba(255,255,255,.25)!important;background:rgba(255,255,255,.05)!important}
   .global-cta:hover,.global-cta:focus-visible{background:#28dcca!important;border-color:#28dcca!important;color:#001b1f!important}
   .app{padding-top:92px!important;background:radial-gradient(circle at 82% 18%,rgba(40,220,202,.16),transparent 30%),linear-gradient(128deg,#002c35 0%,#003e47 50%,#0b563f 100%)!important}
@@ -1699,7 +1716,7 @@ function authHeaders(headers={}){const token=state.session?.access_token;return 
 async function loadAuthConfig(){if(state.authConfig)return state.authConfig;const res=await fetch("/api/auth-config");const data=await res.json();if(!res.ok||!data.configured)throw new Error(data.error||"Supabase Auth is not configured in Render.");state.authConfig=data;return data}
 async function supabaseAuthRequest(path,payload){const cfg=await loadAuthConfig();const res=await fetch(`${cfg.supabaseUrl}/auth/v1/${path}`,{method:"POST",headers:{apikey:cfg.supabaseAnonKey,"Content-Type":"application/json"},body:JSON.stringify(payload)});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error_description||data.msg||data.error||"Supabase login failed.");return data}
 function currentUserEmail(){return state.profile?.email||state.session?.user?.email||""}
-function updateAuthUi(){const btn=$("globalLoginBtn");if(!btn)return;const email=currentUserEmail();btn.textContent=state.session?`Log Out${email?` (${email.split("@")[0]})`:""}`:"Log In";btn.title=state.session?`Signed in as ${email||"KestrelIQ user"}. Click to log out.`:"Log in"}
+function updateAuthUi(){const btn=$("globalLoginBtn");if(!btn)return;const email=currentUserEmail();const name=email?email.split("@")[0]:"User";btn.textContent=state.session?name:"Log In";btn.title=state.session?`Signed in as ${email||"KestrelIQ user"}. Click to log out.`:"Log in"}
 function showLoginScreen(){showGlobalTopbar(false);$("authScreen").classList.remove("hidden");$("intelligenceHome").classList.add("hidden");$("huntScreen").classList.add("hidden");$("baseOrgScreen").classList.add("hidden");$("loginPass").value="";$("loginError").textContent="";setTimeout(()=>$("loginUser").focus(),0)}
 function handleGlobalLoginClick(){if(state.session){logoutUser();return}showLoginScreen()}
 async function fetchProfile(){if(!state.session)return null;const res=await fetch("/api/profile",{headers:authHeaders()});const data=await res.json().catch(()=>({}));if(res.status===401){clearSession();return null}if(!res.ok)throw new Error(data.error||"Could not load profile.");state.profile=data.profile||null;updateAuthUi();return state.profile}
