@@ -151,6 +151,20 @@ def _bearer_token(handler):
     return header.split(" ", 1)[1].strip()
 
 
+def _urlopen_with_retry(request, timeout=15, retries=2):
+    transient_statuses = {408, 425, 429, 500, 502, 503, 504}
+    for attempt in range(retries + 1):
+        try:
+            return urllib.request.urlopen(request, timeout=timeout)
+        except urllib.error.HTTPError as exc:
+            if exc.code not in transient_statuses or attempt >= retries:
+                raise
+        except (urllib.error.URLError, TimeoutError, OSError):
+            if attempt >= retries:
+                raise
+        time.sleep(0.3 * (2 ** attempt))
+
+
 def _supabase_table_request(table, method, query="", payload=None, access_token=None):
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
         raise RuntimeError("Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.")
@@ -163,7 +177,8 @@ def _supabase_table_request(table, method, query="", payload=None, access_token=
     req.add_header("Accept", "application/json")
     if method in {"POST", "PATCH", "DELETE"}:
         req.add_header("Prefer", "resolution=merge-duplicates,return=representation")
-    with urllib.request.urlopen(req, timeout=15) as response:
+    retries = 2 if method in {"GET", "PATCH", "DELETE"} else 0
+    with _urlopen_with_retry(req, timeout=15, retries=retries) as response:
         raw = response.read().decode("utf-8", errors="replace")
     return json.loads(raw) if raw else []
 
@@ -177,7 +192,7 @@ def _supabase_auth_user(access_token):
     req.add_header("apikey", SUPABASE_ANON_KEY)
     req.add_header("Authorization", f"Bearer {access_token}")
     req.add_header("Accept", "application/json")
-    with urllib.request.urlopen(req, timeout=15) as response:
+    with _urlopen_with_retry(req, timeout=15, retries=2) as response:
         raw = response.read().decode("utf-8", errors="replace")
     user = json.loads(raw) if raw else {}
     if not user.get("id"):
@@ -192,8 +207,23 @@ def _list_favorites(access_token):
 def _save_favorite(article, user_id, access_token):
     record = _favorite_record(article)
     record["user_id"] = user_id
-    query = "?on_conflict=user_id,article_key"
-    return _supabase_table_request("favorites", "POST", query, [record], access_token=access_token)
+    encoded_key = urllib.parse.quote(record["article_key"], safe="")
+    existing = _supabase_table_request(
+        "favorites", "GET", f"?article_key=eq.{encoded_key}&select=id", access_token=access_token
+    )
+    if existing:
+        encoded_id = urllib.parse.quote(str(existing[0].get("id") or ""), safe="")
+        query = f"?id=eq.{encoded_id}" if encoded_id else f"?article_key=eq.{encoded_key}"
+        return _supabase_table_request("favorites", "PATCH", query, record, access_token=access_token)
+    try:
+        return _supabase_table_request("favorites", "POST", "", [record], access_token=access_token)
+    except (urllib.error.URLError, TimeoutError, OSError):
+        confirmed = _supabase_table_request(
+            "favorites", "GET", f"?article_key=eq.{encoded_key}&select=*", access_token=access_token
+        )
+        if confirmed:
+            return confirmed
+        return _supabase_table_request("favorites", "POST", "", [record], access_token=access_token)
 
 
 def _delete_favorite(article_key, access_token):
@@ -263,12 +293,30 @@ def _activate_watchlist(watchlist_id, user_id, access_token):
     )
     if not owned:
         raise ValueError("Watchlist was not found.")
+    previously_active = _supabase_table_request(
+        "watchlists", "GET",
+        f"?user_id=eq.{encoded_user}&is_active=eq.true&select=id",
+        access_token=access_token,
+    )
     _supabase_table_request(
         "watchlists", "PATCH", f"?user_id=eq.{encoded_user}", {"is_active": False}, access_token=access_token
     )
-    return _supabase_table_request(
-        "watchlists", "PATCH", f"?id=eq.{encoded_id}", {"is_active": True}, access_token=access_token
-    )
+    try:
+        return _supabase_table_request(
+            "watchlists", "PATCH", f"?id=eq.{encoded_id}", {"is_active": True}, access_token=access_token
+        )
+    except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError):
+        for previous in previously_active:
+            previous_id = urllib.parse.quote(str(previous.get("id") or ""), safe="")
+            if not previous_id:
+                continue
+            try:
+                _supabase_table_request(
+                    "watchlists", "PATCH", f"?id=eq.{previous_id}", {"is_active": True}, access_token=access_token
+                )
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError):
+                pass
+        raise
 
 
 def _delete_watchlist(watchlist_id, access_token):
@@ -2565,12 +2613,21 @@ class Handler(BaseHTTPRequestHandler):
             access_token = _bearer_token(self)
             try:
                 user = _supabase_auth_user(access_token)
-                _delete_watchlist(payload.get("id"), access_token)
-                watchlists = _list_watchlists(access_token)
-                if watchlists and not any(item.get("is_active") for item in watchlists):
-                    _activate_watchlist(watchlists[0].get("id"), user["id"], access_token)
+                deleted_id = str(payload.get("id") or "").strip()
+                _delete_watchlist(deleted_id, access_token)
+                watchlists = None
+                warning = ""
+                try:
                     watchlists = _list_watchlists(access_token)
-                _json_response(self, 200, {"watchlists": watchlists})
+                    if watchlists and not any(item.get("is_active") for item in watchlists):
+                        try:
+                            _activate_watchlist(watchlists[0].get("id"), user["id"], access_token)
+                            watchlists = _list_watchlists(access_token)
+                        except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                            warning = f"The list was deleted, but another list could not be activated automatically: {exc}"
+                except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                    warning = f"The list was deleted, but the remaining watchlists could not be reloaded: {exc}"
+                _json_response(self, 200, {"deletedId": deleted_id, "watchlists": watchlists, "warning": warning})
             except ValueError as exc:
                 _json_response(self, 400, {"error": str(exc)})
             except PermissionError as exc:
