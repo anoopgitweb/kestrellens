@@ -30,5 +30,6 @@ The app automatically uses the hosting provider's `PORT` environment variable wh
 
 - No paid news API is required for this first version.
 - News is fetched from Google News RSS by the Python backend.
-- Watchlist settings are stored in the user's browser local storage.
+- Guest watchlist settings are stored in the user's browser local storage.
+- Signed-in users can manage multiple named Supabase watchlists from their profile. Run `supabase_watchlists.sql` once in the Supabase SQL editor before enabling this feature in production.
 - The current sentiment and strategy scoring are lightweight keyword-based rules and can be upgraded later.

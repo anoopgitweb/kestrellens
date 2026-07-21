@@ -204,6 +204,81 @@ def _delete_favorite(article_key, access_token):
     return _supabase_table_request("favorites", "DELETE", f"?article_key=eq.{encoded}", access_token=access_token)
 
 
+def _watchlist_record(payload):
+    if not isinstance(payload, dict):
+        raise ValueError("Watchlist details are required.")
+    name = str(payload.get("name") or "").strip()
+    mode = str(payload.get("mode") or "companies").strip().lower()
+    raw_items = payload.get("items") if isinstance(payload.get("items"), list) else []
+    if not name:
+        raise ValueError("Watchlist name is required.")
+    if mode not in {"companies", "people", "interests"}:
+        raise ValueError("Watchlist mode must be companies, people, or interests.")
+    items = []
+    seen = set()
+    for value in raw_items:
+        item = str(value or "").strip()
+        key = item.lower()
+        if not item or key in seen:
+            continue
+        seen.add(key)
+        items.append(item[:240])
+        if len(items) >= 100:
+            break
+    return {
+        "name": name[:80],
+        "mode": mode,
+        "items": items,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _list_watchlists(access_token):
+    return _supabase_table_request(
+        "watchlists", "GET", "?select=*&order=is_active.desc,updated_at.desc", access_token=access_token
+    )
+
+
+def _save_watchlist(payload, user_id, access_token):
+    record = _watchlist_record(payload)
+    watchlist_id = str(payload.get("id") or "").strip()
+    if watchlist_id:
+        encoded = urllib.parse.quote(watchlist_id, safe="")
+        return _supabase_table_request(
+            "watchlists", "PATCH", f"?id=eq.{encoded}", record, access_token=access_token
+        )
+    record["user_id"] = user_id
+    record["is_active"] = bool(payload.get("is_active"))
+    return _supabase_table_request("watchlists", "POST", "", [record], access_token=access_token)
+
+
+def _activate_watchlist(watchlist_id, user_id, access_token):
+    key = str(watchlist_id or "").strip()
+    if not key:
+        raise ValueError("Watchlist id is required.")
+    encoded_user = urllib.parse.quote(str(user_id), safe="")
+    encoded_id = urllib.parse.quote(key, safe="")
+    owned = _supabase_table_request(
+        "watchlists", "GET", f"?id=eq.{encoded_id}&select=id", access_token=access_token
+    )
+    if not owned:
+        raise ValueError("Watchlist was not found.")
+    _supabase_table_request(
+        "watchlists", "PATCH", f"?user_id=eq.{encoded_user}", {"is_active": False}, access_token=access_token
+    )
+    return _supabase_table_request(
+        "watchlists", "PATCH", f"?id=eq.{encoded_id}", {"is_active": True}, access_token=access_token
+    )
+
+
+def _delete_watchlist(watchlist_id, access_token):
+    key = str(watchlist_id or "").strip()
+    if not key:
+        raise ValueError("Watchlist id is required.")
+    encoded = urllib.parse.quote(key, safe="")
+    return _supabase_table_request("watchlists", "DELETE", f"?id=eq.{encoded}", access_token=access_token)
+
+
 def _profile_for_user(user, access_token):
     encoded = urllib.parse.quote(str(user.get("id") or ""), safe="")
     rows = _supabase_table_request("profiles", "GET", f"?id=eq.{encoded}&select=*", access_token=access_token)
@@ -2328,6 +2403,16 @@ class Handler(BaseHTTPRequestHandler):
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 _json_response(self, 503, {"error": "Favorites are temporarily unavailable.", "detail": str(exc)})
             return
+        if self.path == "/api/watchlists":
+            access_token = _bearer_token(self)
+            try:
+                _supabase_auth_user(access_token)
+                _json_response(self, 200, {"watchlists": _list_watchlists(access_token)})
+            except PermissionError as exc:
+                _json_response(self, 401, {"error": str(exc)})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Watchlists are temporarily unavailable.", "detail": str(exc)})
+            return
         if self.path == "/api/health":
             _json_response(self, 200, {"ok": True, "service": "KestrelIQ"})
             return
@@ -2393,6 +2478,56 @@ class Handler(BaseHTTPRequestHandler):
                 _json_response(self, 401, {"error": str(exc)})
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 _json_response(self, 503, {"error": "Could not remove favorite.", "detail": str(exc)})
+            return
+        if post_path == "/api/watchlists":
+            payload = _read_json(self)
+            access_token = _bearer_token(self)
+            try:
+                user = _supabase_auth_user(access_token)
+                saved = _save_watchlist(payload, user["id"], access_token)
+                watchlists = _list_watchlists(access_token)
+                if len(watchlists) == 1 and not watchlists[0].get("is_active"):
+                    _activate_watchlist(watchlists[0].get("id"), user["id"], access_token)
+                    watchlists = _list_watchlists(access_token)
+                _json_response(self, 200, {"watchlist": saved[0] if saved else None, "watchlists": watchlists})
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except PermissionError as exc:
+                _json_response(self, 401, {"error": str(exc)})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Could not save watchlist.", "detail": str(exc)})
+            return
+        if post_path == "/api/watchlists/activate":
+            payload = _read_json(self)
+            access_token = _bearer_token(self)
+            try:
+                user = _supabase_auth_user(access_token)
+                _activate_watchlist(payload.get("id"), user["id"], access_token)
+                _json_response(self, 200, {"watchlists": _list_watchlists(access_token)})
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except PermissionError as exc:
+                _json_response(self, 401, {"error": str(exc)})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Could not activate watchlist.", "detail": str(exc)})
+            return
+        if post_path == "/api/watchlists/delete":
+            payload = _read_json(self)
+            access_token = _bearer_token(self)
+            try:
+                user = _supabase_auth_user(access_token)
+                _delete_watchlist(payload.get("id"), access_token)
+                watchlists = _list_watchlists(access_token)
+                if watchlists and not any(item.get("is_active") for item in watchlists):
+                    _activate_watchlist(watchlists[0].get("id"), user["id"], access_token)
+                    watchlists = _list_watchlists(access_token)
+                _json_response(self, 200, {"watchlists": watchlists})
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except PermissionError as exc:
+                _json_response(self, 401, {"error": str(exc)})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Could not delete watchlist.", "detail": str(exc)})
             return
         if self.path == "/api/news":
             payload = _read_json(self)
