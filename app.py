@@ -292,6 +292,28 @@ def _profile_for_user(user, access_token):
     }
 
 
+def _save_profile(payload, user, access_token):
+    if not isinstance(payload, dict):
+        raise ValueError("Profile details are required.")
+    full_name = str(payload.get("full_name") or payload.get("fullName") or "").strip()
+    company = str(payload.get("company") or "").strip()
+    if len(full_name) > 120:
+        raise ValueError("Full name must be 120 characters or fewer.")
+    if len(company) > 160:
+        raise ValueError("Company must be 160 characters or fewer.")
+    record = {
+        "id": user["id"],
+        "email": str(user.get("email") or "").strip()[:320],
+        "full_name": full_name,
+        "company": company,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _supabase_table_request(
+        "profiles", "POST", "?on_conflict=id", [record], access_token=access_token
+    )
+    return _profile_for_user(user, access_token)
+
+
 def _date_range_to_days(value):
     ranges = {
         "all": None,
@@ -2448,6 +2470,20 @@ class Handler(BaseHTTPRequestHandler):
                 _json_response(self, 200, {"provider": provider, "events": events})
             except (urllib.error.URLError, TimeoutError, OSError, KeyError, IndexError, json.JSONDecodeError, ValueError) as exc:
                 _json_response(self, 502, {"error": "Could not extract signal intelligence.", "detail": _provider_error_detail(exc)})
+            return
+        if post_path == "/api/profile":
+            payload = _read_json(self)
+            access_token = _bearer_token(self)
+            try:
+                user = _supabase_auth_user(access_token)
+                profile = _save_profile(payload, user, access_token)
+                _json_response(self, 200, {"profile": profile})
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except PermissionError as exc:
+                _json_response(self, 401, {"error": str(exc)})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Could not update profile.", "detail": str(exc)})
             return
         if post_path == "/api/favorites":
             payload = _read_json(self)
