@@ -823,8 +823,8 @@
   .home-result-label{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0b2025;font-size:12.5px;font-weight:500}
   .home-result-detail{display:block;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#5c7075;font-size:10.5px}
   .app{
-    padding-top:130px!important;
-    grid-template-rows:minmax(0,1fr)!important;
+    padding-top:84px!important;
+    grid-template-rows:auto minmax(0,1fr)!important;
     background:
       radial-gradient(circle at 86% 18%,rgba(40,220,202,.12),transparent 28%),
       linear-gradient(125deg,#002d36 0%,#003943 54%,#07533e 100%)!important;
@@ -833,21 +833,21 @@
     display:none;
   }
   body.dashboard-active .dashboard-commandbar{
-    position:fixed!important;
-    top:84px!important;
-    left:0!important;
-    right:0!important;
-    z-index:1180!important;
+    position:relative!important;
+    top:auto!important;
+    left:auto!important;
+    right:auto!important;
+    z-index:30!important;
     min-height:52px!important;
     display:flex!important;
     align-items:center!important;
     justify-content:space-between!important;
     gap:14px!important;
     padding:8px 18px!important;
-    border-top:1px solid rgba(40,220,202,.18)!important;
+    border-top:0!important;
     border-bottom:1px solid rgba(255,255,255,.1)!important;
-    background:rgba(0,31,38,.98)!important;
-    box-shadow:0 12px 28px rgba(0,0,0,.24)!important;
+    background:rgba(0,31,38,.72)!important;
+    box-shadow:none!important;
   }
   body.dashboard-active .global-topbar{
     z-index:2300!important;
@@ -855,6 +855,9 @@
   }
   body.dashboard-active .global-topbar .home-dropdown-panel{
     z-index:2400!important;
+  }
+  body.dashboard-active .modal-backdrop{
+    z-index:3600!important;
   }
   .dashboard-commandbar .dashboard-command-left,
   .dashboard-commandbar .dashboard-command-right{
@@ -871,6 +874,8 @@
     flex:0 0 auto!important;
     justify-content:flex-end!important;
   }
+  .dashboard-tools-menu{display:contents}
+  .dashboard-tools-menu>summary{display:none}
   .dashboard-commandbar .tab,
   .dashboard-commandbar .dashboard-action{
     height:34px!important;
@@ -904,6 +909,19 @@
     background:rgba(255,255,255,.1)!important;
     color:#fff!important;
   }
+  @media(max-width:1100px){
+    body.dashboard-active .dashboard-commandbar{min-height:52px!important;flex-wrap:nowrap!important}
+    .dashboard-commandbar .dashboard-command-left{flex-wrap:nowrap!important;overflow-x:auto!important;scrollbar-width:none}
+    .dashboard-commandbar .dashboard-command-left::-webkit-scrollbar{display:none}
+    .dashboard-tools-menu{position:relative;display:block;flex:0 0 auto}
+    .dashboard-tools-menu>summary{height:34px;display:inline-flex;align-items:center;gap:7px;padding:0 12px;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(255,255,255,.06);color:#dff5f5;font-size:12px;font-weight:500;list-style:none;cursor:pointer}
+    .dashboard-tools-menu>summary::-webkit-details-marker{display:none}
+    .dashboard-tools-menu>summary:after{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translateY(-2px)}
+    .dashboard-tools-menu[open]>summary{border-color:#28dcca;background:#28dcca;color:#002f3b}
+    .dashboard-tools-menu:not([open]) .dashboard-command-right{display:none!important}
+    .dashboard-tools-menu .dashboard-command-right{position:absolute;right:0;top:42px;z-index:90;width:190px;padding:8px!important;display:flex!important;align-items:stretch!important;flex-direction:column!important;flex-wrap:nowrap!important;border:1px solid rgba(40,220,202,.28);border-radius:12px;background:rgba(0,31,38,.99);box-shadow:0 18px 38px rgba(0,0,0,.28)}
+    .dashboard-tools-menu .dashboard-action{width:100%!important;justify-content:flex-start!important}
+  }
   .app>header.topbar,
   .app .dashboard-menu,
   body.dashboard-active .app>header.topbar,
@@ -931,7 +949,7 @@
   }
   .app>header.topbar .brand{display:none!important}
   .app .shell{
-    height:calc(100vh - 130px)!important;
+    height:100%!important;
     min-height:0!important;
     grid-template-columns:300px minmax(0,1fr)!important;
     background:transparent!important;
@@ -2031,13 +2049,15 @@
       <button class="tab" type="button" data-view="share">Intelligence Brief</button>
       <button class="tab" type="button" data-view="scan">Scan Pulse</button>
     </div>
-    <div class="dashboard-command-right">
-      <button class="dashboard-action" type="button" onclick="exportSettingsJson()">Save IQ</button>
-      <button class="dashboard-action" type="button" onclick="refreshFeeds()">Refresh</button>
-      <button id="dashboardExportBtn" class="dashboard-action" type="button" title="Export Live Feed" aria-label="Export Live Feed" onclick="exportSettings()">Export</button>
-      <button class="dashboard-action" type="button" onclick="$('importFile').click()">Import</button>
-      <button class="dashboard-action secondary" type="button" onclick="openIntelligenceHome()">Home</button>
-    </div>
+    <details class="dashboard-tools-menu">
+      <summary>Actions</summary>
+      <div class="dashboard-command-right">
+        <button class="dashboard-action" type="button" onclick="exportSettingsJson()">Save IQ</button>
+        <button class="dashboard-action" type="button" onclick="refreshFeeds()">Refresh</button>
+        <button id="dashboardExportBtn" class="dashboard-action" type="button" title="Export Live Feed" aria-label="Export Live Feed" onclick="exportSettings()">Export</button>
+        <button class="dashboard-action" type="button" onclick="$('importFile').click()">Import</button>
+      </div>
+    </details>
   </nav>
   <header class="topbar">
     <div class="brand"><span class="brand-bird" aria-hidden="true"><span class="bb-tail"></span><span class="bb-body"></span><span class="bb-head"><span class="bb-eye"></span></span></span><span class="brand-copy"><strong>Kestrel<span>IQ</span></strong><small>EXECUTIVE INTELLIGENCE</small></span></div>
