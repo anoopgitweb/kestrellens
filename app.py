@@ -23,6 +23,8 @@ ROOT = Path(__file__).resolve().parent
 INDEX_FILE = ROOT / "templates" / "index.html"
 ASSET_DIR = ROOT / "assets"
 FORTUNE_FILE = ASSET_DIR / "fortune500-2026.json"
+GLOBAL_2000_FILE = ASSET_DIR / "forbes-global2000-2026.json"
+GLOBAL_2000_URL = "https://www.forbes.com/forbesapi/org/global2000/2026/position/true.json?limit=2000"
 LLM_RANKINGS_URL = "https://artificialanalysis.ai/leaderboards/models"
 SUPABASE_URL = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY") or ""
@@ -31,6 +33,7 @@ QUOTE_CACHE_SECONDS = 60
 IST = ZoneInfo("Asia/Kolkata")
 
 NEWS_CACHE = {}
+GLOBAL_2000_CACHE = {}
 
 _ORIGINAL_GETADDRINFO = socket.getaddrinfo
 
@@ -1974,6 +1977,29 @@ def _fetch_fortune_news(company_rows, days=2):
     return result
 
 
+def _fetch_global_2000():
+    cached = GLOBAL_2000_CACHE.get("2026")
+    if cached and time.time() - cached["time"] < 24 * 60 * 60:
+        return cached["items"]
+    if GLOBAL_2000_FILE.exists():
+        payload = json.loads(GLOBAL_2000_FILE.read_text(encoding="utf-8"))
+        source_rows = payload.get("companies") or []
+    else:
+        payload = json.loads(_fetch_url(GLOBAL_2000_URL, accept="application/json, text/plain, */*", timeout=30).decode("utf-8", errors="replace"))
+        source_rows = (payload.get("organizationList") or {}).get("organizationsLists") or []
+    rows = [{
+        "rank": item.get("position") or item.get("rank"),
+        "name": item.get("organizationName") or item.get("name") or (item.get("organization") or {}).get("name") or "",
+        "country": item.get("country") or "",
+        "industry": item.get("industry") or "",
+        "sales": item.get("revenue") if item.get("revenue") is not None else item.get("sales"),
+        "marketValue": item.get("marketValue"),
+    } for item in source_rows]
+    rows = sorted((row for row in rows if row["rank"] and row["name"]), key=lambda row: row["rank"])[:2000]
+    GLOBAL_2000_CACHE["2026"] = {"time": time.time(), "items": rows}
+    return rows
+
+
 def _fetch_llm_rankings():
     cache_key = ("llm-rankings", "artificial-analysis")
     cached = NEWS_CACHE.get(cache_key)
@@ -2224,12 +2250,22 @@ class Handler(BaseHTTPRequestHandler):
             ranking = json.loads(FORTUNE_FILE.read_text(encoding="utf-8"))
             companies = ranking.get("companies") or []
             news = _fetch_fortune_news(companies[:50], days=2)
+            try:
+                global_2000_companies = _fetch_global_2000()
+            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+                global_2000_companies = []
             _json_response(self, 200, {
                 "year": ranking.get("year"),
                 "source": ranking.get("source"),
                 "sourceUrl": ranking.get("sourceUrl"),
                 "companies": companies,
                 "news": news,
+                "global2000": {
+                    "year": 2026,
+                    "source": "Forbes Global 2000",
+                    "sourceUrl": "https://www.forbes.com/lists/global2000/",
+                    "companies": global_2000_companies,
+                },
             })
             return
         if self.path == "/api/llm-rankings":
