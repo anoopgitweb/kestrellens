@@ -1709,6 +1709,25 @@ def _is_allowed_agency_url(url, meta):
     )
 
 
+def _agency_feed_link(item, meta):
+    """Keep agency feeds fast while still validating the official publisher.
+
+    Google News RSS items point at a Google redirect. Resolving every redirect
+    before returning the pulse is slow and unreliable on hosted runtimes. The
+    feed also supplies the publisher URL in its ``source`` element, so validate
+    that official domain and retain the working Google redirect for the click.
+    """
+    link = str(item.findtext("link") or "").strip()
+    if _is_allowed_agency_url(link, meta):
+        return link
+    parsed = urllib.parse.urlparse(link)
+    if not parsed.netloc.lower().endswith("news.google.com"):
+        return ""
+    source = item.find("source")
+    source_url = str(source.get("url") if source is not None else "").strip()
+    return link if _is_allowed_agency_url(source_url, meta) else ""
+
+
 def _agency_article_brief(article):
     fallback = _clean_article_block(article.get("articleSummary", ""))
     try:
@@ -1767,6 +1786,7 @@ def _fetch_agency_news(name, days, stats=None):
                 stats["perTarget"].append(cached_target)
         return cached["items"]
 
+    stale_items = list(cached.get("items") or []) if cached else []
     items = []
     cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
     seen = set()
@@ -1804,25 +1824,15 @@ def _fetch_agency_news(name, days, stats=None):
                 stats["rawItemsScanned"] += 1
             target_stats["rawItems"] += 1
             title = _clean_title(item.findtext("title"))
-            link = item.findtext("link") or ""
+            link = _agency_feed_link(item, meta)
             published = _item_published_date(item)
             rss_summary = _clean_rss_summary(item.findtext("description"), title)
-            if meta.get("resolve_links"):
-                try:
-                    link = _resolve_google_news_url(link)
-                except (urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError, IndexError, TypeError):
-                    continue
             raw_themes = _scan_themes_for_title(title, "interests")
             for theme in raw_themes:
                 target_stats["themeCounts"].setdefault(theme, {"raw": 0, "kept": 0})["raw"] += 1
             if cutoff and published and published < cutoff:
                 continue
             if not title or not link:
-                continue
-            if not _is_allowed_agency_url(link, meta):
-                if stats is not None:
-                    stats["relevanceDiscarded"] += 1
-                target_stats["relevanceDiscarded"] += 1
                 continue
             key = (title.lower(), link.lower())
             if key in seen:
@@ -1850,11 +1860,13 @@ def _fetch_agency_news(name, days, stats=None):
                 "scanThemes": raw_themes,
             })
 
+    if not items and stale_items:
+        return stale_items
     if last_fetch_error and not items:
         raise last_fetch_error
 
     items.sort(key=lambda item: item.get("date") or "", reverse=True)
-    if items and meta.get("brief_articles", True):
+    if items and meta.get("brief_articles", False):
         with ThreadPoolExecutor(max_workers=min(4, len(items))) as executor:
             briefs = list(executor.map(_agency_article_brief, items))
         for article, brief in zip(items, briefs):
@@ -1867,7 +1879,8 @@ def _fetch_agency_news(name, days, stats=None):
         stats["relevantItemsKept"] += len(items)
         stats["perTarget"].append(target_stats)
 
-    NEWS_CACHE[cache_key] = {"time": time.time(), "items": items, "targetStats": target_stats}
+    if items:
+        NEWS_CACHE[cache_key] = {"time": time.time(), "items": items, "targetStats": target_stats}
     return items
 
 
