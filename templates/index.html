@@ -2039,21 +2039,21 @@
 </section><div class="app">
   <nav id="dashboardCommandbar" class="dashboard-commandbar" aria-label="Dashboard navigation">
     <div class="dashboard-command-left">
-      <button class="dashboard-action secondary" type="button" onclick="openTrackingChooser()">Switch Lens</button>
-      <button class="tab" type="button" data-view="setup">Setup</button>
+      <button class="dashboard-action secondary" type="button" data-owner-only="true" style="display:none!important" onclick="openTrackingChooser()">Switch Lens</button>
+      <button class="tab" type="button" data-view="setup" style="display:none!important">Setup</button>
       <button class="tab active" type="button" data-view="live">Live Feed</button>
-      <button class="tab" type="button" data-view="today">Summary</button>
+      <button class="tab" type="button" data-view="today" style="display:none!important">Summary</button>
       <button class="tab" type="button" data-view="saved">Saved Items</button>
       <button class="tab" type="button" data-view="articleHeatmap">Article HeatMap</button>
       <button class="tab" type="button" data-view="themeCounts">Theme Count</button>
       <button class="tab" type="button" data-view="share">Intelligence Brief</button>
       <button class="tab" type="button" data-view="scan">Scan Pulse</button>
     </div>
+    <button id="dashboardRefreshAction" class="dashboard-action dashboard-refresh-action" type="button" onclick="refreshFeeds()">Refresh</button>
     <details class="dashboard-tools-menu">
       <summary>Actions</summary>
       <div class="dashboard-command-right">
         <button class="dashboard-action" type="button" onclick="exportSettingsJson()">Save IQ</button>
-        <button class="dashboard-action" type="button" onclick="refreshFeeds()">Refresh</button>
         <button id="dashboardExportBtn" class="dashboard-action" type="button" title="Export Live Feed" aria-label="Export Live Feed" onclick="exportSettings()">Export</button>
         <button class="dashboard-action" type="button" onclick="$('importFile').click()">Import</button>
       </div>
@@ -2065,12 +2065,12 @@
       <summary>Menu</summary>
       <div class="dashboard-menu-panel">
         <nav class="tabs">
-          <button class="tab" data-view="setup">Setup</button>
+          <button class="tab" data-view="setup" style="display:none!important">Setup</button>
           <button class="tab active" data-view="live">Live Feed</button>
           <details class="app-view-menu">
             <summary>Views</summary>
             <div class="app-view-panel">
-              <button class="tab" data-view="today">Summary</button>
+              <button class="tab" data-view="today" style="display:none!important">Summary</button>
               <button class="tab" data-view="saved">Saved</button>
               <button class="tab" data-view="articleHeatmap">Article HeatMap</button>
               <button class="tab" data-view="themeCounts">Theme Count</button>
@@ -2434,6 +2434,8 @@ const AUTH_STORAGE_KEY="kestreliqAuthSession";
 const LOCAL_FAVORITES_KEY="kestreliqLocalFavorites";
 const ADVANCED_DASHBOARD_USERS=["anoopviswanathan","anoopviswanathan@concentrix.com"];
 const ADVANCED_DASHBOARD_VIEWS=new Set(["articleHeatmap","themeCounts","scan"]);
+const OWNER_DASHBOARD_EMAIL="anoopviswanathan@outlook.com";
+const OWNER_DASHBOARD_VIEWS=new Set(["setup","today"]);
 function storedSession(){try{return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)||"null")}catch(_){return null}}
 function sessionExpired(session){return !session?.access_token||Number(session.expires_at||0)&&Date.now()>=Number(session.expires_at)*1000}
 function saveSession(session){if(session?.expires_in&&!session.expires_at)session.expires_at=Math.floor(Date.now()/1000)+Number(session.expires_in);state.session=session;localStorage.setItem(AUTH_STORAGE_KEY,JSON.stringify(session))}
@@ -2446,6 +2448,7 @@ async function loadAuthConfig(){if(state.authConfig)return state.authConfig;cons
 async function supabaseAuthRequest(path,payload){const cfg=await loadAuthConfig();const res=await fetch(`${cfg.supabaseUrl}/auth/v1/${path}`,{method:"POST",headers:{apikey:cfg.supabaseAnonKey,"Content-Type":"application/json"},body:JSON.stringify(payload)});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error_description||data.msg||data.error||"Supabase login failed.");return data}
 function currentUserEmail(){return state.profile?.email||state.session?.user?.email||""}
 function currentUserKeys(){const email=String(currentUserEmail()||"").trim().toLowerCase();const keys=new Set();if(email){keys.add(email);keys.add(email.split("@")[0])}return keys}
+function canUseOwnerDashboard(){return String(currentUserEmail()||"").trim().toLowerCase()===OWNER_DASHBOARD_EMAIL}
 function canUseAdvancedDashboard(){const keys=currentUserKeys();return ADVANCED_DASHBOARD_USERS.some(user=>keys.has(String(user).toLowerCase()))}
 function isAdvancedDashboardView(view){return ADVANCED_DASHBOARD_VIEWS.has(String(view||""))}
 function updateAuthUi(){const btn=$("globalLoginBtn");if(!btn)return;const email=currentUserEmail();const name=email?email.split("@")[0]:"User";if(!authConfigured()&&!state.session){btn.textContent="Guest";btn.title="Supabase Auth is not configured. KestrelIQ is running in local guest mode.";updateTabsForMode();return}btn.textContent=state.session?name:"Log In";btn.title=state.session?`Signed in as ${email||"KestrelIQ user"}. Click to log out.`:"Log in";updateTabsForMode()}
@@ -2472,8 +2475,8 @@ function renderKeywordSetup(){const useDefault=$("useDefaultKeywords");const inp
 function saveKeywordSetup(){const useDefault=$("useDefaultKeywords").checked;const customTerms=parseKeywordInput();state.keywordConfig={useDefault,terms:useDefault?DEFAULT_KEYWORDS:(customTerms.length?customTerms:DEFAULT_KEYWORDS)};localStorage.setItem(STORAGE_KEYS.keywordConfig,JSON.stringify(state.keywordConfig));markSettingsDirty();renderKeywordSetup();markRefreshNeeded();showToast("Search setup saved","Refresh feeds to use these Latest News search themes. Interests will continue using baseline search.")}
 function resetKeywordSetup(){state.keywordConfig={useDefault:true,terms:DEFAULT_KEYWORDS};localStorage.setItem(STORAGE_KEYS.keywordConfig,JSON.stringify(state.keywordConfig));markSettingsDirty();renderKeywordSetup();markRefreshNeeded();showToast("Default themes restored","Latest News will use the standard company business themes.")}
 function applyModeLabels(){const labels=modeLabels();document.querySelector('label[for="companyInput"]').textContent=labels.add;$("companyInput").placeholder=labels.placeholder;$("addBtn").title=`Add ${labels.one}`;const watchLabel=document.querySelector(".sidebar .side-block:nth-child(4) .label");if(watchLabel)watchLabel.textContent=labels.watch;document.querySelectorAll(".col-company").forEach(th=>{if(th.tagName==="TH")th.textContent=state.mode==="interests"?"TOPIC":state.mode==="people"?"PERSON":"COMPANY"});document.querySelectorAll("#modeChoice .mode-card").forEach(btn=>btn.classList.remove("active"));const active=state.mode==="interests"?$("myInterestsBtn"):state.mode==="people"?$("peopleNewsBtn"):$("latestNewsBtn");if(active)active.classList.add("active");updateTabsForMode()}
-function updateTabsForMode(){const hidden=new Set(["briefing"]);if(!canUseAdvancedDashboard())ADVANCED_DASHBOARD_VIEWS.forEach(view=>hidden.add(view));document.querySelectorAll(".tab").forEach(tab=>{const shouldHide=hidden.has(tab.dataset.view);tab.hidden=shouldHide;if(shouldHide)tab.style.setProperty("display","none","important");else tab.style.removeProperty("display")});const current=document.querySelector(".tab.active");if(current&&hidden.has(current.dataset.view)){current.classList.remove("active");const live=document.querySelector('.tab[data-view="live"]');if(live)live.classList.add("active");showAppView("live")}}
-function showAppView(view){if(isAdvancedDashboardView(view)&&!canUseAdvancedDashboard()){view="live";showToast("Restricted view","This dashboard option is visible only to enabled users.")}$("liveView").style.display=view==="live"?"grid":"none";$("todayView").style.display=view==="today"?"block":"none";$("savedView").style.display=view==="saved"?"block":"none";$("executiveView").style.display=view==="executive"?"block":"none";$("verticalView").style.display=view==="vertical"?"block":"none";$("briefingView").style.display=view==="briefing"?"block":"none";$("strategyView").style.display=view==="strategy"?"block":"none";$("heatmapView").style.display=view==="heatmap"?"block":"none";$("articleHeatmapView").style.display=view==="articleHeatmap"?"block":"none";$("competitorView").style.display=view==="competitor"?"block":"none";$("shareView").style.display=view==="share"?"block":"none";$("setupView").style.display=view==="setup"?"block":"none";$("themeCountsView").style.display=view==="themeCounts"?"block":"none";$("scanView").style.display=view==="scan"?"block":"none";state.currentDashboardView=view;updateExportButtonLabel(view);if(view==="saved")loadFavorites()}
+function updateTabsForMode(){const hidden=new Set(["briefing"]);if(!canUseAdvancedDashboard())ADVANCED_DASHBOARD_VIEWS.forEach(view=>hidden.add(view));if(!canUseOwnerDashboard())OWNER_DASHBOARD_VIEWS.forEach(view=>hidden.add(view));document.querySelectorAll(".tab").forEach(tab=>{const shouldHide=hidden.has(tab.dataset.view);tab.hidden=shouldHide;if(shouldHide)tab.style.setProperty("display","none","important");else tab.style.removeProperty("display")});document.querySelectorAll("[data-owner-only]").forEach(control=>{const shouldHide=!canUseOwnerDashboard();control.hidden=shouldHide;if(shouldHide)control.style.setProperty("display","none","important");else control.style.removeProperty("display")});const current=document.querySelector(".tab.active");if(current&&hidden.has(current.dataset.view)){current.classList.remove("active");const live=document.querySelector('.tab[data-view="live"]');if(live)live.classList.add("active");showAppView("live")}}
+function showAppView(view){if(OWNER_DASHBOARD_VIEWS.has(String(view||""))&&!canUseOwnerDashboard()){view="live";showToast("Restricted view","This dashboard option is available only to the dashboard owner.")}if(isAdvancedDashboardView(view)&&!canUseAdvancedDashboard()){view="live";showToast("Restricted view","This dashboard option is visible only to enabled users.")}$("liveView").style.display=view==="live"?"grid":"none";$("todayView").style.display=view==="today"?"block":"none";$("savedView").style.display=view==="saved"?"block":"none";$("executiveView").style.display=view==="executive"?"block":"none";$("verticalView").style.display=view==="vertical"?"block":"none";$("briefingView").style.display=view==="briefing"?"block":"none";$("strategyView").style.display=view==="strategy"?"block":"none";$("heatmapView").style.display=view==="heatmap"?"block":"none";$("articleHeatmapView").style.display=view==="articleHeatmap"?"block":"none";$("competitorView").style.display=view==="competitor"?"block":"none";$("shareView").style.display=view==="share"?"block":"none";$("setupView").style.display=view==="setup"?"block":"none";$("themeCountsView").style.display=view==="themeCounts"?"block":"none";$("scanView").style.display=view==="scan"?"block":"none";state.currentDashboardView=view;updateExportButtonLabel(view);if(view==="saved")loadFavorites()}
 function latestUpdateFor(name){const item=state.articles.find(a=>a.company.toLowerCase()===name.toLowerCase());return item?`Latest: ${item.displayDate||""} ${item.displayTimeIST||""}`.trim():"Latest: refresh to update"}
 function renderWatchlist(){applyModeLabels();const labels=modeLabels();const box=$("watchlist");box.innerHTML="";state.accountFilters=new Set([...state.accountFilters].filter(name=>state.companies.some(c=>c.toLowerCase()===name.toLowerCase())));if(!state.companies.length){box.innerHTML=`<p class="muted">${labels.empty}</p>`}state.companies.forEach((name,i)=>{const selected=state.accountFilters.has(name);const row=document.createElement("div");row.className=`watch-item ${selected?"selected":""}`;row.tabIndex=0;row.title=selected?`Selected. Click to remove ${name} from the filter.`:`Click to filter by ${name}. Select multiple from this list.`;row.innerHTML=`<span class="watch-name"><span class="watch-num">${i+1}</span><span class="watch-copy"><span class="watch-text">${escapeHtml(name)}</span><span class="watch-update">${escapeHtml(latestUpdateFor(name))}</span></span></span><button title="Remove">x</button>`;row.onclick=()=>toggleAccountFilter(name);row.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();toggleAccountFilter(name)}};row.querySelector("button").onclick=e=>{e.stopPropagation();if(!confirm(`Remove ${name} from your ${labels.one} list?`))return;state.companies.splice(i,1);state.accountFilters.delete(name);saveCompanies();state.shareSelectedIds.clear();renderAll();};box.appendChild(row)});renderCompanyFilter();renderShareEntityOptions()}
 function renderCompanyFilter(){const labels=modeLabels();const select=$("companyFilter");const value=select.value;select.innerHTML=`<option value="">${labels.filterAll}</option>`+state.companies.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");select.value=state.companies.includes(value)?value:""}
