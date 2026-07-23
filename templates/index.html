@@ -1836,9 +1836,84 @@
     .industry-visual-screen{padding-top:146px}.industry-visual-kpis,.industry-visual-drivers,.industry-market-trends,.industry-learning-cards{grid-template-columns:1fr}.industry-topic-chart{grid-template-columns:1fr}.industry-topic-legend{grid-template-columns:1fr 1fr}.industry-radar-chart,.industry-llm-insights{grid-template-columns:1fr}.industry-llm-row{grid-template-columns:minmax(110px,1fr) 1fr 58px;gap:7px}.industry-visual-hero-actions,.industry-visual-footer{align-items:stretch;flex-direction:column}.industry-visual-hero-actions{width:100%}.industry-visual-live{justify-content:center}.industry-visual-hero-actions button{width:100%}
     .lesson-kpis,.llm-score-grid,.llm-use-grid,.lesson-fact-grid,.lesson-use-grid{grid-template-columns:1fr}.lesson-panel-head{flex-direction:column}.lesson-panel-head p{text-align:left}.industry-lesson-hero{padding:20px}.industry-lesson-back{width:100%}.concept-scale-row{grid-template-columns:62px minmax(0,1fr) 68px}.metric-pair,.tool-chip-grid{grid-template-columns:1fr}.context-budget span{font-size:8px}
   }
+
+  /* Unified app typography: page heading, section heading, detail and metadata. */
+  :root{
+    --ki-font-heading:28px;
+    --ki-font-subheading:18px;
+    --ki-font-detail:13px;
+    --ki-font-meta:12px;
+    --ki-line-detail:1.5;
+  }
+  body{
+    font-size:var(--ki-font-detail)!important;
+    line-height:var(--ki-line-detail);
+  }
+  #kestrelApp#kestrelApp h1,
+  #kestrelApp#kestrelApp .section-title h1,
+  #kestrelApp#kestrelApp .home-section-head h1,
+  #kestrelApp#kestrelApp .home-intro h1,
+  #kestrelApp#kestrelApp .deep-dive-masthead h1,
+  #kestrelApp#kestrelApp .industry-visual-hero h1,
+  #kestrelApp#kestrelApp .industry-lesson-hero h1,
+  #kestrelApp#kestrelApp .client-brief-top h1{
+    font-size:var(--ki-font-heading)!important;
+    line-height:1.2!important;
+  }
+  #kestrelApp#kestrelApp h2,
+  #kestrelApp#kestrelApp h3,
+  #kestrelApp#kestrelApp h4,
+  #kestrelApp#kestrelApp .modal-head h2,
+  #kestrelApp#kestrelApp .home-route h2,
+  #kestrelApp#kestrelApp .home-route.primary h2,
+  #kestrelApp#kestrelApp .home-insight h3,
+  #kestrelApp#kestrelApp .home-insight:not(.lead) h3,
+  #kestrelApp#kestrelApp .concentrix-lead-copy h2,
+  #kestrelApp#kestrelApp .concentrix-news-head h2,
+  #kestrelApp#kestrelApp .fortune-panel-head h2{
+    font-size:var(--ki-font-subheading)!important;
+    line-height:1.35!important;
+  }
+  #kestrelApp#kestrelApp :is(p,li,td,input,select,textarea,button),
+  #kestrelApp#kestrelApp :is(.detail-text,.gist,.share-summary,.signal-desc,.drill-title,.drill-reason,.insight-callout,.home-result-detail,.home-result-title,.watch-item,.watch-update,.profile-editor-head p,.profile-watchlist-card){
+    font-size:var(--ki-font-detail)!important;
+    line-height:var(--ki-line-detail)!important;
+  }
+  #kestrelApp#kestrelApp :is(th,label,small),
+  #kestrelApp#kestrelApp :is(
+    .label,.meta,.muted,.count,.pill,.mini-pill,.watch-num,.profile-field label,
+    .profile-section-number,.profile-status,.profile-watchlist-card small,
+    .industry-tag,.industry-kicker,.home-kicker,.home-section-kicker,
+    .home-section-status,.home-insight-meta,.home-route-index,.home-route-tags span,
+    .fortune-count,.fortune-news-meta,.fortune-news-meta b,.fortune-source-note,
+    .concentrix-news-head span,.concentrix-news-row time,.concentrix-news-source,
+    .strategy-source,.strategy-date,.drill-meta,.meta-item span
+  ){
+    font-size:var(--ki-font-meta)!important;
+    line-height:1.4!important;
+  }
+  #kestrelApp#kestrelApp .table th,
+  #kestrelApp#kestrelApp .table td,
+  #kestrelApp#kestrelApp .heat-table th,
+  #kestrelApp#kestrelApp .heat-table td,
+  #kestrelApp#kestrelApp .fortune-table th,
+  #kestrelApp#kestrelApp .fortune-table td,
+  #kestrelApp#kestrelApp .profile-saved-table th,
+  #kestrelApp#kestrelApp .profile-saved-table td{
+    font-size:var(--ki-font-detail)!important;
+    line-height:1.45!important;
+  }
+  @media(max-width:560px){
+    :root{
+      --ki-font-heading:26px;
+      --ki-font-subheading:18px;
+      --ki-font-detail:13px;
+      --ki-font-meta:12px;
+    }
+  }
 </style>
 </head>
-<body>
+<body id="kestrelApp">
 <section id="authScreen" class="auth-screen">
   <form id="loginForm" class="auth-card">
     <div class="auth-logo"><strong>Kestrel<span>IQ</span></strong><small>EXECUTIVE INTELLIGENCE</small><span class="initiative-line">An initiative by India Innovation Team</span></div>
