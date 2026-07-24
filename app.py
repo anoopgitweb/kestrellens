@@ -2495,6 +2495,51 @@ def _fetch_company_profile(name):
     return profile
 
 
+def _fetch_learning_overview(query):
+    topic = str(query or "").strip()
+    if len(topic) < 2:
+        raise ValueError("Enter at least two characters to discover a topic.")
+    if len(topic) > 120:
+        raise ValueError("Keep the learning topic under 120 characters.")
+
+    cache_key = ("learning-overview", topic.lower())
+    cached = NEWS_CACHE.get(cache_key)
+    if cached and time.time() - cached["time"] < CACHE_SECONDS:
+        return cached["item"]
+
+    search_url = (
+        "https://en.wikipedia.org/w/api.php?"
+        + urllib.parse.urlencode({
+            "action": "query",
+            "list": "search",
+            "srsearch": topic,
+            "utf8": "1",
+            "format": "json",
+            "srlimit": "1",
+        })
+    )
+    search = json.loads(_fetch_url(search_url, accept="application/json", timeout=12).decode("utf-8", errors="replace"))
+    result = ((search.get("query") or {}).get("search") or [{}])[0]
+    title = str(result.get("title") or topic).strip()
+    summary = {}
+    try:
+        summary_url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + urllib.parse.quote(title.replace(" ", "_"))
+        summary = json.loads(_fetch_url(summary_url, accept="application/json", timeout=12).decode("utf-8", errors="replace"))
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
+        summary = {}
+
+    overview = {
+        "query": topic,
+        "title": summary.get("title") or title,
+        "description": summary.get("description") or "",
+        "summary": summary.get("extract") or "",
+        "url": (summary.get("content_urls") or {}).get("desktop", {}).get("page") or "",
+        "source": "Wikipedia",
+    }
+    NEWS_CACHE[cache_key] = {"time": time.time(), "item": overview}
+    return overview
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         print(f"[KestrelIQ] {self.address_string()} - {fmt % args}")
@@ -2635,6 +2680,47 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         post_path = self.path.split("?", 1)[0].rstrip("/")
+        if post_path == "/api/discover-learn":
+            payload = _read_json(self)
+            query = str(payload.get("query") or "").strip()
+            if len(query) < 2:
+                _json_response(self, 400, {"error": "Enter at least two characters to discover a topic."})
+                return
+            if len(query) > 120:
+                _json_response(self, 400, {"error": "Keep the learning topic under 120 characters."})
+                return
+
+            overview = {
+                "query": query,
+                "title": query,
+                "description": "",
+                "summary": "",
+                "url": "",
+                "source": "Wikipedia",
+            }
+            overview_error = ""
+            try:
+                overview = _fetch_learning_overview(query)
+            except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError, ValueError) as exc:
+                overview_error = str(exc)
+
+            articles = []
+            errors = []
+            scan = {}
+            try:
+                articles, errors, scan = _fetch_news([query], "7d", mode="interests", keyword_config={})
+            except (urllib.error.URLError, TimeoutError, ET.ParseError, OSError, ValueError) as exc:
+                errors = [{"topic": query, "error": str(exc)}]
+
+            _json_response(self, 200, {
+                "query": query,
+                "overview": overview,
+                "overviewError": overview_error,
+                "articles": articles[:20],
+                "errors": errors,
+                "scan": scan,
+            })
+            return
         if post_path == "/api/signal-intelligence":
             payload = _read_json(self)
             provider = str(payload.get("provider") or "local").strip().lower()
