@@ -2616,17 +2616,21 @@ def _call_openai_learning_answer(query):
         "reasoning": {"effort": "low"},
         "tools": [{"type": "web_search", "search_context_size": "medium"}],
         "instructions": (
-            "You are the KestrelIQ learning guide. Answer the user's AI or technology question clearly and accurately. "
-            "Use web search for current or time-sensitive claims. Start with a direct answer, then explain the important "
-            "concepts, practical implications, and three concise takeaways. Distinguish facts from interpretation, do not "
-            "invent details, and keep the response under 900 words. Preserve source citations supplied by web search."
+            "You are the KestrelIQ learning guide. Give a crisp, direct answer to the user's AI or technology question "
+            "in exactly four or five complete sentences and no more than 140 words. Do not use headings, bullet points, "
+            "a preamble, or a concluding recap. Use web search for current or time-sensitive claims, distinguish facts "
+            "from interpretation, and do not invent details. Make every sentence useful and preserve source citations "
+            "supplied by web search."
         ),
         "input": query,
     })
     answer, sources = _openai_output_text_and_sources(payload)
     if not answer:
         raise RuntimeError("OpenAI returned an empty answer.")
-    return {"answer": answer, "sources": sources, "model": OPENAI_ASK_MODEL}
+    normalized_answer = re.sub(r"\s+", " ", answer).strip()
+    sentences = re.findall(r".+?(?:[.!?]+(?=\s|$)|$)", normalized_answer)
+    concise_answer = " ".join(sentence.strip() for sentence in sentences[:5] if sentence.strip())
+    return {"answer": concise_answer or normalized_answer, "sources": sources, "model": OPENAI_ASK_MODEL}
 
 
 def _learning_notebook_schema(min_chapters=2, max_chapters=8):
