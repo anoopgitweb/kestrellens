@@ -102,3 +102,54 @@ create policy "Users manage their notes"
 grant select, insert, update, delete on public.note_topics to authenticated;
 grant select, insert, update, delete on public.note_subtopics to authenticated;
 grant select, insert, update, delete on public.notes to authenticated;
+
+-- Private, user-scoped image storage for pasted Jot Down screenshots.
+-- Images are compressed to WebP in the browser before upload.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'jot-down-images',
+  'jot-down-images',
+  false,
+  5242880,
+  array['image/webp', 'image/jpeg', 'image/png']
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "Users read their Jot Down images" on storage.objects;
+create policy "Users read their Jot Down images"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'jot-down-images'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "Users upload their Jot Down images" on storage.objects;
+create policy "Users upload their Jot Down images"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'jot-down-images'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "Users update their Jot Down images" on storage.objects;
+create policy "Users update their Jot Down images"
+  on storage.objects for update to authenticated
+  using (
+    bucket_id = 'jot-down-images'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'jot-down-images'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "Users delete their Jot Down images" on storage.objects;
+create policy "Users delete their Jot Down images"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'jot-down-images'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
