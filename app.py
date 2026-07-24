@@ -2629,7 +2629,7 @@ def _call_openai_learning_answer(query):
     return {"answer": answer, "sources": sources, "model": OPENAI_ASK_MODEL}
 
 
-def _learning_notebook_schema():
+def _learning_notebook_schema(min_chapters=2, max_chapters=8):
     page_schema = {
         "type": "object",
         "additionalProperties": False,
@@ -2671,8 +2671,8 @@ def _learning_notebook_schema():
             "summary": {"type": "string", "maxLength": 1200},
             "chapters": {
                 "type": "array",
-                "minItems": 2,
-                "maxItems": 8,
+                "minItems": min_chapters,
+                "maxItems": max_chapters,
                 "items": chapter_schema,
             },
             "sources": {
@@ -2685,15 +2685,29 @@ def _learning_notebook_schema():
     }
 
 
-def _call_openai_learning_notebook(query, audience="Practitioner", depth="Standard"):
-    prompt = (
-        f"Create a structured learning notebook about: {query}\n"
-        f"Audience: {audience}\nDepth: {depth}\n\n"
-        "Research current, reliable web sources. Organize the material as one notebook with logical chapters and concise "
-        "learning pages. Each page heading must be specific and each details field should be a self-contained explanation "
-        "with examples, technical distinctions, and practical implications where useful. Avoid repetition. Source URLs "
-        "must come from the research. This is a draft for user review and must not claim to have been saved."
-    )
+def _call_openai_learning_notebook(
+    query, audience="Practitioner", depth="Standard", creation_type="notebook", parent_name=""
+):
+    chapter_only = creation_type == "chapter"
+    if chapter_only:
+        prompt = (
+            f"Create exactly one structured learning chapter named or focused on: {query}\n"
+            f"It will be added to the existing notebook: {parent_name or 'Learning Notebook'}\n"
+            f"Audience: {audience}\nDepth: {depth}\n\n"
+            "Research current, reliable web sources. Return exactly one chapter with concise learning pages. "
+            "Each page heading must be specific and each details field should be a self-contained explanation "
+            "with examples, technical distinctions, and practical implications where useful. Avoid repetition. "
+            "Use the existing notebook name as notebookTitle. This is a draft and must not claim to have been saved."
+        )
+    else:
+        prompt = (
+            f"Create a structured learning notebook named or focused on: {query}\n"
+            f"Audience: {audience}\nDepth: {depth}\n\n"
+            "Research current, reliable web sources. Organize the material as one notebook with logical chapters and concise "
+            "learning pages. Each page heading must be specific and each details field should be a self-contained explanation "
+            "with examples, technical distinctions, and practical implications where useful. Avoid repetition. Source URLs "
+            "must come from the research. This is a draft for user review and must not claim to have been saved."
+        )
     payload = _openai_response_request({
         "model": OPENAI_NOTEBOOK_MODEL,
         "store": False,
@@ -2706,7 +2720,7 @@ def _call_openai_learning_notebook(query, audience="Practitioner", depth="Standa
                 "type": "json_schema",
                 "name": "kestreliq_learning_notebook",
                 "strict": True,
-                "schema": _learning_notebook_schema(),
+                "schema": _learning_notebook_schema(1, 1) if chapter_only else _learning_notebook_schema(),
             }
         },
     }, timeout=180)
@@ -2951,7 +2965,16 @@ class Handler(BaseHTTPRequestHandler):
                         audience = "Practitioner"
                     if depth not in {"Quick guide", "Standard", "Deep dive"}:
                         depth = "Standard"
-                    result = _call_openai_learning_notebook(query, audience, depth)
+                    creation_type = str(payload.get("creationType") or "notebook").strip().lower()
+                    if creation_type not in {"notebook", "chapter"}:
+                        creation_type = "notebook"
+                    parent_name = str(payload.get("parentName") or "").strip()[:120]
+                    if creation_type == "chapter" and not parent_name:
+                        _json_response(self, 400, {"error": "Select the notebook for this chapter."})
+                        return
+                    result = _call_openai_learning_notebook(
+                        query, audience, depth, creation_type, parent_name
+                    )
                 _json_response(self, 200, {"query": query, **result})
             except (RuntimeError, urllib.error.URLError, TimeoutError, OSError, KeyError, IndexError, json.JSONDecodeError) as exc:
                 _json_response(self, 502, {"error": str(exc) or "OpenAI could not complete this request."})
