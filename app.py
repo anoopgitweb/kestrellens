@@ -28,12 +28,16 @@ GLOBAL_2000_URL = "https://www.forbes.com/forbesapi/org/global2000/2026/position
 LLM_RANKINGS_URL = "https://artificialanalysis.ai/leaderboards/models"
 SUPABASE_URL = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY") or ""
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY") or ""
+OPENAI_ASK_MODEL = os.environ.get("OPENAI_ASK_MODEL") or "gpt-5.6-luna"
+OPENAI_NOTEBOOK_MODEL = os.environ.get("OPENAI_NOTEBOOK_MODEL") or "gpt-5.6-terra"
 CACHE_SECONDS = 15 * 60
 QUOTE_CACHE_SECONDS = 60
 IST = ZoneInfo("Asia/Kolkata")
 
 NEWS_CACHE = {}
 GLOBAL_2000_CACHE = {}
+OPENAI_DISCOVERY_USAGE = {}
 
 _ORIGINAL_GETADDRINFO = socket.getaddrinfo
 
@@ -2540,6 +2544,192 @@ def _fetch_learning_overview(query):
     return overview
 
 
+def _openai_discovery_rate_allowed(user_id, operation):
+    limits = {"ask": 30, "notebook": 6}
+    limit = limits.get(operation, 10)
+    now = time.time()
+    key = (str(user_id), operation)
+    recent = [stamp for stamp in OPENAI_DISCOVERY_USAGE.get(key, []) if now - stamp < 3600]
+    if len(recent) >= limit:
+        retry_after = max(1, int(3600 - (now - recent[0])))
+        OPENAI_DISCOVERY_USAGE[key] = recent
+        return False, retry_after
+    recent.append(now)
+    OPENAI_DISCOVERY_USAGE[key] = recent
+    return True, 0
+
+
+def _openai_response_request(body, timeout=120):
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OpenAI is not configured. Add OPENAI_API_KEY to the Render environment.")
+    request = urllib.request.Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8", errors="replace"))
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            payload = json.loads(exc.read().decode("utf-8", errors="replace"))
+            detail = str((payload.get("error") or {}).get("message") or "")
+        except (json.JSONDecodeError, AttributeError):
+            detail = ""
+        raise RuntimeError(detail or f"OpenAI returned HTTP {exc.code}.") from exc
+
+
+def _openai_output_text_and_sources(payload):
+    text_parts = []
+    sources = []
+    seen_urls = set()
+    for item in payload.get("output") or []:
+        if item.get("type") != "message":
+            continue
+        for content in item.get("content") or []:
+            if content.get("type") != "output_text":
+                continue
+            if content.get("text"):
+                text_parts.append(str(content["text"]).strip())
+            for annotation in content.get("annotations") or []:
+                citation = annotation.get("url_citation") if isinstance(annotation.get("url_citation"), dict) else annotation
+                url = str(citation.get("url") or "").strip()
+                if not url.startswith(("https://", "http://")) or url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                sources.append({
+                    "title": str(citation.get("title") or urllib.parse.urlparse(url).netloc or "Source").strip()[:300],
+                    "url": url[:2000],
+                })
+    return "\n\n".join(part for part in text_parts if part).strip(), sources[:12]
+
+
+def _call_openai_learning_answer(query):
+    payload = _openai_response_request({
+        "model": OPENAI_ASK_MODEL,
+        "store": False,
+        "reasoning": {"effort": "low"},
+        "tools": [{"type": "web_search", "search_context_size": "medium"}],
+        "instructions": (
+            "You are the KestrelIQ learning guide. Answer the user's AI or technology question clearly and accurately. "
+            "Use web search for current or time-sensitive claims. Start with a direct answer, then explain the important "
+            "concepts, practical implications, and three concise takeaways. Distinguish facts from interpretation, do not "
+            "invent details, and keep the response under 900 words. Preserve source citations supplied by web search."
+        ),
+        "input": query,
+    })
+    answer, sources = _openai_output_text_and_sources(payload)
+    if not answer:
+        raise RuntimeError("OpenAI returned an empty answer.")
+    return {"answer": answer, "sources": sources, "model": OPENAI_ASK_MODEL}
+
+
+def _learning_notebook_schema():
+    page_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "heading": {"type": "string", "maxLength": 200},
+            "details": {"type": "string", "maxLength": 3000},
+        },
+        "required": ["heading", "details"],
+    }
+    chapter_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "title": {"type": "string", "maxLength": 160},
+            "overview": {"type": "string", "maxLength": 600},
+            "pages": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 8,
+                "items": page_schema,
+            },
+        },
+        "required": ["title", "overview", "pages"],
+    }
+    source_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "title": {"type": "string", "maxLength": 300},
+            "url": {"type": "string", "maxLength": 2000},
+        },
+        "required": ["title", "url"],
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "notebookTitle": {"type": "string", "maxLength": 120},
+            "summary": {"type": "string", "maxLength": 1200},
+            "chapters": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 8,
+                "items": chapter_schema,
+            },
+            "sources": {
+                "type": "array",
+                "maxItems": 12,
+                "items": source_schema,
+            },
+        },
+        "required": ["notebookTitle", "summary", "chapters", "sources"],
+    }
+
+
+def _call_openai_learning_notebook(query, audience="Practitioner", depth="Standard"):
+    prompt = (
+        f"Create a structured learning notebook about: {query}\n"
+        f"Audience: {audience}\nDepth: {depth}\n\n"
+        "Research current, reliable web sources. Organize the material as one notebook with logical chapters and concise "
+        "learning pages. Each page heading must be specific and each details field should be a self-contained explanation "
+        "with examples, technical distinctions, and practical implications where useful. Avoid repetition. Source URLs "
+        "must come from the research. This is a draft for user review and must not claim to have been saved."
+    )
+    payload = _openai_response_request({
+        "model": OPENAI_NOTEBOOK_MODEL,
+        "store": False,
+        "reasoning": {"effort": "medium"},
+        "tools": [{"type": "web_search", "search_context_size": "medium"}],
+        "instructions": "You create accurate, well-structured technical learning notebooks for KestrelIQ.",
+        "input": prompt,
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": "kestreliq_learning_notebook",
+                "strict": True,
+                "schema": _learning_notebook_schema(),
+            }
+        },
+    }, timeout=180)
+    output_text, cited_sources = _openai_output_text_and_sources(payload)
+    try:
+        notebook = json.loads(output_text)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("OpenAI returned a notebook that could not be parsed.") from exc
+    if not notebook.get("notebookTitle") or not notebook.get("chapters"):
+        raise RuntimeError("OpenAI returned an incomplete notebook.")
+    notebook["sources"] = [
+        source for source in (notebook.get("sources") or [])
+        if str(source.get("url") or "").startswith(("https://", "http://"))
+    ]
+    source_urls = {str(item.get("url") or "") for item in notebook["sources"]}
+    for source in cited_sources:
+        if source["url"] not in source_urls:
+            notebook.setdefault("sources", []).append(source)
+            source_urls.add(source["url"])
+    notebook["sources"] = (notebook.get("sources") or [])[:12]
+    return {"notebook": notebook, "model": OPENAI_NOTEBOOK_MODEL}
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         print(f"[KestrelIQ] {self.address_string()} - {fmt % args}")
@@ -2720,6 +2910,51 @@ class Handler(BaseHTTPRequestHandler):
                 "errors": errors,
                 "scan": scan,
             })
+            return
+        if post_path in {"/api/discover-learn/openai", "/api/discover-learn/notebook"}:
+            payload = _read_json(self)
+            query = str(payload.get("query") or "").strip()
+            if len(query) < 2:
+                _json_response(self, 400, {"error": "Enter at least two characters."})
+                return
+            if len(query) > 500:
+                _json_response(self, 400, {"error": "Keep the request under 500 characters."})
+                return
+            try:
+                access_token = _bearer_token(self)
+                user = _supabase_auth_user(access_token)
+            except PermissionError as exc:
+                _json_response(self, 401, {"error": str(exc)})
+                return
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Authentication is temporarily unavailable.", "detail": str(exc)})
+                return
+            if not OPENAI_API_KEY:
+                _json_response(self, 503, {
+                    "error": "OpenAI is not configured yet. Add OPENAI_API_KEY to the Render environment."
+                })
+                return
+            operation = "notebook" if post_path.endswith("/notebook") else "ask"
+            allowed, retry_after = _openai_discovery_rate_allowed(user["id"], operation)
+            if not allowed:
+                _json_response(self, 429, {
+                    "error": f"OpenAI {operation} limit reached. Try again in about {max(1, retry_after // 60)} minutes."
+                })
+                return
+            try:
+                if operation == "ask":
+                    result = _call_openai_learning_answer(query)
+                else:
+                    audience = str(payload.get("audience") or "Practitioner").strip()[:40]
+                    depth = str(payload.get("depth") or "Standard").strip()[:40]
+                    if audience not in {"Beginner", "Practitioner", "Expert"}:
+                        audience = "Practitioner"
+                    if depth not in {"Quick guide", "Standard", "Deep dive"}:
+                        depth = "Standard"
+                    result = _call_openai_learning_notebook(query, audience, depth)
+                _json_response(self, 200, {"query": query, **result})
+            except (RuntimeError, urllib.error.URLError, TimeoutError, OSError, KeyError, IndexError, json.JSONDecodeError) as exc:
+                _json_response(self, 502, {"error": str(exc) or "OpenAI could not complete this request."})
             return
         if post_path == "/api/signal-intelligence":
             payload = _read_json(self)
