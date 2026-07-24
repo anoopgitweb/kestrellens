@@ -327,6 +327,128 @@ def _delete_watchlist(watchlist_id, access_token):
     return _supabase_table_request("watchlists", "DELETE", f"?id=eq.{encoded}", access_token=access_token)
 
 
+def _jot_uuid(value, label):
+    key = str(value or "").strip()
+    if not re.fullmatch(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}", key):
+        raise ValueError(f"{label} is invalid.")
+    return key
+
+
+def _jot_title(payload, field="title", maximum=160):
+    title = str((payload or {}).get(field) or "").strip()
+    if not title:
+        raise ValueError("A title is required.")
+    if len(title) > maximum:
+        raise ValueError(f"Title must be {maximum} characters or fewer.")
+    return title
+
+
+def _jot_order(payload):
+    try:
+        return max(0, min(10000, int((payload or {}).get("sort_order") or 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _list_jot_down(user_id, access_token):
+    encoded_user = urllib.parse.quote(str(user_id), safe="")
+    topics = _supabase_table_request(
+        "note_topics",
+        "GET",
+        f"?user_id=eq.{encoded_user}&select=*&order=sort_order.asc,created_at.asc",
+        access_token=access_token,
+    )
+    subtopics = _supabase_table_request(
+        "note_subtopics",
+        "GET",
+        f"?user_id=eq.{encoded_user}&select=*&order=sort_order.asc,created_at.asc",
+        access_token=access_token,
+    )
+    notes = _supabase_table_request(
+        "notes",
+        "GET",
+        f"?user_id=eq.{encoded_user}&select=*&order=updated_at.desc",
+        access_token=access_token,
+    )
+    return {"topics": topics, "subtopics": subtopics, "notes": notes}
+
+
+def _save_jot_topic(payload, user_id, access_token):
+    if not isinstance(payload, dict):
+        raise ValueError("Topic details are required.")
+    record = {
+        "title": _jot_title(payload, maximum=120),
+        "sort_order": _jot_order(payload),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    topic_id = str(payload.get("id") or "").strip()
+    if topic_id:
+        encoded = urllib.parse.quote(_jot_uuid(topic_id, "Topic id"), safe="")
+        return _supabase_table_request("note_topics", "PATCH", f"?id=eq.{encoded}", record, access_token=access_token)
+    record["user_id"] = user_id
+    return _supabase_table_request("note_topics", "POST", "", [record], access_token=access_token)
+
+
+def _save_jot_subtopic(payload, user_id, access_token):
+    if not isinstance(payload, dict):
+        raise ValueError("Subtopic details are required.")
+    topic_id = _jot_uuid(payload.get("topic_id") or payload.get("topicId"), "Topic id")
+    encoded_topic = urllib.parse.quote(topic_id, safe="")
+    owned_topic = _supabase_table_request(
+        "note_topics", "GET", f"?id=eq.{encoded_topic}&select=id", access_token=access_token
+    )
+    if not owned_topic:
+        raise ValueError("The selected topic was not found.")
+    record = {
+        "topic_id": topic_id,
+        "title": _jot_title(payload),
+        "sort_order": _jot_order(payload),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    subtopic_id = str(payload.get("id") or "").strip()
+    if subtopic_id:
+        encoded = urllib.parse.quote(_jot_uuid(subtopic_id, "Subtopic id"), safe="")
+        return _supabase_table_request(
+            "note_subtopics", "PATCH", f"?id=eq.{encoded}", record, access_token=access_token
+        )
+    record["user_id"] = user_id
+    return _supabase_table_request("note_subtopics", "POST", "", [record], access_token=access_token)
+
+
+def _save_jot_note(payload, user_id, access_token):
+    if not isinstance(payload, dict):
+        raise ValueError("Note details are required.")
+    subtopic_id = _jot_uuid(payload.get("subtopic_id") or payload.get("subtopicId"), "Subtopic id")
+    encoded_subtopic = urllib.parse.quote(subtopic_id, safe="")
+    owned_subtopic = _supabase_table_request(
+        "note_subtopics", "GET", f"?id=eq.{encoded_subtopic}&select=id", access_token=access_token
+    )
+    if not owned_subtopic:
+        raise ValueError("The selected subtopic was not found.")
+    content = str(payload.get("content") or "")
+    if len(content) > 500000:
+        raise ValueError("Note content must be 500,000 characters or fewer.")
+    record = {
+        "subtopic_id": subtopic_id,
+        "title": _jot_title(payload, maximum=200),
+        "content": content,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    existing = _supabase_table_request(
+        "notes", "GET", f"?subtopic_id=eq.{encoded_subtopic}&select=id", access_token=access_token
+    )
+    if existing:
+        encoded_note = urllib.parse.quote(str(existing[0].get("id") or ""), safe="")
+        return _supabase_table_request("notes", "PATCH", f"?id=eq.{encoded_note}", record, access_token=access_token)
+    record["user_id"] = user_id
+    return _supabase_table_request("notes", "POST", "", [record], access_token=access_token)
+
+
+def _delete_jot_item(table, item_id, label, access_token):
+    encoded = urllib.parse.quote(_jot_uuid(item_id, f"{label} id"), safe="")
+    return _supabase_table_request(table, "DELETE", f"?id=eq.{encoded}", access_token=access_token)
+
+
 def _profile_for_user(user, access_token):
     encoded = urllib.parse.quote(str(user.get("id") or ""), safe="")
     rows = _supabase_table_request("profiles", "GET", f"?id=eq.{encoded}&select=*", access_token=access_token)
@@ -2496,6 +2618,16 @@ class Handler(BaseHTTPRequestHandler):
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 _json_response(self, 503, {"error": "Watchlists are temporarily unavailable.", "detail": str(exc)})
             return
+        if self.path == "/api/jot-down":
+            access_token = _bearer_token(self)
+            try:
+                user = _supabase_auth_user(access_token)
+                _json_response(self, 200, _list_jot_down(user["id"], access_token))
+            except PermissionError as exc:
+                _json_response(self, 401, {"error": str(exc)})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Jot Down is temporarily unavailable.", "detail": str(exc)})
+            return
         if self.path == "/api/health":
             _json_response(self, 200, {"ok": True, "service": "KestrelIQ"})
             return
@@ -2634,6 +2766,35 @@ class Handler(BaseHTTPRequestHandler):
                 _json_response(self, 401, {"error": str(exc)})
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 _json_response(self, 503, {"error": "Could not delete watchlist.", "detail": str(exc)})
+            return
+        if post_path in {
+            "/api/jot-down/topic",
+            "/api/jot-down/subtopic",
+            "/api/jot-down/note",
+            "/api/jot-down/topic/delete",
+            "/api/jot-down/subtopic/delete",
+        }:
+            payload = _read_json(self)
+            access_token = _bearer_token(self)
+            try:
+                user = _supabase_auth_user(access_token)
+                if post_path == "/api/jot-down/topic":
+                    _save_jot_topic(payload, user["id"], access_token)
+                elif post_path == "/api/jot-down/subtopic":
+                    _save_jot_subtopic(payload, user["id"], access_token)
+                elif post_path == "/api/jot-down/note":
+                    _save_jot_note(payload, user["id"], access_token)
+                elif post_path == "/api/jot-down/topic/delete":
+                    _delete_jot_item("note_topics", payload.get("id"), "Topic", access_token)
+                else:
+                    _delete_jot_item("note_subtopics", payload.get("id"), "Subtopic", access_token)
+                _json_response(self, 200, _list_jot_down(user["id"], access_token))
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except PermissionError as exc:
+                _json_response(self, 401, {"error": str(exc)})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Could not update Jot Down.", "detail": str(exc)})
             return
         if self.path == "/api/news":
             payload = _read_json(self)
