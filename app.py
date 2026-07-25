@@ -497,6 +497,7 @@ def _date_range_to_days(value):
         "30d": 30,
         "60d": 60,
         "180d": 180,
+        "365d": 365,
     }
     return ranges.get(value, 7)
 
