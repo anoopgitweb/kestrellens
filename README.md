@@ -45,6 +45,16 @@ OPENAI_NOTEBOOK_MODEL=gpt-5.6-terra
 
 The regular **Ask** mode continues to use the existing Wikipedia and Google News workflow without OpenAI. OpenAI-generated notebooks remain drafts until the signed-in user confirms that they should be saved to their private Supabase Jot Down workspace.
 
+### Shared timeline refresh
+
+The timeline reads its normal views and filters from Supabase. **Refresh timeline** performs a cached 48-hour discovery scan and inserts only URL-unique articles. To let a refresh initiated by any user save to the shared database, add the server-only Supabase service role key in Render:
+
+```text
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+```
+
+Never expose this key in browser code. Without it, automatic saving is limited to the signed-in timeline administrator; other users still read the shared timeline.
+
 ## Notes
 
 - No paid news API is required for the regular Ask and intelligence-feed workflows.

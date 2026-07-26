@@ -1,5 +1,8 @@
 ﻿import email.utils
 import html
+import base64
+import csv
+import io
 import json
 import os
 import re
@@ -9,6 +12,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
@@ -28,6 +32,7 @@ GLOBAL_2000_URL = "https://www.forbes.com/forbesapi/org/global2000/2026/position
 LLM_RANKINGS_URL = "https://artificialanalysis.ai/leaderboards/models"
 SUPABASE_URL = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY") or ""
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or ""
 TIMELINE_ADMIN_EMAIL = (os.environ.get("TIMELINE_ADMIN_EMAIL") or "anoopviswanathan@outlook.com").strip().lower()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY") or ""
 OPENAI_ASK_MODEL = os.environ.get("OPENAI_ASK_MODEL") or "gpt-5.6-luna"
@@ -39,6 +44,7 @@ IST = ZoneInfo("Asia/Kolkata")
 NEWS_CACHE = {}
 GLOBAL_2000_CACHE = {}
 OPENAI_DISCOVERY_USAGE = {}
+TIMELINE_REFRESH_CACHE = {"time": 0.0, "articles": [], "errors": [], "scan": None, "sync": None}
 
 _ORIGINAL_GETADDRINFO = socket.getaddrinfo
 
@@ -170,18 +176,19 @@ def _urlopen_with_retry(request, timeout=15, retries=2):
         time.sleep(0.3 * (2 ** attempt))
 
 
-def _supabase_table_request(table, method, query="", payload=None, access_token=None):
+def _supabase_table_request(table, method, query="", payload=None, access_token=None, api_key=None, prefer=None):
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
         raise RuntimeError("Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.")
+    request_key = api_key or SUPABASE_ANON_KEY
     url = f"{SUPABASE_URL}/rest/v1/{table}{query}"
     data = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(url, data=data, method=method)
-    req.add_header("apikey", SUPABASE_ANON_KEY)
-    req.add_header("Authorization", f"Bearer {access_token or SUPABASE_ANON_KEY}")
+    req.add_header("apikey", request_key)
+    req.add_header("Authorization", f"Bearer {access_token or request_key}")
     req.add_header("Content-Type", "application/json")
     req.add_header("Accept", "application/json")
     if method in {"POST", "PATCH", "DELETE"}:
-        req.add_header("Prefer", "resolution=merge-duplicates,return=representation")
+        req.add_header("Prefer", prefer or "resolution=merge-duplicates,return=representation")
     retries = 2 if method in {"GET", "PATCH", "DELETE"} else 0
     with _urlopen_with_retry(req, timeout=15, retries=retries) as response:
         raw = response.read().decode("utf-8", errors="replace")
@@ -549,9 +556,7 @@ def _list_timeline_signals(date_range="all"):
     return [_timeline_signal_article(row) for row in rows]
 
 
-def _save_timeline_signal(payload, user, access_token):
-    if not _is_timeline_admin(user):
-        raise PermissionError("Only the timeline administrator can add signals.")
+def _timeline_manual_record(payload, user):
     if not isinstance(payload, dict):
         raise ValueError("Timeline signal details are required.")
     headline = str(payload.get("headline") or "").strip()
@@ -586,6 +591,13 @@ def _save_timeline_signal(payload, user, access_token):
         "created_by": user["id"],
         "created_by_email": str(user.get("email") or "")[:320],
     }
+    return record
+
+
+def _save_timeline_signal(payload, user, access_token):
+    if not _is_timeline_admin(user):
+        raise PermissionError("Only the timeline administrator can add signals.")
+    record = _timeline_manual_record(payload, user)
     encoded_url = urllib.parse.quote(record["url"], safe="")
     existing = _supabase_table_request(
         "timeline_signals",
@@ -605,6 +617,342 @@ def _save_timeline_signal(payload, user, access_token):
     return _timeline_signal_article(rows[0]) if rows else _timeline_signal_article(record)
 
 
+def _timeline_bulk_header(value):
+    return re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().lower()).strip("_")
+
+
+def _timeline_csv_rows(raw):
+    return list(csv.DictReader(io.StringIO(raw.decode("utf-8-sig", errors="replace"))))
+
+
+def _timeline_xlsx_rows(raw):
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        shared = []
+        namespace = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+        if "xl/sharedStrings.xml" in archive.namelist():
+            root = ET.fromstring(archive.read("xl/sharedStrings.xml"))
+            for item in root.findall("x:si", namespace):
+                shared.append("".join(node.text or "" for node in item.findall(".//x:t", namespace)))
+        workbook = ET.fromstring(archive.read("xl/workbook.xml"))
+        relationships = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+        relationship_map = {
+            relationship.attrib.get("Id"): relationship.attrib.get("Target")
+            for relationship in relationships
+        }
+        namespace["r"] = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        first_sheet = workbook.find("x:sheets/x:sheet", namespace)
+        if first_sheet is None:
+            return []
+        target = relationship_map.get(
+            first_sheet.attrib.get(f"{{{namespace['r']}}}id"),
+            "worksheets/sheet1.xml",
+        ).lstrip("/")
+        sheet_path = target if target.startswith("xl/") else "xl/" + target
+        sheet = ET.fromstring(archive.read(sheet_path))
+        table = []
+        for row in sheet.findall(".//x:sheetData/x:row", namespace):
+            values = {}
+            for cell in row.findall("x:c", namespace):
+                reference = cell.attrib.get("r", "")
+                column = re.sub(r"\d+", "", reference)
+                cell_type = cell.attrib.get("t", "")
+                value_node = cell.find("x:v", namespace)
+                if cell_type == "inlineStr":
+                    value = "".join(node.text or "" for node in cell.findall(".//x:t", namespace))
+                elif value_node is None:
+                    value = ""
+                elif cell_type == "s":
+                    index = int(value_node.text or "0")
+                    value = shared[index] if 0 <= index < len(shared) else ""
+                else:
+                    value = value_node.text or ""
+                values[column] = value
+            table.append(values)
+    if not table:
+        return []
+    columns = sorted({column for row in table for column in row}, key=lambda value: (len(value), value))
+    headers = {column: table[0].get(column, "") for column in columns}
+    return [
+        {headers[column]: row.get(column, "") for column in columns if headers[column]}
+        for row in table[1:]
+        if any(str(row.get(column, "")).strip() for column in columns)
+    ]
+
+
+def _timeline_bulk_published(value):
+    text = str(value or "").strip()
+    if not text:
+        return text
+    try:
+        serial = float(text)
+        if 20000 <= serial <= 100000:
+            return (datetime(1899, 12, 30, tzinfo=timezone.utc) + timedelta(days=serial)).isoformat()
+    except ValueError:
+        pass
+    return text
+
+
+def _timeline_bulk_payload(row):
+    normalized = {_timeline_bulk_header(key): value for key, value in (row or {}).items()}
+    return {
+        "url": normalized.get("article_url") or normalized.get("url") or "",
+        "headline": normalized.get("headline") or normalized.get("title") or "",
+        "provider": normalized.get("provider_company") or normalized.get("provider") or normalized.get("company") or "",
+        "source": normalized.get("publisher") or normalized.get("source") or "",
+        "category": normalized.get("category") or "technology",
+        "publishedAt": _timeline_bulk_published(
+            normalized.get("published_date_and_time")
+            or normalized.get("published_at")
+            or normalized.get("published")
+            or normalized.get("date")
+            or ""
+        ),
+        "summary": normalized.get("quick_summary") or normalized.get("summary") or "",
+    }
+
+
+def _save_timeline_bulk(payload, user, access_token):
+    if not _is_timeline_admin(user):
+        raise PermissionError("Only the timeline administrator can import signals.")
+    filename = str((payload or {}).get("filename") or "").strip()
+    encoded = str((payload or {}).get("content") or "")
+    if "," in encoded and encoded.lower().startswith("data:"):
+        encoded = encoded.split(",", 1)[1]
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("The selected file could not be read.") from exc
+    if not raw or len(raw) > 8 * 1024 * 1024:
+        raise ValueError("Upload a CSV or Excel file smaller than 8 MB.")
+    extension = Path(filename).suffix.lower()
+    if extension == ".csv":
+        rows = _timeline_csv_rows(raw)
+    elif extension == ".xlsx":
+        rows = _timeline_xlsx_rows(raw)
+    else:
+        raise ValueError("Choose a .csv or .xlsx file.")
+    if not rows:
+        raise ValueError("The file does not contain any article rows.")
+    if len(rows) > 1000:
+        raise ValueError("Import up to 1,000 articles at a time.")
+    records = []
+    errors = []
+    for index, row in enumerate(rows, start=2):
+        try:
+            records.append(_timeline_manual_record(_timeline_bulk_payload(row), user))
+        except ValueError as exc:
+            errors.append({"row": index, "error": str(exc)})
+    if not records:
+        raise ValueError(errors[0]["error"] if errors else "No valid articles were found.")
+    inserted = _supabase_table_request(
+        "timeline_signals",
+        "POST",
+        "?on_conflict=url",
+        records,
+        access_token=access_token,
+        prefer="resolution=ignore-duplicates,return=representation",
+    )
+    return {
+        "rows": len(rows),
+        "valid": len(records),
+        "inserted": len(inserted or []),
+        "duplicates": max(0, len(records) - len(inserted or [])),
+        "errors": errors[:25],
+    }
+
+
+TIMELINE_PROVIDER_QUERIES = [
+    "OpenAI", "Anthropic", "Google Gemini", "Meta AI", "xAI", "Mistral AI",
+    "DeepSeek", "Moonshot AI", "Alibaba Qwen", "Microsoft Phi", "Amazon Nova",
+    "NVIDIA Nemotron", "Cohere Command", "AI21 Jamba", "IBM Granite",
+    "Perplexity Sonar", "Hugging Face model", "Apple Intelligence", "Apple AI",
+    "Apple technology", "Baidu ERNIE", "Tencent Hunyuan", "Zhipu GLM",
+    "MiniMax AI", "01.AI", "Naver HyperCLOVA", "Stability AI",
+    "AI model release", "AI chips", "Agentic AI", "Enterprise AI",
+    "AI risk and regulation", "Technology industry",
+]
+TIMELINE_MODEL_TERMS = [
+    "AI", "technology", "model", "release", "launch", "LLM", "GPT", "Claude",
+    "Gemini", "Gemma", "Kimi", "DeepSeek", "Qwen", "Grok", "Mistral",
+    "Mixtral", "Llama", "Phi", "Nova", "Nemotron", "Command", "Jamba",
+    "Granite", "Sonar", "ERNIE", "Hunyuan", "GLM", "MiniMax", "HyperCLOVA",
+    "chip", "semiconductor", "GPU", "agent", "automation", "enterprise",
+    "cloud", "security", "risk", "regulation",
+]
+
+
+def _timeline_provider(article):
+    text = " ".join([
+        str(article.get("headline") or ""),
+        str(article.get("source") or ""),
+        str(article.get("company") or ""),
+    ]).lower()
+    providers = [
+        (r"openai|\bgpt\b|o[134]-", "OpenAI"),
+        (r"anthropic|claude", "Anthropic"),
+        (r"google|gemini|gemma|deepmind", "Google"),
+        (r"moonshot|\bkimi\b", "Moonshot AI"),
+        (r"deepseek", "DeepSeek"),
+        (r"\bmeta\b|\bllama\b", "Meta"),
+        (r"\bxai\b|\bgrok\b", "xAI"),
+        (r"mistral|mixtral", "Mistral AI"),
+        (r"alibaba|\bqwen\b", "Alibaba"),
+        (r"microsoft|\bphi[-\s]?\d", "Microsoft"),
+        (r"amazon|\bnova\b|\btitan\b", "Amazon"),
+        (r"nvidia|nemotron", "NVIDIA"),
+        (r"cohere", "Cohere"),
+        (r"ai21|\bjamba\b", "AI21 Labs"),
+        (r"\bibm\b|\bgranite\b", "IBM"),
+        (r"perplexity|\bsonar\b", "Perplexity"),
+        (r"hugging\s*face", "Hugging Face"),
+        (r"\bapple\b|foundation models framework", "Apple"),
+        (r"baidu|\bernie\b", "Baidu"),
+        (r"tencent|hunyuan", "Tencent"),
+        (r"zhipu|\bglm[-\s]?\d", "Zhipu AI"),
+        (r"\bminimax\b", "MiniMax"),
+        (r"01\.ai|零一万物", "01.AI"),
+        (r"naver|hyperclova", "Naver"),
+        (r"stability\s*ai|stable diffusion", "Stability AI"),
+    ]
+    for pattern, provider in providers:
+        if re.search(pattern, text, re.I):
+            return provider
+    return "Emerging provider"
+
+
+def _timeline_category(article):
+    text = " ".join([
+        str(article.get("headline") or ""),
+        str(article.get("articleSummary") or article.get("summary") or ""),
+        str(article.get("source") or ""),
+    ]).lower()
+    if re.search(r"chip|semiconductor|\bgpu\b|\btpu\b|accelerator|foundry", text):
+        return "chips"
+    if re.search(r"agentic|ai agent|autonomous agent|multi-agent|copilot|automation", text):
+        return "agentic"
+    if re.search(r"risk|regulat|lawsuit|copyright|security|safety|ban|policy", text):
+        return "risk"
+    if re.search(r"enterprise|cloud|business|workplace|platform|customer", text):
+        return "enterprise"
+    if re.search(r"\bmodel\b|\bllm\b|gpt|claude|gemini|llama|kimi|qwen|grok|mistral|deepseek", text):
+        return "models"
+    return "technology"
+
+
+def _timeline_automatic_record(article):
+    url = str(article.get("url") or "").strip()
+    headline = str(article.get("headline") or "").strip()
+    published_at = str(article.get("date") or article.get("published_at") or "").strip()
+    if not url or not headline or not published_at or not re.match(r"^https?://", url, re.I):
+        return None
+    try:
+        published = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+        if published.tzinfo is None:
+            published = published.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    return {
+        "headline": headline[:1000],
+        "provider": _timeline_provider(article)[:160],
+        "category": _timeline_category(article),
+        "source": str(article.get("source") or "Live intelligence")[:240],
+        "url": url[:2000],
+        "summary": str(article.get("articleSummary") or article.get("summary") or "")[:6000],
+        "published_at": published.astimezone(timezone.utc).isoformat(),
+        "entry_type": "automatic",
+        "created_by": None,
+        "created_by_email": "",
+    }
+
+
+def _sync_timeline_articles(articles, user=None, access_token=""):
+    records = []
+    seen_urls = set()
+    for article in articles:
+        record = _timeline_automatic_record(article)
+        key = str((record or {}).get("url") or "").lower()
+        if not record or key in seen_urls:
+            continue
+        seen_urls.add(key)
+        records.append(record)
+    if not records:
+        return {"found": len(articles), "candidates": 0, "inserted": 0, "persisted": True}
+    api_key = SUPABASE_SERVICE_ROLE_KEY
+    token = ""
+    if not api_key and _is_timeline_admin(user):
+        token = access_token
+    if not api_key and not token:
+        return {
+            "found": len(articles),
+            "candidates": len(records),
+            "inserted": 0,
+            "persisted": False,
+            "reason": "Shared persistence requires the timeline administrator or SUPABASE_SERVICE_ROLE_KEY.",
+        }
+    if token and user:
+        for record in records:
+            record["created_by"] = user.get("id")
+            record["created_by_email"] = str(user.get("email") or "")[:320]
+    inserted = _supabase_table_request(
+        "timeline_signals",
+        "POST",
+        "?on_conflict=url",
+        records,
+        access_token=token or None,
+        api_key=api_key or None,
+        prefer="resolution=ignore-duplicates,return=representation",
+    )
+    return {
+        "found": len(articles),
+        "candidates": len(records),
+        "inserted": len(inserted or []),
+        "persisted": True,
+    }
+
+
+def _refresh_timeline_incrementally(access_token=""):
+    if time.time() - float(TIMELINE_REFRESH_CACHE.get("time") or 0) < CACHE_SECONDS:
+        cached_articles = TIMELINE_REFRESH_CACHE.get("articles") or []
+        cached_sync = TIMELINE_REFRESH_CACHE.get("sync") or {}
+        if cached_articles and not cached_sync.get("persisted"):
+            user = None
+            if access_token:
+                try:
+                    user = _supabase_auth_user(access_token)
+                except PermissionError:
+                    user = None
+            retried_sync = _sync_timeline_articles(cached_articles, user=user, access_token=access_token)
+            if retried_sync.get("persisted"):
+                TIMELINE_REFRESH_CACHE["sync"] = retried_sync
+        return (
+            cached_articles,
+            TIMELINE_REFRESH_CACHE.get("errors") or [],
+            TIMELINE_REFRESH_CACHE.get("scan"),
+            {**(TIMELINE_REFRESH_CACHE.get("sync") or {}), "cached": True},
+        )
+    user = None
+    if access_token:
+        try:
+            user = _supabase_auth_user(access_token)
+        except PermissionError:
+            user = None
+    articles, errors, scan = _fetch_news(
+        TIMELINE_PROVIDER_QUERIES,
+        "48h",
+        mode="interests",
+        keyword_config={"useDefault": True, "terms": TIMELINE_MODEL_TERMS},
+    )
+    sync = _sync_timeline_articles(articles, user=user, access_token=access_token)
+    TIMELINE_REFRESH_CACHE.update({
+        "time": time.time(),
+        "articles": articles,
+        "errors": errors,
+        "scan": scan,
+        "sync": sync,
+    })
+    return articles, errors, scan, sync
+
+
 def _date_range_to_days(value):
     ranges = {
         "all": None,
@@ -613,6 +961,7 @@ def _date_range_to_days(value):
         "week": 7,
         "month": 31,
         "24h": 1,
+        "48h": 2,
         "3d": 3,
         "7d": 7,
         "30d": 30,
@@ -3080,6 +3429,32 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         post_path = self.path.split("?", 1)[0].rstrip("/")
+        if post_path == "/api/timeline-refresh":
+            try:
+                articles, errors, scan, sync = _refresh_timeline_incrementally(_bearer_token(self))
+                _json_response(self, 200, {
+                    "articles": articles,
+                    "errors": errors,
+                    "scan": scan,
+                    "sync": sync,
+                    "window": "48h",
+                })
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Could not refresh the timeline.", "detail": str(exc)})
+            return
+        if post_path == "/api/timeline-signals/bulk":
+            access_token = _bearer_token(self)
+            try:
+                user = _supabase_auth_user(access_token)
+                result = _save_timeline_bulk(_read_json(self), user, access_token)
+                _json_response(self, 200, {"result": result})
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
+            except (ValueError, zipfile.BadZipFile, ET.ParseError, KeyError) as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Could not import timeline signals.", "detail": str(exc)})
+            return
         if post_path == "/api/timeline-signals":
             access_token = _bearer_token(self)
             try:
