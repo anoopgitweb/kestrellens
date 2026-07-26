@@ -28,6 +28,7 @@ GLOBAL_2000_URL = "https://www.forbes.com/forbesapi/org/global2000/2026/position
 LLM_RANKINGS_URL = "https://artificialanalysis.ai/leaderboards/models"
 SUPABASE_URL = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY") or ""
+TIMELINE_ADMIN_EMAIL = (os.environ.get("TIMELINE_ADMIN_EMAIL") or "anoopviswanathan@outlook.com").strip().lower()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY") or ""
 OPENAI_ASK_MODEL = os.environ.get("OPENAI_ASK_MODEL") or "gpt-5.6-luna"
 OPENAI_NOTEBOOK_MODEL = os.environ.get("OPENAI_NOTEBOOK_MODEL") or "gpt-5.6-terra"
@@ -488,9 +489,129 @@ def _save_profile(payload, user, access_token):
     return _profile_for_user(user, access_token)
 
 
+def _is_timeline_admin(user):
+    return str((user or {}).get("email") or "").strip().lower() == TIMELINE_ADMIN_EMAIL
+
+
+def _timeline_signal_article(row):
+    published = str(row.get("published_at") or "").strip()
+    parsed = None
+    if published:
+        try:
+            parsed = datetime.fromisoformat(published.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+        except ValueError:
+            parsed = None
+    return {
+        "id": str(row.get("id") or row.get("url") or ""),
+        "headline": str(row.get("headline") or ""),
+        "company": str(row.get("provider") or ""),
+        "provider": str(row.get("provider") or ""),
+        "category": str(row.get("category") or "technology"),
+        "source": str(row.get("source") or "Manual signal"),
+        "url": str(row.get("url") or ""),
+        "date": parsed.isoformat() if parsed else published,
+        "displayDate": parsed.astimezone(IST).strftime("%d %b %Y") if parsed else "",
+        "displayTimeIST": parsed.astimezone(IST).strftime("%I:%M %p IST") if parsed else "",
+        "articleSummary": str(row.get("summary") or ""),
+        "entryType": str(row.get("entry_type") or "manual"),
+    }
+
+
+def _date_range_window(value):
+    now = datetime.now(IST)
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if value == "today":
+        return today.astimezone(timezone.utc), (today + timedelta(days=1)).astimezone(timezone.utc)
+    if value == "yesterday":
+        return (today - timedelta(days=1)).astimezone(timezone.utc), today.astimezone(timezone.utc)
+    if value == "week":
+        return (today - timedelta(days=today.weekday())).astimezone(timezone.utc), None
+    if value == "month":
+        return today.replace(day=1).astimezone(timezone.utc), None
+    days = _date_range_to_days(value)
+    return (datetime.now(timezone.utc) - timedelta(days=days), None) if days else (None, None)
+
+
+def _list_timeline_signals(date_range="all"):
+    start, end = _date_range_window(date_range)
+    filters = ""
+    if start:
+        filters += f"&published_at=gte.{urllib.parse.quote(start.isoformat(), safe=':TZ+-')}"
+    if end:
+        filters += f"&published_at=lt.{urllib.parse.quote(end.isoformat(), safe=':TZ+-')}"
+    rows = _supabase_table_request(
+        "timeline_signals",
+        "GET",
+        f"?select=*&order=published_at.desc&limit=2000{filters}",
+    )
+    return [_timeline_signal_article(row) for row in rows]
+
+
+def _save_timeline_signal(payload, user, access_token):
+    if not _is_timeline_admin(user):
+        raise PermissionError("Only the timeline administrator can add signals.")
+    if not isinstance(payload, dict):
+        raise ValueError("Timeline signal details are required.")
+    headline = str(payload.get("headline") or "").strip()
+    provider = str(payload.get("provider") or "").strip()
+    category = str(payload.get("category") or "technology").strip().lower()
+    source = str(payload.get("source") or "").strip()
+    url = str(payload.get("url") or "").strip()
+    summary = str(payload.get("summary") or "").strip()
+    published_at = str(payload.get("publishedAt") or payload.get("published_at") or "").strip()
+    if not headline or not provider or not source or not url or not published_at:
+        raise ValueError("Headline, provider, source, URL, and published date are required.")
+    if category not in {"chips", "agentic", "enterprise", "models", "risk", "technology"}:
+        raise ValueError("Choose a valid timeline category.")
+    if not re.match(r"^https?://", url, re.I):
+        raise ValueError("Enter a valid article URL beginning with http:// or https://.")
+    try:
+        published = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+        if published.tzinfo is None:
+            published = published.replace(tzinfo=IST)
+        published_at = published.astimezone(timezone.utc).isoformat()
+    except ValueError as exc:
+        raise ValueError("Enter a valid publication date and time.") from exc
+    record = {
+        "headline": headline[:1000],
+        "provider": provider[:160],
+        "category": category,
+        "source": source[:240],
+        "url": url[:2000],
+        "summary": summary[:6000],
+        "published_at": published_at,
+        "entry_type": "manual",
+        "created_by": user["id"],
+        "created_by_email": str(user.get("email") or "")[:320],
+    }
+    encoded_url = urllib.parse.quote(record["url"], safe="")
+    existing = _supabase_table_request(
+        "timeline_signals",
+        "GET",
+        f"?url=eq.{encoded_url}&select=id,headline",
+        access_token=access_token,
+    )
+    if existing:
+        raise ValueError("This article is already included in the shared timeline.")
+    rows = _supabase_table_request(
+        "timeline_signals",
+        "POST",
+        "",
+        [record],
+        access_token=access_token,
+    )
+    return _timeline_signal_article(rows[0]) if rows else _timeline_signal_article(record)
+
+
 def _date_range_to_days(value):
     ranges = {
         "all": None,
+        "today": 1,
+        "yesterday": 2,
+        "week": 7,
+        "month": 31,
         "24h": 1,
         "3d": 3,
         "7d": 7,
@@ -2105,6 +2226,23 @@ def _fetch_news(companies, date_range, mode="companies", keyword_config=None):
         key=lambda item: item.get("date") or "",
         reverse=True,
     )
+    range_start, range_end = _date_range_window(date_range)
+    if range_start or range_end:
+        filtered_articles = []
+        for article in sorted_articles:
+            raw_date = str(article.get("date") or "").strip()
+            try:
+                published = datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
+                if published.tzinfo is None:
+                    published = published.replace(tzinfo=timezone.utc)
+            except ValueError:
+                published = None
+            if published and range_start and published < range_start:
+                continue
+            if published and range_end and published >= range_end:
+                continue
+            filtered_articles.append(article)
+        sorted_articles = filtered_articles
     if mode == "agency":
         source_order = [str(name).strip().lower() for name in companies if str(name).strip()]
         buckets = {
@@ -2927,6 +3065,14 @@ class Handler(BaseHTTPRequestHandler):
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 _json_response(self, 503, {"error": "Jot Down is temporarily unavailable.", "detail": str(exc)})
             return
+        if self.path.startswith("/api/timeline-signals"):
+            try:
+                query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                coverage = (query.get("coverage") or ["all"])[0]
+                _json_response(self, 200, {"signals": _list_timeline_signals(coverage)})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Saved timeline signals are temporarily unavailable.", "detail": str(exc)})
+            return
         if self.path == "/api/health":
             _json_response(self, 200, {"ok": True, "service": "KestrelIQ"})
             return
@@ -2934,6 +3080,19 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         post_path = self.path.split("?", 1)[0].rstrip("/")
+        if post_path == "/api/timeline-signals":
+            access_token = _bearer_token(self)
+            try:
+                user = _supabase_auth_user(access_token)
+                signal = _save_timeline_signal(_read_json(self), user, access_token)
+                _json_response(self, 200, {"signal": signal})
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Could not save the timeline signal.", "detail": str(exc)})
+            return
         if post_path == "/api/discover-learn":
             payload = _read_json(self)
             query = str(payload.get("query") or "").strip()
