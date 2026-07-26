@@ -893,15 +893,20 @@ def _sync_timeline_articles(articles, user=None, access_token=""):
         for record in records:
             record["created_by"] = user.get("id")
             record["created_by_email"] = str(user.get("email") or "")[:320]
-    inserted = _supabase_table_request(
-        "timeline_signals",
-        "POST",
-        "?on_conflict=url",
-        records,
-        access_token=token or None,
-        api_key=api_key or None,
-        prefer="resolution=ignore-duplicates,return=representation",
-    )
+    inserted = []
+    batch_size = 150
+    for offset in range(0, len(records), batch_size):
+        batch = records[offset:offset + batch_size]
+        saved = _supabase_table_request(
+            "timeline_signals",
+            "POST",
+            "?on_conflict=url",
+            batch,
+            access_token=token or None,
+            api_key=api_key or None,
+            prefer="resolution=ignore-duplicates,return=representation",
+        )
+        inserted.extend(saved or [])
     return {
         "found": len(articles),
         "candidates": len(records),
@@ -951,6 +956,38 @@ def _refresh_timeline_incrementally(access_token=""):
         "sync": sync,
     })
     return articles, errors, scan, sync
+
+
+def _bootstrap_timeline_database(access_token):
+    user = _supabase_auth_user(access_token)
+    if not _is_timeline_admin(user):
+        raise PermissionError("Only the timeline administrator can initialize the shared timeline.")
+    existing = _supabase_table_request(
+        "timeline_signals",
+        "GET",
+        "?select=id&limit=1",
+        access_token=access_token,
+    )
+    if existing:
+        return {
+            "alreadyInitialized": True,
+            "inserted": 0,
+            "message": "The shared timeline database is already initialized.",
+        }
+    articles, errors, scan = _fetch_news(
+        TIMELINE_PROVIDER_QUERIES,
+        "365d",
+        mode="interests",
+        keyword_config={"useDefault": True, "terms": TIMELINE_MODEL_TERMS},
+    )
+    sync = _sync_timeline_articles(articles, user=user, access_token=access_token)
+    return {
+        **sync,
+        "alreadyInitialized": False,
+        "errors": errors,
+        "scan": scan,
+        "window": "365d",
+    }
 
 
 def _date_range_to_days(value):
@@ -3429,6 +3466,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         post_path = self.path.split("?", 1)[0].rstrip("/")
+        if post_path == "/api/timeline-bootstrap":
+            try:
+                result = _bootstrap_timeline_database(_bearer_token(self))
+                _json_response(self, 200, {"result": result})
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Could not initialize the shared timeline.", "detail": str(exc)})
+            return
         if post_path == "/api/timeline-refresh":
             try:
                 articles, errors, scan, sync = _refresh_timeline_incrementally(_bearer_token(self))
