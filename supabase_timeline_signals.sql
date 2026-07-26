@@ -4,7 +4,7 @@ create table if not exists public.timeline_signals (
   id uuid primary key default gen_random_uuid(),
   headline text not null,
   provider text not null,
-  category text not null check (category in ('chips', 'agentic', 'enterprise', 'models', 'risk', 'technology')),
+  category text not null,
   source text not null,
   url text not null unique,
   summary text not null default '',
@@ -15,6 +15,18 @@ create table if not exists public.timeline_signals (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Earlier versions limited category to six fixed values. Remove that legacy
+-- constraint so administrators can import and create their own categories.
+alter table public.timeline_signals
+  drop constraint if exists timeline_signals_category_check;
+
+alter table public.timeline_signals
+  drop constraint if exists timeline_signals_category_not_blank;
+
+alter table public.timeline_signals
+  add constraint timeline_signals_category_not_blank
+  check (char_length(trim(category)) between 1 and 60);
 
 create index if not exists timeline_signals_published_at_idx
   on public.timeline_signals (published_at desc);

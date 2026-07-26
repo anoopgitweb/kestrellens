@@ -734,6 +734,23 @@ def _timeline_bulk_payload(row):
     }
 
 
+def _timeline_bulk_storage_error(exc):
+    detail = _provider_error_detail(exc)
+    lowered = detail.lower()
+    if "timeline_signals_category_check" in lowered or (
+        "check constraint" in lowered and "category" in lowered
+    ):
+        return (
+            "Supabase still has the old fixed-category rule. Run the latest "
+            "supabase_timeline_signals.sql migration, then retry this import."
+        )
+    if "row-level security" in lowered or "42501" in lowered:
+        return "Supabase did not allow this import. Confirm that you are signed in as the timeline administrator."
+    if "duplicate key" in lowered and "url" in lowered:
+        return "The import contains article URLs that already exist in the shared timeline."
+    return "Could not save the imported articles to Supabase."
+
+
 def _save_timeline_bulk(payload, user, access_token):
     if not _is_timeline_admin(user):
         raise PermissionError("Only the timeline administrator can import signals.")
@@ -3527,7 +3544,10 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, zipfile.BadZipFile, ET.ParseError, KeyError) as exc:
                 _json_response(self, 400, {"error": str(exc)})
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-                _json_response(self, 503, {"error": "Could not import timeline signals.", "detail": str(exc)})
+                _json_response(self, 503, {
+                    "error": _timeline_bulk_storage_error(exc),
+                    "detail": _provider_error_detail(exc),
+                })
             return
         if post_path == "/api/timeline-signals":
             access_token = _bearer_token(self)
