@@ -556,20 +556,43 @@ def _list_timeline_signals(date_range="all"):
     return [_timeline_signal_article(row) for row in rows]
 
 
+def _normalize_timeline_category(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return "technology"
+    aliases = {
+        "ai chip": "chips",
+        "ai chips": "chips",
+        "chip": "chips",
+        "agentic ai": "agentic",
+        "ai agents": "agentic",
+        "enterprise ai": "enterprise",
+        "model": "models",
+        "ai model": "models",
+        "ai models": "models",
+        "ai risk": "risk",
+    }
+    normalized = aliases.get(raw.lower(), raw.lower())
+    normalized = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-")
+    if not normalized or normalized in {"custom", "new-category"}:
+        raise ValueError("Enter a name for the new timeline category.")
+    if len(normalized) > 60:
+        raise ValueError("Timeline category names must be 60 characters or fewer.")
+    return normalized
+
+
 def _timeline_manual_record(payload, user):
     if not isinstance(payload, dict):
         raise ValueError("Timeline signal details are required.")
     headline = str(payload.get("headline") or "").strip()
     provider = str(payload.get("provider") or "").strip()
-    category = str(payload.get("category") or "technology").strip().lower()
+    category = _normalize_timeline_category(payload.get("category"))
     source = str(payload.get("source") or "").strip()
     url = str(payload.get("url") or "").strip()
     summary = str(payload.get("summary") or "").strip()
     published_at = str(payload.get("publishedAt") or payload.get("published_at") or "").strip()
     if not headline or not provider or not source or not url or not published_at:
         raise ValueError("Headline, provider, source, URL, and published date are required.")
-    if category not in {"chips", "agentic", "enterprise", "models", "risk", "technology"}:
-        raise ValueError("Choose a valid timeline category.")
     if not re.match(r"^https?://", url, re.I):
         raise ValueError("Enter a valid article URL beginning with http:// or https://.")
     try:
@@ -3477,6 +3500,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if post_path == "/api/timeline-refresh":
             try:
+                user = _supabase_auth_user(_bearer_token(self))
+                if not _is_timeline_admin(user):
+                    raise PermissionError("Only the timeline administrator can refresh the shared timeline.")
                 articles, errors, scan, sync = _refresh_timeline_incrementally(_bearer_token(self))
                 _json_response(self, 200, {
                     "articles": articles,
@@ -3485,6 +3511,8 @@ class Handler(BaseHTTPRequestHandler):
                     "sync": sync,
                     "window": "48h",
                 })
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 _json_response(self, 503, {"error": "Could not refresh the timeline.", "detail": str(exc)})
             return
