@@ -797,6 +797,7 @@ def _save_timeline_bulk(payload, user, access_token):
         "valid": len(records),
         "inserted": len(inserted or []),
         "duplicates": max(0, len(records) - len(inserted or [])),
+        "categories": sorted({record["category"] for record in records}),
         "errors": errors[:25],
     }
 
