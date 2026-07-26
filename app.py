@@ -548,11 +548,21 @@ def _list_timeline_signals(date_range="all"):
         filters += f"&published_at=gte.{urllib.parse.quote(start.isoformat(), safe=':TZ+-')}"
     if end:
         filters += f"&published_at=lt.{urllib.parse.quote(end.isoformat(), safe=':TZ+-')}"
-    rows = _supabase_table_request(
-        "timeline_signals",
-        "GET",
-        f"?select=*&order=published_at.desc&limit=2000{filters}",
-    )
+    # Supabase/PostgREST commonly caps a response at 1,000 rows regardless of
+    # a larger limit. Fetch consecutive pages so historical imports do not
+    # disappear behind the newest 1,000 timeline signals.
+    rows = []
+    page_size = 1000
+    max_rows = 10000
+    for offset in range(0, max_rows, page_size):
+        page = _supabase_table_request(
+            "timeline_signals",
+            "GET",
+            f"?select=*&order=published_at.desc&limit={page_size}&offset={offset}{filters}",
+        )
+        rows.extend(page)
+        if len(page) < page_size:
+            break
     return [_timeline_signal_article(row) for row in rows]
 
 
