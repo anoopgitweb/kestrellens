@@ -2,6 +2,8 @@
 import html
 import base64
 import csv
+import hashlib
+import hmac
 import io
 import json
 import os
@@ -34,6 +36,12 @@ SUPABASE_URL = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY") or ""
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or ""
 TIMELINE_ADMIN_EMAIL = (os.environ.get("TIMELINE_ADMIN_EMAIL") or "anoopviswanathan@outlook.com").strip().lower()
+QUICK_BYTES_SYNC_TOKEN = os.environ.get("QUICK_BYTES_SYNC_TOKEN") or ""
+QUICK_BYTES_SOURCE_USER_ID = (os.environ.get("QUICK_BYTES_SOURCE_USER_ID") or "").strip()
+QUICK_BYTES_SOURCE_EMAIL = (
+    os.environ.get("QUICK_BYTES_SOURCE_EMAIL") or TIMELINE_ADMIN_EMAIL
+).strip().lower()
+QUICK_BYTES_NOTEBOOK_TITLE = "Daily Learnings"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY") or ""
 OPENAI_ASK_MODEL = os.environ.get("OPENAI_ASK_MODEL") or "gpt-5.6-luna"
 OPENAI_NOTEBOOK_MODEL = os.environ.get("OPENAI_NOTEBOOK_MODEL") or "gpt-5.6-terra"
@@ -383,6 +391,186 @@ def _list_jot_down(user_id, access_token):
         access_token=access_token,
     )
     return {"topics": topics, "subtopics": subtopics, "notes": notes}
+
+
+class _QuickByteHtmlParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.items = []
+        self.current = []
+        self.li_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() == "li":
+            if self.li_depth == 0:
+                self.current = []
+            self.li_depth += 1
+        elif self.li_depth and tag.lower() in {"br", "p", "div"}:
+            self.current.append("\n")
+
+    def handle_endtag(self, tag):
+        if tag.lower() != "li" or not self.li_depth:
+            return
+        self.li_depth -= 1
+        if self.li_depth == 0:
+            value = re.sub(r"[ \t]+", " ", "".join(self.current))
+            value = re.sub(r"\s*\n\s*", "\n", value).strip()
+            if value:
+                self.items.append(value)
+            self.current = []
+
+    def handle_data(self, data):
+        if self.li_depth:
+            self.current.append(data)
+
+
+def _quick_byte_parts(raw):
+    value = re.sub(r"\s+", " ", str(raw or "")).strip()
+    match = re.match(r"^(.+?)\s+[-–—]\s+(.+)$", value)
+    if match:
+        return match.group(1).strip()[:200], match.group(2).strip()[:20000]
+    return value[:200] or "Quick Byte", ""
+
+
+def _quick_bytes_from_note(note):
+    parser = _QuickByteHtmlParser()
+    parser.feed(str((note or {}).get("content") or ""))
+    parser.close()
+    values = parser.items
+    if not values:
+        fallback = re.sub(
+            r"\s+",
+            " ",
+            html.unescape(
+                re.sub(r"<[^>]+>", " ", str((note or {}).get("content") or ""))
+            ),
+        ).strip()
+        values = [fallback] if fallback else []
+    result = []
+    for index, raw in enumerate(values[:50]):
+        title, content = _quick_byte_parts(raw)
+        if not title:
+            continue
+        stable_key = hashlib.sha256(
+            f"{note.get('id') or note.get('subtopic_id')}:{title.lower()}".encode("utf-8")
+        ).hexdigest()[:24]
+        result.append({
+            "id": stable_key,
+            "title": title,
+            "content": content,
+            "order": index + 1,
+            "updatedAt": note.get("updated_at") or "",
+        })
+    return result
+
+
+def _quick_bytes_source_user_id():
+    if QUICK_BYTES_SOURCE_USER_ID:
+        return _jot_uuid(QUICK_BYTES_SOURCE_USER_ID, "Quick Bytes source user id")
+    if not QUICK_BYTES_SOURCE_EMAIL:
+        raise RuntimeError(
+            "Set QUICK_BYTES_SOURCE_USER_ID or QUICK_BYTES_SOURCE_EMAIL."
+        )
+    encoded_email = urllib.parse.quote(QUICK_BYTES_SOURCE_EMAIL, safe="")
+    rows = _supabase_table_request(
+        "profiles",
+        "GET",
+        f"?email=eq.{encoded_email}&select=id,email&limit=1",
+        access_token=SUPABASE_SERVICE_ROLE_KEY,
+        api_key=SUPABASE_SERVICE_ROLE_KEY,
+    )
+    if not rows or not rows[0].get("id"):
+        raise RuntimeError("The configured Quick Bytes source user was not found.")
+    return str(rows[0]["id"])
+
+
+def _daily_learnings_quick_bytes():
+    if not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError(
+            "SUPABASE_SERVICE_ROLE_KEY is required for the Quick Bytes feed."
+        )
+    user_id = _quick_bytes_source_user_id()
+    encoded_user = urllib.parse.quote(user_id, safe="")
+    encoded_title = urllib.parse.quote(QUICK_BYTES_NOTEBOOK_TITLE, safe="")
+    topics = _supabase_table_request(
+        "note_topics",
+        "GET",
+        (
+            f"?user_id=eq.{encoded_user}&title=eq.{encoded_title}"
+            "&select=id,title,updated_at&limit=1"
+        ),
+        access_token=SUPABASE_SERVICE_ROLE_KEY,
+        api_key=SUPABASE_SERVICE_ROLE_KEY,
+    )
+    if not topics:
+        return {
+            "notebook": QUICK_BYTES_NOTEBOOK_TITLE,
+            "source": "KestrelIQ",
+            "editions": [],
+            "updatedAt": "",
+        }
+
+    topic = topics[0]
+    topic_id = urllib.parse.quote(str(topic["id"]), safe="")
+    chapters = _supabase_table_request(
+        "note_subtopics",
+        "GET",
+        (
+            f"?user_id=eq.{encoded_user}&topic_id=eq.{topic_id}"
+            "&select=id,title,sort_order,created_at,updated_at"
+            "&order=sort_order.desc,created_at.desc"
+        ),
+        access_token=SUPABASE_SERVICE_ROLE_KEY,
+        api_key=SUPABASE_SERVICE_ROLE_KEY,
+    )
+    chapter_ids = [
+        str(chapter.get("id") or "") for chapter in chapters if chapter.get("id")
+    ]
+    notes = []
+    if chapter_ids:
+        encoded_ids = ",".join(
+            urllib.parse.quote(value, safe="") for value in chapter_ids
+        )
+        notes = _supabase_table_request(
+            "notes",
+            "GET",
+            (
+                f"?user_id=eq.{encoded_user}&subtopic_id=in.({encoded_ids})"
+                "&select=id,subtopic_id,title,content,updated_at"
+            ),
+            access_token=SUPABASE_SERVICE_ROLE_KEY,
+            api_key=SUPABASE_SERVICE_ROLE_KEY,
+        )
+    notes_by_chapter = {
+        str(note.get("subtopic_id") or ""): note for note in notes
+    }
+    editions = []
+    for chapter in chapters:
+        note = notes_by_chapter.get(str(chapter.get("id") or ""))
+        quick_bytes = _quick_bytes_from_note(note or {})
+        if not quick_bytes:
+            continue
+        editions.append({
+            "id": str(chapter["id"]),
+            "title": str(chapter.get("title") or "Daily Learning")[:160],
+            "sortOrder": int(chapter.get("sort_order") or 0),
+            "updatedAt": (
+                (note or {}).get("updated_at")
+                or chapter.get("updated_at")
+                or ""
+            ),
+            "bytes": quick_bytes,
+        })
+    updated_at = max(
+        [str(item.get("updatedAt") or "") for item in editions]
+        + [str(topic.get("updated_at") or "")]
+    )
+    return {
+        "notebook": QUICK_BYTES_NOTEBOOK_TITLE,
+        "source": "KestrelIQ",
+        "editions": editions,
+        "updatedAt": updated_at,
+    }
 
 
 def _save_jot_topic(payload, user_id, access_token):
@@ -3491,6 +3679,35 @@ class Handler(BaseHTTPRequestHandler):
                 _json_response(self, 401, {"error": str(exc)})
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 _json_response(self, 503, {"error": "Watchlists are temporarily unavailable.", "detail": str(exc)})
+            return
+        if self.path == "/api/vivawise/quick-bytes":
+            provided_token = _bearer_token(self)
+            if (
+                not QUICK_BYTES_SYNC_TOKEN
+                or not provided_token
+                or not hmac.compare_digest(provided_token, QUICK_BYTES_SYNC_TOKEN)
+            ):
+                _json_response(self, 401, {"error": "Unauthorized"})
+                return
+            try:
+                _json_response(self, 200, _daily_learnings_quick_bytes())
+            except (
+                RuntimeError,
+                ValueError,
+                urllib.error.URLError,
+                urllib.error.HTTPError,
+                TimeoutError,
+                OSError,
+                json.JSONDecodeError,
+            ) as exc:
+                _json_response(
+                    self,
+                    503,
+                    {
+                        "error": "Daily Learnings is temporarily unavailable.",
+                        "detail": str(exc),
+                    },
+                )
             return
         if self.path == "/api/jot-down":
             access_token = _bearer_token(self)

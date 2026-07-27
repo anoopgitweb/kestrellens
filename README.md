@@ -55,6 +55,25 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
 Never expose this key in browser code. Without it, automatic saving is limited to the signed-in timeline administrator; other users still read the shared timeline.
 
+### Vivawise AI Quick Bytes feed
+
+Vivawise can read a narrowly scoped, read-only feed containing only the
+configured user's notebook named **Daily Learnings**. The endpoint does not
+return any other notebook, profile, watchlist, or intelligence data.
+
+Configure these server-only values in Render:
+
+```text
+QUICK_BYTES_SYNC_TOKEN=use-a-long-random-shared-secret
+QUICK_BYTES_SOURCE_EMAIL=anoopviswanathan@outlook.com
+```
+
+`QUICK_BYTES_SOURCE_USER_ID` may be used instead of the email when a stable
+Supabase user UUID is preferred. `SUPABASE_SERVICE_ROLE_KEY` is also required.
+Vivawise must send the shared token as a Bearer token to
+`GET /api/vivawise/quick-bytes`. Never place the token or service-role key in
+browser code.
+
 ## Notes
 
 - No paid news API is required for the regular Ask and intelligence-feed workflows.
