@@ -103,15 +103,25 @@ grant select, insert, update, delete on public.note_topics to authenticated;
 grant select, insert, update, delete on public.note_subtopics to authenticated;
 grant select, insert, update, delete on public.notes to authenticated;
 
--- Private, user-scoped image storage for pasted Jot Down screenshots.
--- Images are compressed to WebP in the browser before upload.
+-- Private, user-scoped storage for pasted images and optional page attachments.
+-- Images are compressed to WebP; documents are limited to 5 MB by the bucket.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'jot-down-images',
   'jot-down-images',
   false,
   5242880,
-  array['image/webp', 'image/jpeg', 'image/png']
+  array[
+    'image/webp',
+    'image/jpeg',
+    'image/png',
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/csv',
+    'text/plain'
+  ]
 )
 on conflict (id) do update set
   public = excluded.public,
