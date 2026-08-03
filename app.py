@@ -684,6 +684,55 @@ def _save_profile(payload, user, access_token):
     return _profile_for_user(user, access_token)
 
 
+def _create_admin_user(payload, requesting_user):
+    if not _is_timeline_admin(requesting_user):
+        raise PermissionError("Only the KestrelIQ administrator can add users.")
+    if not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is required to add users.")
+    if not isinstance(payload, dict):
+        raise ValueError("User details are required.")
+    email_address = str(payload.get("email") or "").strip().lower()
+    password = str(payload.get("password") or "")
+    full_name = str(payload.get("full_name") or payload.get("fullName") or "").strip()
+    company = str(payload.get("company") or "").strip()
+    if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email_address):
+        raise ValueError("Enter a valid email address.")
+    if len(password) < 8:
+        raise ValueError("Temporary password must contain at least 8 characters.")
+    if len(full_name) > 120 or len(company) > 160:
+        raise ValueError("Full name or company is too long.")
+    auth_payload = {
+        "email": email_address,
+        "password": password,
+        "email_confirm": True,
+        "user_metadata": {"full_name": full_name, "company": company},
+    }
+    data = json.dumps(auth_payload, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(f"{SUPABASE_URL}/auth/v1/admin/users", data=data, method="POST")
+    req.add_header("apikey", SUPABASE_SERVICE_ROLE_KEY)
+    req.add_header("Authorization", f"Bearer {SUPABASE_SERVICE_ROLE_KEY}")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Accept", "application/json")
+    with _urlopen_with_retry(req, timeout=20, retries=0) as response:
+        raw = response.read().decode("utf-8", errors="replace")
+    created = json.loads(raw) if raw else {}
+    user_id = str(created.get("id") or "").strip()
+    if not user_id:
+        raise RuntimeError("Supabase did not return the new user account.")
+    profile_record = {
+        "id": user_id,
+        "email": email_address,
+        "full_name": full_name,
+        "company": company,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _supabase_table_request(
+        "profiles", "POST", "?on_conflict=id", [profile_record],
+        access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY,
+    )
+    return {"id": user_id, "email": email_address, "full_name": full_name, "company": company}
+
+
 def _is_timeline_admin(user):
     return str((user or {}).get("email") or "").strip().lower() == TIMELINE_ADMIN_EMAIL
 
@@ -3959,6 +4008,27 @@ class Handler(BaseHTTPRequestHandler):
                 _json_response(self, 401, {"error": str(exc)})
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 _json_response(self, 503, {"error": "Could not update profile.", "detail": str(exc)})
+            return
+        if post_path == "/api/admin/users":
+            payload = _read_json(self)
+            access_token = _bearer_token(self)
+            try:
+                requesting_user = _supabase_auth_user(access_token)
+                created_user = _create_admin_user(payload, requesting_user)
+                _json_response(self, 201, {"user": created_user})
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
+            except urllib.error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="replace")
+                try:
+                    detail = json.loads(detail).get("msg") or json.loads(detail).get("message") or detail
+                except json.JSONDecodeError:
+                    pass
+                _json_response(self, exc.code if exc.code in {400, 409, 422} else 502, {"error": str(detail or "Could not add user.")})
+            except (RuntimeError, urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 503, {"error": "Could not add user.", "detail": str(exc)})
             return
         if post_path == "/api/favorites":
             payload = _read_json(self)
