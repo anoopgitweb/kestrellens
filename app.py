@@ -33,6 +33,8 @@ TOOL_PAGES = {
     "/tools/project-charter": "project-charter.html",
     "/tools/gantt-chart": "gantt-chart.html",
     "/tools/notebook-presenter": "notebook-presenter.html",
+    "/tools/change-analyzer": "change-analyzer.html",
+    "/tools/dashboard-creator": "dashboard-creator.html",
 }
 FORTUNE_FILE = ASSET_DIR / "fortune500-2026.json"
 GLOBAL_2000_FILE = ASSET_DIR / "forbes-global2000-2026.json"
