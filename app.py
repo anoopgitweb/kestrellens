@@ -22,6 +22,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from sentiment_module import analyze as sentiment_analyze
+from sentiment_module import inspect as sentiment_inspect
+from sentiment_module import progress as sentiment_progress
+
 
 HOST = os.environ.get("KESTRELIQ_HOST") or ("0.0.0.0" if os.environ.get("PORT") else "127.0.0.1")
 PORT = int(os.environ.get("PORT") or os.environ.get("KESTRELIQ_PORT", "8787"))
@@ -3629,6 +3633,27 @@ class Handler(BaseHTTPRequestHandler):
             _html_response(self, 200, INDEX_FILE.read_text(encoding="utf-8"))
             return
         tool_path = urllib.parse.urlparse(self.path).path.rstrip("/")
+        if tool_path == "/tools/sentiment-analysis":
+            tool_file = TOOL_DIR / "sentiment-analysis" / "index.html"
+            if not tool_file.exists():
+                _html_response(self, 404, "Sentiment Analysis tool not found.")
+                return
+            _html_response(self, 200, tool_file.read_text(encoding="utf-8"))
+            return
+        if tool_path.startswith("/tools/sentiment-analysis/"):
+            resource_name = Path(tool_path).name
+            resource = TOOL_DIR / "sentiment-analysis" / resource_name
+            mime = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8"}.get(resource.suffix.lower())
+            if mime and resource.exists() and resource.is_file():
+                payload = resource.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", mime)
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+            _json_response(self, 404, {"error": "Sentiment Analysis resource not found"})
+            return
         if tool_path in TOOL_PAGES:
             tool_file = TOOL_DIR / TOOL_PAGES[tool_path]
             if not tool_file.exists():
@@ -3795,10 +3820,27 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/health":
             _json_response(self, 200, {"ok": True, "service": "KestrelIQ"})
             return
+        if tool_path == "/api/sentiment/status":
+            _json_response(self, 200, {"ok": True, "model_status": {"sparrow": {"path": "", "available": False}, "vulture": {"path": "", "available": False}}})
+            return
+        if tool_path == "/api/sentiment/progress":
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            _json_response(self, 200, sentiment_progress((query.get("id") or [""])[0]))
+            return
         _json_response(self, 404, {"error": "Not found"})
 
     def do_POST(self):
         post_path = self.path.split("?", 1)[0].rstrip("/")
+        if post_path in {"/api/sentiment/inspect", "/api/sentiment/analyze"}:
+            try:
+                payload = _read_json(self)
+                result = sentiment_inspect(payload) if post_path.endswith("/inspect") else sentiment_analyze(payload)
+                _json_response(self, 200, result)
+            except (ValueError, TypeError, OSError, json.JSONDecodeError) as exc:
+                _json_response(self, 400, {"ok": False, "error": str(exc)})
+            except Exception as exc:
+                _json_response(self, 500, {"ok": False, "error": "Sentiment analysis failed.", "detail": str(exc)})
+            return
         if post_path == "/api/timeline-bootstrap":
             try:
                 result = _bootstrap_timeline_database(_bearer_token(self))
