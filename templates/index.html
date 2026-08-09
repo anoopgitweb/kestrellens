@@ -2103,6 +2103,9 @@
       <div class="home-dropdown-panel">
         <button type="button" onclick="closeUserProfile();closeHomeMenus();closeIndustryVisuals();openIntelligenceHome();openClientBriefingPage()">I’m meeting a client</button>
         <button type="button" onclick="closeUserProfile();closeHomeMenus();closeIndustryVisuals();openIntelligenceHome();openRfpResponsePage()">I’m responding to an RFP</button>
+        <button type="button" onclick="openToolKitPage('/tools/project-charter')">Project Charter</button>
+        <button type="button" onclick="openToolKitPage('/tools/gantt-chart')">Gantt Chart</button>
+        <button type="button" onclick="openToolKitPage('/tools/notebook-presenter')">Notebook Presenter</button>
       </div>
     </details>
     <details class="home-dropdown">
@@ -2137,6 +2140,9 @@
           <div class="home-dropdown-panel">
             <button type="button" onclick="closeHomeMenus();openClientBriefingPage()">I’m meeting a client</button>
             <button type="button" onclick="closeHomeMenus();openRfpResponsePage()">I’m responding to an RFP</button>
+            <button type="button" onclick="openToolKitPage('/tools/project-charter')">Project Charter</button>
+            <button type="button" onclick="openToolKitPage('/tools/gantt-chart')">Gantt Chart</button>
+            <button type="button" onclick="openToolKitPage('/tools/notebook-presenter')">Notebook Presenter</button>
           </div>
         </details>
         <details class="home-dropdown">
@@ -3250,6 +3256,7 @@ async function loadHomeInsights(){if(state.homeInsights?.length){renderHomeInsig
 function openClientBriefingPage(){const page=$("clientBriefingPage");if(!page)return;page.classList.remove("hidden");loadFortuneIntelligence();setTimeout(()=>$("clientBriefInput")?.focus(),80)}
 function closeClientBriefingPage(){$("clientBriefingPage")?.classList.add("hidden")}
 function closeHomeMenus(){document.querySelectorAll(".home-dropdown[open]").forEach(menu=>menu.removeAttribute("open"))}
+function openToolKitPage(path){closeHomeMenus();window.open(path,"_blank","noopener")}
 function learnCreationLabels(type=state.learnCreateType){return type==="chapter"?{placeholder:"New chapter name or topic…",button:"Generate chapter",queryLabel:"New chapter"}:type==="page"?{placeholder:"New page name…",button:"Create page",queryLabel:"New page"}:type==="replicate"?{placeholder:"e.g. Microsoft Platform",button:"Replicate notebook",queryLabel:"Replicate for · New company or platform"}:{placeholder:"New notebook name or topic…",button:"Generate notebook",queryLabel:"New notebook or subject"}}
 function learnCreationNoun(type="notebook"){return type==="chapter"?"chapter":type==="page"?"page":type==="replicate"?"replicated notebook":"notebook"}
 function renderLearnReplicationChapters(){const host=$("learnReplicationChapters"),type=$("learnCreationType")?.value||state.learnCreateType,scope=$("learnReplicationScope")?.value||"all",topicId=$("learnTargetNotebook")?.value||"";if(!host)return;const visible=type==="replicate"&&scope==="selected";host.classList.toggle("hidden",!visible);if(!visible){host.innerHTML="";return}const previous=new Set([...host.querySelectorAll("input:checked")].map(input=>input.value)),chapters=state.jotSubtopics.filter(chapter=>chapter.topic_id===topicId),retain=chapters.some(chapter=>previous.has(chapter.id));host.innerHTML=chapters.length?chapters.map(chapter=>`<label title="${escapeHtml(chapter.title)}"><input type="checkbox" value="${escapeHtml(chapter.id)}" ${!retain||previous.has(chapter.id)?"checked":""}><span>${escapeHtml(chapter.title)}</span></label>`).join(""):'<span>No chapters are available in this notebook.</span>'}

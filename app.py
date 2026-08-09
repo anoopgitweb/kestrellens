@@ -28,6 +28,12 @@ PORT = int(os.environ.get("PORT") or os.environ.get("KESTRELIQ_PORT", "8787"))
 ROOT = Path(__file__).resolve().parent
 INDEX_FILE = ROOT / "templates" / "index.html"
 ASSET_DIR = ROOT / "assets"
+TOOL_DIR = ROOT / "tools"
+TOOL_PAGES = {
+    "/tools/project-charter": "project-charter.html",
+    "/tools/gantt-chart": "gantt-chart.html",
+    "/tools/notebook-presenter": "notebook-presenter.html",
+}
 FORTUNE_FILE = ASSET_DIR / "fortune500-2026.json"
 GLOBAL_2000_FILE = ASSET_DIR / "forbes-global2000-2026.json"
 GLOBAL_2000_URL = "https://www.forbes.com/forbesapi/org/global2000/2026/position/true.json?limit=2000"
@@ -3619,6 +3625,14 @@ class Handler(BaseHTTPRequestHandler):
                 _html_response(self, 500, "templates/index.html is missing.")
                 return
             _html_response(self, 200, INDEX_FILE.read_text(encoding="utf-8"))
+            return
+        tool_path = urllib.parse.urlparse(self.path).path.rstrip("/")
+        if tool_path in TOOL_PAGES:
+            tool_file = TOOL_DIR / TOOL_PAGES[tool_path]
+            if not tool_file.exists():
+                _html_response(self, 404, "Tool not found.")
+                return
+            _html_response(self, 200, tool_file.read_text(encoding="utf-8"))
             return
         if self.path.startswith("/assets/"):
             asset = ASSET_DIR / Path(urllib.parse.urlparse(self.path).path).name

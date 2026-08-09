@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Charter Pro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PptxGenJS/3.12.0/pptxgen.bundled.js"></script>
+<style>
+
+:root{
+  --navy:#0A1628;--navy2:#112240;--navy3:#1E3A5F;--navy4:#2A4F7A;
+  --gold:#C9A84C;--gold2:#E8C56A;--gold-light:#FDF8EC;
+  --blue:#3B82F6;--blue2:#2563EB;--blue-light:#EFF6FF;
+  --green:#059669;--green-light:#ECFDF5;
+  --amber:#D97706;--amber-light:#FFFBEB;
+  --red:#DC2626;--red-light:#FEF2F2;
+  --purple:#7C3AED;--purple-light:#F5F3FF;
+  --teal:#0F766E;--teal2:#0D9488;--teal-light:#F0FDFA;
+  --slate:#F1F5F9;--slate2:#E2E8F0;--slate3:#CBD5E1;--slate4:#94A3B8;
+  --text:#0F172A;--text2:#334155;--text3:#64748B;--text4:#94A3B8;
+  --border:#E2E8F0;--border2:#CBD5E1;
+  --white:#fff;--radius:10px;
+  --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:0 4px 6px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:'Segoe UI','Inter',system-ui,sans-serif;background:var(--slate);color:var(--text);font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── TOP BAR ── */
+.topbar{height:56px;background:var(--navy);display:flex;align-items:center;padding:0 24px;gap:14px;flex-shrink:0;border-bottom:1px solid var(--navy3)}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:32px;height:32px;background:linear-gradient(135deg,var(--gold),var(--gold2));border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo-mark svg{width:17px;height:17px;stroke:var(--navy);fill:none;stroke-width:2}
+.logo-text{display:flex;flex-direction:column;line-height:1.1}
+.logo-title{font-size:13px;font-weight:400;color:#fff;letter-spacing:-.1px}
+.logo-sub{font-size:10px;color:var(--gold);letter-spacing:.3px;text-transform:uppercase;font-weight:400}
+.vsep{width:1px;height:22px;background:var(--navy3);margin:0 6px}
+.proj-input-wrap{display:flex;align-items:center;gap:8px;background:var(--navy2);border:1px solid var(--navy3);border-radius:8px;padding:5px 12px;min-width:280px}
+.proj-input-wrap svg{width:13px;height:13px;stroke:var(--slate4);fill:none;flex-shrink:0}
+.proj-input{background:transparent;border:none;color:#fff;font-size:13px;font-weight:400;outline:none;width:240px;font-family:inherit}
+.proj-input::placeholder{color:var(--navy4)}
+.status-select{background:var(--navy2);border:1px solid var(--navy3);color:var(--slate4);font-size:11px;font-weight:400;border-radius:6px;padding:4px 8px;outline:none;cursor:pointer;font-family:inherit}
+.status-select option{background:var(--navy2)}
+.topbar-right{margin-left:auto;display:flex;gap:6px;align-items:center}
+.tbtn{padding:6px 13px;border-radius:7px;font-size:11px;font-weight:400;cursor:pointer;border:none;transition:all .15s;display:flex;align-items:center;gap:5px;font-family:inherit;letter-spacing:.1px;white-space:nowrap}
+.tbtn-ghost{background:rgba(255,255,255,.06);color:#94A3B8;border:1px solid rgba(255,255,255,.08)}.tbtn-ghost:hover{background:rgba(255,255,255,.11);color:#fff}
+.tbtn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--navy);font-weight:400}.tbtn-gold:hover{filter:brightness(1.08)}
+.tbtn svg{width:12px;height:12px;flex-shrink:0}
+
+/* ── PROGRESS BAR ── */
+.progress-strip{height:3px;background:var(--navy2);flex-shrink:0;position:relative}
+.progress-strip-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));transition:width .5s ease;border-radius:0 2px 2px 0}
+
+/* ── LAYOUT ── */
+.app{display:flex;flex:1;overflow:hidden}
+
+/* ── SIDEBAR ── */
+.sidebar{width:230px;background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.sb-header{padding:18px 16px 12px;border-bottom:1px solid var(--border)}
+.sb-header-title{font-size:10px;font-weight:400;color:var(--text4);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
+.sb-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.sb-stat{background:var(--slate);border-radius:7px;padding:7px 9px;text-align:center}
+.sb-stat-val{font-size:16px;font-weight:400;color:var(--text);line-height:1}
+.sb-stat-lbl{font-size:9px;color:var(--text4);text-transform:uppercase;letter-spacing:.4px;margin-top:2px;font-weight:400}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0}
+.sb-nav::-webkit-scrollbar{width:3px}.sb-nav::-webkit-scrollbar-thumb{background:var(--slate2);border-radius:2px}
+.sb-group-label{font-size:9px;font-weight:400;color:var(--text4);text-transform:uppercase;letter-spacing:.6px;padding:8px 16px 4px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 14px;margin:1px 8px;border-radius:8px;cursor:pointer;transition:all .12s;font-size:12px;font-weight:400;color:var(--text3);position:relative}
+.nav-item:hover{background:var(--slate);color:var(--text)}
+.nav-item.active{background:var(--navy);color:#fff;font-weight:400}
+.nav-item.active .nav-icon{background:rgba(255,255,255,.15)}
+.nav-item.done .nav-icon{background:var(--green-light)}
+.nav-item.done .nav-icon svg{stroke:var(--green)}
+.nav-icon{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--slate);transition:all .15s}
+.nav-icon svg{width:13px;height:13px;fill:none;stroke:var(--text4);stroke-width:1.8;transition:stroke .15s}
+.nav-item.active .nav-icon svg{stroke:#fff}
+.nav-check{width:14px;height:14px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;margin-left:auto;flex-shrink:0}
+.nav-check svg{width:8px;height:8px;stroke:#fff;stroke-width:3;fill:none}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);background:var(--slate)}
+.sb-footer-pct{font-size:11px;font-weight:400;color:var(--text2);margin-bottom:5px;display:flex;justify-content:space-between}
+.sb-track{height:5px;background:var(--slate2);border-radius:3px;overflow:hidden}
+.sb-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--green),#10B981);transition:width .4s}
+
+/* ── MAIN ── */
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.main::-webkit-scrollbar{width:6px}.main::-webkit-scrollbar-thumb{background:var(--slate2);border-radius:3px}
+.section-wrap{flex:1;padding:28px 32px}
+
+/* ── SECTION HEADER ── */
+.sec-hero{display:flex;align-items:flex-start;gap:16px;margin-bottom:28px;padding-bottom:22px;border-bottom:1px solid var(--border)}
+.sec-hero-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid rgba(0,0,0,.06)}
+.sec-hero-icon svg{width:22px;height:22px;fill:none;stroke-width:1.7}
+.sec-hero-body{flex:1}
+.sec-hero-num{font-size:10px;font-weight:400;color:var(--text4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
+.sec-hero-title{font-size:20px;font-weight:400;color:var(--text);letter-spacing:-.3px;line-height:1.2}
+.sec-hero-desc{font-size:13px;color:var(--text3);margin-top:4px;line-height:1.5}
+.sec-hero-badge{margin-left:auto;display:flex;align-items:center;gap:6px}
+
+/* ── CARDS ── */
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:22px 24px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card-title{font-size:11px;font-weight:400;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.card-title-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* ── FORM ── */
+.fg{display:grid;gap:14px}
+.fg-2{grid-template-columns:1fr 1fr}
+.fg-3{grid-template-columns:1fr 1fr 1fr}
+.fg-4{grid-template-columns:repeat(4,1fr)}
+.ff{display:flex;flex-direction:column;gap:5px}
+.ff label{font-size:11px;font-weight:400;color:var(--text2);letter-spacing:.1px}
+.ff input,.ff select,.ff textarea{padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);background:var(--white);font-family:inherit;transition:all .15s;width:100%}
+.ff input:focus,.ff select:focus,.ff textarea:focus{outline:none;border-color:var(--navy3);box-shadow:0 0 0 3px rgba(10,22,40,.08)}
+.ff textarea{resize:vertical;min-height:88px;line-height:1.65}
+.ff-hint{font-size:11px;color:var(--text4);font-style:italic}
+.ff input::placeholder,.ff textarea::placeholder{color:var(--text4)}
+
+/* ── RICH TABLE ── */
+.rt-wrap{overflow-x:auto;border-radius:9px;border:1px solid var(--border);margin-bottom:12px}
+.rt{width:100%;border-collapse:collapse;min-width:500px}
+.rt thead th{background:var(--navy);color:#CBD5E1;font-size:10px;font-weight:400;text-transform:uppercase;letter-spacing:.5px;padding:10px 12px;text-align:left;white-space:nowrap}
+.rt thead th:first-child{border-radius:8px 0 0 0}
+.rt thead th:last-child{border-radius:0 8px 0 0}
+.rt tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+.rt tbody tr:last-child{border-bottom:none}
+.rt tbody tr:hover{background:#FAFBFF}
+.rt td{padding:8px 12px;vertical-align:middle}
+.rt td input,.rt td select{border:none;background:transparent;font-size:12px;font-family:inherit;color:var(--text);width:100%;outline:none;padding:3px 0}
+.rt td input:focus,.rt td textarea:focus{border-bottom:1.5px solid var(--teal2)}
+.rt td textarea{border:none;background:transparent;font-size:12px;font-family:inherit;color:var(--text);width:100%;outline:none;padding:3px 0;resize:none;min-height:28px;overflow:hidden}
+.rt-del{background:none;border:none;cursor:pointer;color:var(--text4);font-size:13px;padding:3px 6px;border-radius:5px;transition:all .1s;line-height:1}
+.rt-del:hover{background:var(--red-light);color:var(--red)}
+.rt-num{width:32px;text-align:center;font-size:11px;color:var(--text4);font-weight:400}
+.add-row{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:var(--white);border:1.5px dashed var(--border2);border-radius:8px;font-size:12px;font-weight:400;color:var(--text3);cursor:pointer;transition:all .15s;font-family:inherit}
+.add-row:hover{background:var(--teal-light);border-color:var(--teal2);color:var(--teal)}
+
+/* ── BADGES ── */
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:400;letter-spacing:.2px}
+.pill-green{background:var(--green-light);color:#065F46}
+.pill-amber{background:var(--amber-light);color:#92400E}
+.pill-red{background:var(--red-light);color:#991B1B}
+.pill-blue{background:var(--blue-light);color:#1E40AF}
+.pill-grey{background:var(--slate);color:var(--text3)}
+
+/* ── RISK MATRIX ── */
+.risk-matrix{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
+.rm-cell{padding:6px 8px;border-radius:6px;text-align:center;font-size:10px;font-weight:400}
+.rm-h{background:#FEE2E2;color:#991B1B}
+.rm-m{background:#FEF3C7;color:#92400E}
+.rm-l{background:#D1FAE5;color:#065F46}
+
+/* ── SIGN-OFF ── */
+.signoff-card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px}
+.signoff-head{background:var(--navy);padding:12px 20px;display:grid;grid-template-columns:2fr 2fr 1.5fr 1fr 36px;gap:10px}
+.signoff-head span{font-size:10px;font-weight:400;color:#94A3B8;text-transform:uppercase;letter-spacing:.5px}
+.signoff-row{display:grid;grid-template-columns:2fr 2fr 1.5fr 1fr 36px;gap:10px;padding:12px 20px;border-bottom:1px solid var(--border);align-items:center}
+.signoff-row:last-child{border-bottom:none}
+.signoff-row:nth-child(even){background:var(--slate)}
+.signoff-row input{border:none;border-bottom:1px dashed var(--border2);background:transparent;font-family:inherit;font-size:12px;color:var(--text);width:100%;outline:none;padding:2px 0}
+.signoff-row input:focus{border-bottom-color:var(--teal2)}
+.sig-area{border:1px dashed var(--slate3);border-radius:5px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--text4);font-size:10px;font-style:italic}
+
+/* ── BOTTOM NAV ── */
+.bottom-bar{border-top:1px solid var(--border);background:var(--white);padding:12px 32px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.bot-section-info{font-size:12px;color:var(--text3);font-weight:400}
+.bot-section-info strong{color:var(--text);font-weight:400}
+.bot-btns{display:flex;gap:8px}
+.bot-btn{padding:8px 20px;border-radius:8px;font-size:13px;font-weight:400;cursor:pointer;border:none;font-family:inherit;transition:all .15s;display:flex;align-items:center;gap:6px}
+.bot-prev{background:var(--slate);color:var(--text2)}.bot-prev:hover{background:var(--slate2)}
+.bot-next{background:var(--navy);color:#fff}.bot-next:hover{background:var(--navy2)}
+.bot-finish{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--navy);font-weight:400}.bot-finish:hover{filter:brightness(1.06)}
+
+/* ── PREVIEW MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(5,10,20,.65);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:32px 20px;overflow-y:auto;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(6px)}
+.modal-bg.open{opacity:1;pointer-events:all}
+.modal{background:#F8F9FA;border-radius:4px;width:860px;max-width:100%;display:flex;flex-direction:column;transform:translateY(16px) scale(.975);transition:transform .28s cubic-bezier(.22,.68,0,1.2);overflow:hidden;max-height:92vh;box-shadow:0 32px 80px rgba(0,0,0,.35)}
+.modal-bg.open .modal{transform:translateY(0) scale(1)}
+.modal-hd{padding:14px 20px;border-bottom:1px solid #DEE2E8;display:flex;align-items:center;justify-content:space-between;background:#fff;flex-shrink:0}
+.modal-hd-left{display:flex;align-items:center;gap:10px}
+.modal-hd-eyebrow{font-size:10px;font-weight:400;color:#94A3B8;text-transform:uppercase;letter-spacing:.7px}
+.modal-hd-title{font-size:14px;font-weight:400;color:#0F172A;margin-top:1px}
+.modal-hd-right{display:flex;gap:8px;align-items:center}
+.modal-close{background:#F1F5F9;border:none;width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:16px;color:#64748B;display:flex;align-items:center;justify-content:center;transition:all .1s}
+.modal-close:hover{background:#E2E8F0;color:#0F172A}
+.modal-body{padding:0;overflow-y:auto;flex:1;background:#F0F2F5}
+.modal-body::-webkit-scrollbar{width:5px}.modal-body::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:3px}
+.mfbtn{padding:8px 18px;border-radius:7px;font-size:12px;font-weight:400;cursor:pointer;border:none;font-family:inherit;transition:all .15s;display:flex;align-items:center;gap:5px}
+.mfbtn-cancel{background:#F1F5F9;border:1px solid #E2E8F0;color:#475569}.mfbtn-cancel:hover{background:#E2E8F0}
+.mfbtn-print{background:var(--navy);color:#fff}.mfbtn-print:hover{background:var(--navy2)}
+
+/* ── CHARTER DOCUMENT — Clean Light Professional ── */
+.charter-doc{
+  background:#fff;
+  margin:20px;
+  border-radius:4px;
+  box-shadow:0 2px 16px rgba(0,0,0,.10);
+  overflow:hidden;
+  font-family:'Segoe UI','Calibri',system-ui,sans-serif;
+  font-size:13px;
+  line-height:1.7;
+  color:#1E2535;
+}
+
+/* Cover — clean light with blue accent top bar */
+.cd-cover{
+  background:#fff;
+  padding:0;
+  position:relative;
+  border-bottom:1px solid #E4E8F0;
+}
+.cd-cover-top-bar{
+  height:6px;
+  background:linear-gradient(90deg,#1E3A5F,#2E6DB4,#4A9FD4);
+}
+.cd-cover-accent{display:none}
+.cd-cover-stripe{display:none}
+.cd-cover-inner{padding:32px 44px 28px;position:relative;z-index:1}
+.cd-cover-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
+.cd-cover-org{display:flex;align-items:center;gap:8px}
+.cd-cover-org-mark{width:30px;height:30px;border-radius:6px;background:#1E3A5F;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cd-cover-org-mark svg{width:15px;height:15px;stroke:#fff;fill:none;stroke-width:2}
+.cd-cover-org-name{font-size:11px;font-weight:400;color:#94A3B8;letter-spacing:.5px;text-transform:uppercase}
+.cd-cover-doctype{font-size:10px;font-weight:400;color:#2E6DB4;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px}
+.cd-cover-title{font-size:28px;font-weight:400;color:#1E2535;letter-spacing:-.4px;line-height:1.25;margin-bottom:16px}
+.cd-cover-pills{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cd-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:400;border:1px solid #CBD5E1;color:#64748B;background:#F8FAFC}
+.cd-pill-gold{background:#EEF6FF;border-color:#BFDBFE;color:#1D4ED8}
+.cd-pill-green{background:#ECFDF5;border-color:#A7F3D0;color:#065F46}
+.cd-pill-dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
+
+/* Meta strip */
+.cd-meta-strip{background:#F8FAFC;border-bottom:1px solid #E4E8F0;padding:0}
+.cd-meta-grid{display:grid;grid-template-columns:repeat(4,1fr)}
+.cd-meta-cell{padding:14px 20px;border-right:1px solid #E4E8F0}
+.cd-meta-cell:last-child{border-right:none}
+.cd-meta-label{font-size:9px;font-weight:400;color:#94A3B8;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px;display:flex;align-items:center;gap:4px}
+.cd-meta-label svg{width:10px;height:10px;stroke:#94A3B8;fill:none;stroke-width:2}
+.cd-meta-value{font-size:13px;font-weight:400;color:#1E2535}
+
+/* Body */
+.cd-body{padding:32px 44px 40px}
+
+/* Section */
+.cd-section{margin-bottom:32px}
+.cd-section-hd{display:flex;align-items:center;margin-bottom:16px}
+.cd-section-num{width:26px;height:26px;border-radius:6px;background:#EEF2FF;color:#1E3A5F;font-size:11px;font-weight:400;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:10px;border:1px solid #C7D7F0}
+.cd-section-label{font-size:11px;font-weight:400;color:#1E3A5F;text-transform:uppercase;letter-spacing:.7px}
+.cd-section-rule{flex:1;height:1px;background:linear-gradient(90deg,#C7D7F0,transparent);margin-left:12px}
+
+/* Prose block */
+.cd-prose{font-size:13px;color:#334155;line-height:1.8;white-space:pre-wrap;margin-bottom:12px}
+
+/* Highlighted box */
+.cd-highlight{background:#F8FAFC;border:1px solid #E4E8F0;border-left:3px solid #2E6DB4;border-radius:0 7px 7px 0;padding:13px 18px;margin-bottom:12px}
+.cd-highlight-lbl{font-size:9px;font-weight:400;color:#94A3B8;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px}
+.cd-highlight-val{font-size:13px;color:#1E2535;line-height:1.7;white-space:pre-wrap}
+
+/* Two-col highlight */
+.cd-2up{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+
+/* Data table */
+.cd-tbl-wrap{border:1px solid #E4E8F0;border-radius:8px;overflow:hidden;margin-bottom:14px}
+.cd-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.cd-tbl thead{background:#F1F5FB}
+.cd-tbl th{padding:9px 14px;text-align:left;font-size:9px;font-weight:400;color:#64748B;text-transform:uppercase;letter-spacing:.6px;border-right:1px solid #E4E8F0;white-space:nowrap;border-bottom:2px solid #C7D7F0}
+.cd-tbl th:last-child{border-right:none}
+.cd-tbl td{padding:9px 14px;border-bottom:1px solid #EEF1F6;color:#334155;font-size:12px;border-right:1px solid #F4F6FA;vertical-align:top}
+.cd-tbl td:last-child{border-right:none}
+.cd-tbl tbody tr:last-child td{border-bottom:none}
+.cd-tbl tbody tr:nth-child(even) td{background:#FAFBFD}
+.cd-tbl .row-num{width:28px;text-align:center;color:#94A3B8;font-weight:400;font-size:11px}
+
+/* Risk pills */
+.rp{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:400;letter-spacing:.2px}
+.rp-h{background:#FEE2E2;color:#991B1B}
+.rp-m{background:#FEF3C7;color:#92400E}
+.rp-l{background:#D1FAE5;color:#065F46}
+
+/* Budget highlight */
+.cd-budget-hero{background:#F1F5FB;border:1px solid #C7D7F0;border-radius:8px;padding:18px 22px;margin-bottom:14px;display:flex;align-items:center;gap:28px}
+.cd-budget-total{flex:1}
+.cd-budget-lbl{font-size:9px;font-weight:400;color:#64748B;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px}
+.cd-budget-val{font-size:24px;font-weight:400;color:#1E3A5F;letter-spacing:-.3px}
+.cd-budget-cont{text-align:right}
+.cd-budget-cont-lbl{font-size:9px;color:#94A3B8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;font-weight:400}
+.cd-budget-cont-val{font-size:15px;font-weight:400;color:#2E6DB4}
+
+/* Sign-off */
+.cd-sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+.cd-sig-box{border:1px solid #E4E8F0;border-radius:8px;overflow:hidden}
+.cd-sig-head{background:#F1F5FB;border-bottom:2px solid #C7D7F0;padding:13px 18px}
+.cd-sig-name{font-size:13px;font-weight:400;color:#1E2535;margin-bottom:1px}
+.cd-sig-role{font-size:11px;color:#64748B}
+.cd-sig-body{padding:14px 16px;background:#fff}
+.cd-sig-field{margin-bottom:10px}
+.cd-sig-field-lbl{font-size:9px;font-weight:400;color:#94A3B8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.cd-sig-line{height:36px;border-bottom:1.5px solid #CBD5E1;display:flex;align-items:flex-end;padding-bottom:4px}
+.cd-sig-date{font-size:11px;color:#64748B;font-weight:400}
+
+/* Footer */
+.cd-footer{background:#F1F5FB;border-top:2px solid #C7D7F0;padding:11px 44px;display:flex;align-items:center;justify-content:space-between}
+.cd-footer-left{font-size:10px;color:#64748B;font-weight:400;letter-spacing:.2px}
+.cd-footer-right{font-size:10px;color:#64748B}
+.cd-footer-gold{color:#1E3A5F;font-weight:400}
+
+.cd-risk-h{color:#991B1B;font-weight:400}.cd-risk-m{color:#92400E;font-weight:400}.cd-risk-l{color:#065F46;font-weight:400}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:10px 18px;border-radius:10px;font-size:12px;font-weight:400;z-index:9999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow-md)}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast-icon{width:18px;height:18px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.toast-icon svg{width:10px;height:10px;stroke:#fff;stroke-width:3;fill:none}
+
+@media print{
+  body *{visibility:hidden}
+  #printContainer,#printContainer *{visibility:visible}
+  #printContainer{
+    position:fixed;inset:0;z-index:99999;
+    background:#fff;overflow:visible;
+    display:block!important;
+  }
+  .charter-doc{box-shadow:none!important;margin:0!important;border-radius:0!important}
+  .cd-cover-top-bar,.cd-tbl thead,.cd-budget-hero,.cd-sig-head,.cd-section-num,.cd-footer,.cd-meta-strip,.cd-highlight,.rp{
+    -webkit-print-color-adjust:exact;print-color-adjust:exact
+  }
+  @page{margin:0;size:A4}
+}
+
+</style>
+</head>
+<body>
+</head>
+<body>
+
+<!-- PREVIEW MODAL -->
+<div class="modal-bg" id="modalBg" onclick="handleBgClick(event)">
+  <div class="modal">
+    <div class="modal-hd">
+      <div class="modal-hd-left">
+        <div>
+          <div class="modal-hd-eyebrow">Document preview</div>
+          <div class="modal-hd-title">Project Charter</div>
+        </div>
+      </div>
+      <div class="modal-hd-right">
+        <button class="mfbtn mfbtn-cancel" onclick="closeModal()">Close</button>
+        <button class="mfbtn mfbtn-print" onclick="printCharter()" style="background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--navy);font-weight:400">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:-1px;margin-right:4px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print / Save PDF
+        </button>
+      </div>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <div class="toast-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+  <span id="toastMsg"></span>
+</div>
+
+<!-- PRINT CONTAINER -->
+<div id="printContainer" style="display:none"></div>
+
+<!-- SNAPSHOT OVERLAY -->
+<div id="snapOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,22,40,.6);z-index:2000;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:#fff;border-radius:12px;padding:20px;max-width:92vw;max-height:90vh;display:flex;flex-direction:column;gap:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px">Charter Snapshot</div>
+        <div style="font-size:14px;color:#1E2535" id="snapTitle">Preview</div>
+      </div>
+      <button onclick="closeSnap()" style="background:#F1F5F9;border:none;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;color:#64748B;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <img id="snapImg" src="" style="max-width:100%;max-height:62vh;object-fit:contain;border-radius:8px;border:1px solid #E4E8F0">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="closeSnap()" style="padding:8px 16px;border-radius:7px;font-size:12px;cursor:pointer;border:1px solid #E2E8F0;background:#F8FAFC;color:#475569;font-family:inherit">Close</button>
+      <button id="snapDownloadBtn" style="padding:8px 16px;border-radius:7px;font-size:12px;cursor:pointer;border:none;background:#1E3A5F;color:#fff;font-family:inherit">Download PNG</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    </div>
+    <div class="logo-text">
+      <span class="logo-title">Charter Pro</span>
+      <span class="logo-sub">Project Charter Tool</span>
+    </div>
+  </div>
+  <div class="vsep"></div>
+  <div class="proj-input-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    <input class="proj-input" id="topProjName" placeholder="Enter project name…" oninput="syncName()">
+  </div>
+  <select class="status-select" id="topStatus" onchange="syncStatus()">
+    <option>Draft</option><option>Under Review</option><option>Approved</option><option>On Hold</option><option>Closed</option>
+  </select>
+  <div class="topbar-right">
+    <button class="tbtn tbtn-ghost" onclick="showPreview()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      Preview
+    </button>
+    <div class="vsep"></div>
+    <button class="tbtn tbtn-ghost" onclick="exportJSON()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export
+    </button>
+    <label class="tbtn tbtn-ghost" style="cursor:pointer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 5 17 10"/><line x1="12" y1="5" x2="12" y2="15"/></svg>
+      Import
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+    </label>
+    <div class="vsep"></div>
+    <button class="tbtn tbtn-ghost" onclick="takeSnapshot()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      Snapshot
+    </button>
+    <button class="tbtn tbtn-ghost" onclick="downloadPDF()">PDF</button>
+    <button class="tbtn tbtn-ghost" onclick="downloadPPT()">PPT</button>
+    <button class="tbtn tbtn-ghost" onclick="downloadDOCX()">DOC</button>
+    <div class="vsep"></div>
+    <button class="tbtn tbtn-gold" onclick="printCharter()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      Print
+    </button>
+  </div>
+</div>
+<div class="progress-strip"><div class="progress-strip-fill" id="progressFill" style="width:0%"></div></div>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sb-header">
+      <div class="sb-header-title">Completion</div>
+      <div class="sb-stats">
+        <div class="sb-stat"><div class="sb-stat-val" id="statFilled">0</div><div class="sb-stat-lbl">Filled</div></div>
+        <div class="sb-stat"><div class="sb-stat-val" id="statTotal">10</div><div class="sb-stat-lbl">Sections</div></div>
+      </div>
+    </div>
+    <div class="sb-nav" id="sbNav"></div>
+    <div class="sb-footer">
+      <div class="sb-footer-pct"><span id="sbPctLabel">Progress</span><span id="sbPct" style="color:var(--green);font-weight:400">0%</span></div>
+      <div class="sb-track"><div class="sb-fill" id="sbFill" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="section-wrap" id="sectionWrap"></div>
+    <div class="bottom-bar">
+      <div class="bot-section-info" id="botInfo"></div>
+      <div class="bot-btns" id="botBtns"></div>
+    </div>
+  </div>
+</div>
+<script>
+const SECS=[
+  {id:'overview',label:'Project Overview',group:'Fundamentals',color:'#3B82F6',bg:'#EFF6FF',
+   icon:'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z',
+   desc:'Core project details, background, and problem statement'},
+  {id:'objectives',label:'Objectives',group:'Fundamentals',color:'#059669',bg:'#ECFDF5',
+   icon:'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9l2 2 4-4',
+   desc:'What the project must achieve and how success will be measured'},
+  {id:'scope',label:'Scope',group:'Fundamentals',color:'#7C3AED',bg:'#F5F3FF',
+   icon:'M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4',
+   desc:'Boundaries of the project -- what is and is not included'},
+  {id:'stakeholders',label:'Stakeholders',group:'People',color:'#D97706',bg:'#FFFBEB',
+   icon:'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75M9 7a4 4 0 1 1 0-8 4 4 0 0 1 0 8',
+   desc:'Key people, their roles, and level of influence on the project'},
+  {id:'timeline',label:'Timeline and Milestones',group:'Planning',color:'#0F766E',bg:'#F0FDFA',
+   icon:'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z',
+   desc:'Project schedule, key dates, and milestone checkpoints'},
+  {id:'budget',label:'Budget',group:'Planning',color:'#DC2626',bg:'#FEF2F2',
+   icon:'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
+   desc:'Financial resources, breakdown, and contingency planning'},
+  {id:'risks',label:'Risks',group:'Planning',color:'#DC2626',bg:'#FEF2F2',
+   icon:'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01',
+   desc:'Known risks, their likelihood, impact and mitigation strategies'},
+  {id:'assumptions',label:'Assumptions and Dependencies',group:'Planning',color:'#7C3AED',bg:'#F5F3FF',
+   icon:'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
+   desc:'Assumptions the project is based on, and external dependencies'},
+  {id:'success',label:'Success Criteria',group:'Outcomes',color:'#059669',bg:'#ECFDF5',
+   icon:'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 0 0 1.946-.806 3.42 3.42 0 0 1 4.438 0 3.42 3.42 0 0 0 1.946.806 3.42 3.42 0 0 1 3.138 3.138',
+   desc:'Measurable criteria that define when the project is successful'},
+  {id:'signoff',label:'Sign-off and Approval',group:'Outcomes',color:'#0A1628',bg:'#F1F5F9',
+   icon:'M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 1 1 3.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z',
+   desc:'Formal approval signatures from project sponsors and stakeholders'},
+];
+
+var cur=0;
+var C={
+  projectName:'',status:'Draft',preparedBy:'',preparedDate:'',version:'1.0',department:'',sponsor:'',manager:'',
+  background:'',problemStatement:'',projectDescription:'',businessCase:'',
+  objectives:[{text:'',measure:'',target:'',owner:''}],
+  inScope:'',outScope:'',constraints:'',
+  deliverables:[{item:'',description:'',dueDate:'',owner:''}],
+  stakeholders:[{name:'',title:'',department:'',responsibility:'',influence:'High',engagement:'Manage Closely'}],
+  startDate:'',endDate:'',methodology:'',
+  milestones:[{name:'',date:'',owner:'',status:'Not Started',criteria:''}],
+  totalBudget:'',currency:'USD',contingency:'',budgetSource:'',
+  budgetLines:[{category:'',amount:'',notes:''}],
+  risks:[{risk:'',likelihood:'Medium',impact:'Medium',rating:'Medium',mitigation:'',owner:'',status:'Open'}],
+  assumptions:[{text:''}],
+  dependencies:[{description:'',type:'Internal',owner:'',dueBy:''}],
+  successCriteria:[{criterion:'',kpi:'',target:'',reviewDate:''}],
+  approvers:[{name:'',title:'',email:'',date:''}],
+};
+
+function g(id){return document.getElementById(id);}
+function val(id){var e=g(id);return e?e.value:'';}
+
+function syncName(){C.projectName=val('topProjName');updateProgress();}
+function syncStatus(){C.status=val('topStatus');updateProgress();}
+
+var ROWS={
+  objectives:{text:'',measure:'',target:'',owner:''},
+  deliverables:{item:'',description:'',dueDate:'',owner:''},
+  stakeholders:{name:'',title:'',department:'',responsibility:'',influence:'High',engagement:'Manage Closely'},
+  milestones:{name:'',date:'',owner:'',status:'Not Started',criteria:''},
+  budgetLines:{category:'',amount:'',notes:''},
+  risks:{risk:'',likelihood:'Medium',impact:'Medium',rating:'Medium',mitigation:'',owner:'',status:'Open'},
+  assumptions:{text:''},
+  dependencies:{description:'',type:'Internal',owner:'',dueBy:''},
+  successCriteria:{criterion:'',kpi:'',target:'',reviewDate:''},
+  approvers:{name:'',title:'',email:'',date:''},
+};
+
+function addRow(k){save();C[k].push(Object.assign({},ROWS[k]));render();}
+function delRow(k,i){save();C[k].splice(i,1);if(!C[k].length)C[k].push(Object.assign({},ROWS[k]));render();}
+
+function isFilled(id){
+  switch(id){
+    case 'overview':return !!(C.projectName&&C.background);
+    case 'objectives':return C.objectives.some(function(o){return o.text;});
+    case 'scope':return !!(C.inScope||C.outScope);
+    case 'stakeholders':return C.stakeholders.some(function(s){return s.name;});
+    case 'timeline':return !!(C.startDate&&C.endDate);
+    case 'budget':return !!C.totalBudget;
+    case 'risks':return C.risks.some(function(r){return r.risk;});
+    case 'assumptions':return C.assumptions.some(function(a){return a.text;})||C.dependencies.some(function(d){return d.description;});
+    case 'success':return C.successCriteria.some(function(s){return s.criterion;});
+    case 'signoff':return C.approvers.some(function(a){return a.name;});
+    default:return false;
+  }
+}
+
+function updateProgress(){
+  var filled=SECS.filter(function(s){return isFilled(s.id);}).length;
+  var pct=Math.round(filled/SECS.length*100);
+  g('sbPct').textContent=pct+'%';
+  g('sbFill').style.width=pct+'%';
+  g('progressFill').style.width=pct+'%';
+  g('statFilled').textContent=filled;
+  g('statTotal').textContent=SECS.length;
+  renderSidebar();
+}
+
+function renderSidebar(){
+  var groups=[];
+  SECS.forEach(function(s){if(groups.indexOf(s.group)<0)groups.push(s.group);});
+  var html='';
+  groups.forEach(function(grp){
+    html+='<div class="sb-group-label">'+grp+'</div>';
+    SECS.filter(function(s){return s.group===grp;}).forEach(function(s){
+      var idx=SECS.indexOf(s);
+      var done=isFilled(s.id);
+      var active=idx===cur;
+      var cls='nav-item'+(active?' active':'')+(done&&!active?' done':'');
+      var check=done&&!active?'<div class="nav-check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>':'';
+      html+='<div class="'+cls+'" onclick="goto('+idx+')">';
+      html+='<div class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="'+s.icon+'"/></svg></div>';
+      html+=s.label+check+'</div>';
+    });
+  });
+  g('sbNav').innerHTML=html;
+}
+
+function goto(i){save();cur=i;render();updateProgress();var m=g('sectionWrap');if(m&&m.parentElement)m.parentElement.scrollTop=0;}
+
+function render(){
+  var s=SECS[cur];
+  var builders={overview:overview,objectives:objectives,scope:scope,stakeholders:stakeholders,
+    timeline:timeline,budget:budget,risks:risks,assumptions:assumptions,success:success,signoff:signoff};
+  var icon='<div class="sec-hero-icon" style="background:'+s.bg+'"><svg viewBox="0 0 24 24" fill="none" stroke="'+s.color+'" stroke-width="1.7"><path d="'+s.icon+'"/></svg></div>';
+  var heroHTML='<div class="sec-hero">'+icon+'<div class="sec-hero-body"><div class="sec-hero-num">Section '+(cur+1)+' of '+SECS.length+' - '+s.group+'</div><div class="sec-hero-title">'+s.label+'</div><div class="sec-hero-desc">'+s.desc+'</div></div></div>';
+  g('sectionWrap').innerHTML=heroHTML+builders[s.id]();
+  g('botInfo').innerHTML=s.label+' - '+(cur+1)+' of '+SECS.length;
+  var prev=cur>0?'<button class="bot-btn bot-prev" onclick="goto('+(cur-1)+')">Previous</button>':'';
+  var next=cur<SECS.length-1?'<button class="bot-btn bot-next" onclick="goto('+(cur+1)+')">Save and Continue</button>':'<button class="bot-btn bot-finish" onclick="showPreview()">Preview Charter</button>';
+  g('botBtns').innerHTML=prev+next;
+}
+
+function ffd(label,id,v,type,hint){
+  type=type||'text';hint=hint||'';
+  return '<div class="ff"><label>'+label+'</label><input type="'+type+'" id="'+id+'" value="'+String(v||'').replace(/"/g,'&quot;')+'" placeholder="'+hint+'" oninput="autoSave()"></div>';
+}
+function ffta(label,id,v,hint){
+  hint=hint||'';
+  return '<div class="ff"><label>'+label+'</label><textarea id="'+id+'" placeholder="'+hint+'" oninput="autoSave()">'+String(v||'')+'</textarea></div>';
+}
+function ffsel(label,id,v,opts){
+  var options=opts.map(function(o){return '<option'+(v===o?' selected':'')+'>'+o+'</option>';}).join('');
+  return '<div class="ff"><label>'+label+'</label><select id="'+id+'" onchange="autoSave()">'+options+'</select></div>';
+}
+function rtBtn(key){
+  var b=document.createElement("button");
+  b.className="add-row";b.textContent="+ Add row";
+  b.setAttribute("data-action","addRow");b.setAttribute("data-key",key);
+  b.onclick=function(){addRow(this.dataset.key);};
+  return b.outerHTML;
+}
+function inl(v,key,idx,field,ph){
+  var esc=String(v||"").replace(/"/g,"&quot;");
+  ph=ph||"";
+  return "<input value=\""+esc+"\" placeholder=\""+ph+"\" data-key=\""+key+"\" data-idx=\""+idx+"\" data-field=\""+field+"\" oninput=\"C[this.dataset.key][this.dataset.idx][this.dataset.field]=this.value;autoSave()\">";
+}
+function sel(v,key,idx,field,opts){
+  var options=opts.map(function(o){return "<option"+(v===o?" selected":"")+">"+o+"</option>";}).join("");
+  return "<select data-key=\""+key+"\" data-idx=\""+idx+"\" data-field=\""+field+"\" onchange=\"C[this.dataset.key][this.dataset.idx][this.dataset.field]=this.value;autoSave()\">"+options+"</select>";
+}
+function deld(key,i){
+  return "<button class=\"rt-del\" data-key=\""+key+"\" data-idx=\""+i+"\" onclick=\"delRow(this.dataset.key,+this.dataset.idx)\">x</button>";
+}
+function cardHead(title,color){return '<div class="card-title"><div class="card-title-dot" style="background:'+color+'"></div>'+title+'</div>';}
+
+function tblWrap(heads,body){
+  var ths=heads.map(function(h){
+    var c=h[0],w=h[1];
+    return '<th style="'+(w?'width:'+w:'')+'">'+(c||'')+'</th>';
+  }).join('')+'<th style="width:36px"></th>';
+  return '<div class="rt-wrap"><table class="rt"><thead><tr>'+ths+'</tr></thead><tbody>'+body+'</tbody></table></div>';
+}
+
+function overview(){
+  return '<div class="card">'+cardHead('Project identification','#3B82F6')+
+    '<div class="fg fg-2">'+ffd('Project name','ov-name',C.projectName,'text','e.g. CRM System Upgrade')+ffsel('Status','ov-status',C.status,['Draft','Under Review','Approved','On Hold','Closed'])+'</div>'+
+    '<div class="fg fg-4" style="margin-top:12px">'+ffd('Prepared by','ov-preparedBy',C.preparedBy,'text','Full name')+ffd('Date prepared','ov-preparedDate',C.preparedDate,'date','')+ffd('Version','ov-version',C.version,'text','e.g. 1.0')+ffd('Department','ov-dept',C.department,'text','Owning department')+'</div>'+
+    '<div class="fg fg-2" style="margin-top:12px">'+ffd('Project sponsor','ov-sponsor',C.sponsor,'text','Executive sponsor name')+ffd('Project manager','ov-pm',C.manager,'text','Assigned PM')+'</div></div>'+
+    '<div class="card">'+cardHead('Context and rationale','#3B82F6')+
+    '<div class="fg">'+ffta('Business background','ov-bg',C.background,'Why is this project being undertaken?')+ffta('Problem statement','ov-prob',C.problemStatement,'What specific problem does this project address?')+ffta('Project description','ov-desc',C.projectDescription,'High-level description of what the project will deliver')+ffta('Business case summary','ov-biz',C.businessCase,'Why is this the right solution?')+'</div></div>';
+}
+
+function objectives(){
+  var rows=C.objectives.map(function(o,i){
+    return '<tr><td class="rt-num">'+(i+1)+'</td><td>'+inl(o.text,'objectives',i,'text','Describe the objective...')+'</td><td>'+inl(o.measure,'objectives',i,'measure','How measured?')+'</td><td>'+inl(o.target,'objectives',i,'target','e.g. 95% uptime')+'</td><td>'+inl(o.owner,'objectives',i,'owner','Owner')+'</td><td>'+deld('objectives',i)+'</td></tr>';
+  }).join('');
+  return '<div class="card">'+cardHead('Project objectives','#059669')+
+    '<p style="font-size:12px;color:var(--text3);margin-bottom:14px">Define SMART objectives -- what the project must achieve, how it will be measured, and who is accountable.</p>'+
+    tblWrap([['#','20px'],['Objective'],['Measurement method'],['Target / KPI','160px'],['Owner','100px']],rows)+
+    rtBtn('objectives')+'</div>';
+}
+
+function scope(){
+  var rows=C.deliverables.map(function(d,i){
+    return '<tr><td class="rt-num">'+(i+1)+'</td><td>'+inl(d.item,'deliverables',i,'item','Deliverable name')+'</td><td>'+inl(d.description,'deliverables',i,'description','Brief description')+'</td><td><input type="date" value="'+(d.dueDate||'')+'" oninput="C.deliverables['+i+'].dueDate=this.value;autoSave()"></td><td>'+inl(d.owner,'deliverables',i,'owner','Owner')+'</td><td>'+deld('deliverables',i)+'</td></tr>';
+  }).join('');
+  return '<div class="card">'+cardHead('Scope definition','#7C3AED')+
+    '<div class="fg fg-2">'+ffta('In scope','sc-in',C.inScope,'What is explicitly included?')+ffta('Out of scope','sc-out',C.outScope,'What is explicitly excluded?')+'</div>'+
+    '<div style="margin-top:12px">'+ffta('Constraints','sc-constraints',C.constraints,'Budget caps, regulatory requirements, resource limits')+'</div></div>'+
+    '<div class="card">'+cardHead('Deliverables','#7C3AED')+
+    tblWrap([['#','20px'],['Deliverable'],['Description'],['Due date','110px'],['Owner','100px']],rows)+
+    rtBtn('deliverables')+'</div>';
+}
+
+function stakeholders(){
+  var rows=C.stakeholders.map(function(s,i){
+    return '<tr><td class="rt-num">'+(i+1)+'</td><td>'+inl(s.name,'stakeholders',i,'name','Full name')+'</td><td>'+inl(s.title,'stakeholders',i,'title','Job title')+'</td><td>'+inl(s.department,'stakeholders',i,'department','Department')+'</td><td>'+inl(s.responsibility,'stakeholders',i,'responsibility','Responsibility')+'</td><td>'+sel(s.influence,'stakeholders',i,'influence',['High','Medium','Low'])+'</td><td>'+sel(s.engagement,'stakeholders',i,'engagement',['Manage Closely','Keep Satisfied','Keep Informed','Monitor'])+'</td><td>'+deld('stakeholders',i)+'</td></tr>';
+  }).join('');
+  return '<div class="card">'+cardHead('Stakeholder register','#D97706')+
+    '<p style="font-size:12px;color:var(--text3);margin-bottom:14px">Identify everyone who has a stake in the project, their level of influence, and the appropriate engagement strategy.</p>'+
+    tblWrap([['#','20px'],['Name'],['Title'],['Department','110px'],['Responsibility'],['Influence','90px'],['Engagement','130px']],rows)+
+    rtBtn('stakeholders')+'</div>';
+}
+
+function timeline(){
+  var rows=C.milestones.map(function(m,i){
+    return '<tr><td class="rt-num">'+(i+1)+'</td><td>'+inl(m.name,'milestones',i,'name','Milestone name')+'</td><td><input type="date" value="'+(m.date||'')+'" oninput="C.milestones['+i+'].date=this.value;autoSave()"></td><td>'+inl(m.owner,'milestones',i,'owner','Owner')+'</td><td>'+inl(m.criteria,'milestones',i,'criteria','Completion criteria')+'</td><td>'+sel(m.status,'milestones',i,'status',['Not Started','In Progress','Done','Delayed','At Risk'])+'</td><td>'+deld('milestones',i)+'</td></tr>';
+  }).join('');
+  return '<div class="card">'+cardHead('Project schedule','#0F766E')+
+    '<div class="fg fg-3">'+ffd('Start date','tl-start',C.startDate,'date','')+ffd('End date','tl-end',C.endDate,'date','')+ffsel('Methodology','tl-method',C.methodology,['','Waterfall','Agile / Scrum','Hybrid','Kanban','PRINCE2','Other'])+'</div></div>'+
+    '<div class="card">'+cardHead('Key milestones','#0F766E')+
+    tblWrap([['#','20px'],['Milestone'],['Target date','120px'],['Owner','100px'],['Completion criteria'],['Status','110px']],rows)+
+    rtBtn('milestones')+'</div>';
+}
+
+function budget(){
+  var rows=C.budgetLines.map(function(b,i){
+    return '<tr><td class="rt-num">'+(i+1)+'</td><td>'+inl(b.category,'budgetLines',i,'category','e.g. Technology, Staffing')+'</td><td>'+inl(b.amount,'budgetLines',i,'amount','0.00')+'</td><td>'+inl(b.notes,'budgetLines',i,'notes','Notes')+'</td><td>'+deld('budgetLines',i)+'</td></tr>';
+  }).join('');
+  return '<div class="card">'+cardHead('Budget summary','#DC2626')+
+    '<div class="fg fg-4">'+ffd('Total approved budget','bgt-total',C.totalBudget,'text','0.00')+ffsel('Currency','bgt-currency',C.currency,['USD','SGD','GBP','EUR','AUD','MYR','INR','JPY'])+ffd('Contingency reserve','bgt-contingency',C.contingency,'text','e.g. 10%')+ffd('Budget source','bgt-source',C.budgetSource,'text','e.g. CAPEX, OPEX')+'</div></div>'+
+    '<div class="card">'+cardHead('Budget breakdown','#DC2626')+
+    tblWrap([['#','20px'],['Category'],['Amount ('+C.currency+')','160px'],['Notes']],rows)+
+    rtBtn('budgetLines')+'</div>';
+}
+
+function risks(){
+  var rows=C.risks.map(function(r,i){
+    return '<tr><td class="rt-num">'+(i+1)+'</td><td>'+inl(r.risk,'risks',i,'risk','Describe the risk...')+'</td><td>'+sel(r.likelihood,'risks',i,'likelihood',['High','Medium','Low'])+'</td><td>'+sel(r.impact,'risks',i,'impact',['High','Medium','Low'])+'</td><td>'+sel(r.rating,'risks',i,'rating',['Critical','High','Medium','Low'])+'</td><td>'+inl(r.mitigation,'risks',i,'mitigation','Mitigation plan')+'</td><td>'+inl(r.owner,'risks',i,'owner','Owner')+'</td><td>'+sel(r.status,'risks',i,'status',['Open','Mitigated','Closed','Accepted'])+'</td><td>'+deld('risks',i)+'</td></tr>';
+  }).join('');
+  return '<div class="card">'+cardHead('Risk register','#DC2626')+
+    '<p style="font-size:12px;color:var(--text3);margin-bottom:14px">Rate likelihood and impact independently, then assign an overall rating and mitigation plan.</p>'+
+    tblWrap([['#','20px'],['Risk description'],['Likelihood','100px'],['Impact','90px'],['Rating','90px'],['Mitigation strategy'],['Owner','90px'],['Status','90px']],rows)+
+    rtBtn('risks')+'</div>';
+}
+
+function assumptions(){
+  var aRows=C.assumptions.map(function(a,i){
+    return '<tr><td class="rt-num">'+(i+1)+'</td><td>'+inl(a.text,'assumptions',i,'text','State the assumption...')+'</td><td>'+deld('assumptions',i)+'</td></tr>';
+  }).join('');
+  var dRows=C.dependencies.map(function(d,i){
+    return '<tr><td class="rt-num">'+(i+1)+'</td><td>'+inl(d.description,'dependencies',i,'description','Describe the dependency...')+'</td><td>'+sel(d.type,'dependencies',i,'type',['Internal','External','Technical','Regulatory','Vendor'])+'</td><td>'+inl(d.owner,'dependencies',i,'owner','Owner')+'</td><td><input type="date" value="'+(d.dueBy||'')+'" oninput="C.dependencies['+i+'].dueBy=this.value;autoSave()"></td><td>'+deld('dependencies',i)+'</td></tr>';
+  }).join('');
+  return '<div class="card">'+cardHead('Assumptions','#7C3AED')+
+    '<p style="font-size:12px;color:var(--text3);margin-bottom:14px">List all conditions assumed to be true for this project to succeed.</p>'+
+    tblWrap([['#','20px'],['Assumption']],aRows)+rtBtn('assumptions')+'</div>'+
+    '<div class="card">'+cardHead('Dependencies','#7C3AED')+
+    '<p style="font-size:12px;color:var(--text3);margin-bottom:14px">List all external or internal dependencies that this project relies on.</p>'+
+    tblWrap([['#','20px'],['Dependency description'],['Type','120px'],['Owner','100px'],['Required by','120px']],dRows)+rtBtn('dependencies')+'</div>';
+}
+
+function success(){
+  var rows=C.successCriteria.map(function(s,i){
+    return '<tr><td class="rt-num">'+(i+1)+'</td><td>'+inl(s.criterion,'successCriteria',i,'criterion','What does success look like?')+'</td><td>'+inl(s.kpi,'successCriteria',i,'kpi','e.g. NPS, Revenue')+'</td><td>'+inl(s.target,'successCriteria',i,'target','e.g. >= 80%')+'</td><td><input type="date" value="'+(s.reviewDate||'')+'" oninput="C.successCriteria['+i+'].reviewDate=this.value;autoSave()"></td><td>'+deld('successCriteria',i)+'</td></tr>';
+  }).join('');
+  return '<div class="card">'+cardHead('Success criteria','#059669')+
+    '<p style="font-size:12px;color:var(--text3);margin-bottom:14px">Define measurable criteria used to evaluate whether the project has been successful.</p>'+
+    tblWrap([['#','20px'],['Success criterion'],['KPI / Metric','160px'],['Target','140px'],['Review date','120px']],rows)+
+    rtBtn('successCriteria')+'</div>';
+}
+
+function signoff(){
+  var rows=C.approvers.map(function(a,i){
+    return '<div class="signoff-row">'+inl(a.name,'approvers',i,'name','Full name')+inl(a.title,'approvers',i,'title','Job title / role')+'<div class="sig-area">Signature</div><input type="date" value="'+(a.date||'')+'" data-idx="'+i+'" oninput="C.approvers[this.dataset.idx].date=this.value;autoSave()"><button class="rt-del" data-key="approvers" data-idx="'+i+'" onclick="delRow(this.dataset.key,+this.dataset.idx)">x</button></div>';
+  }).join('');
+  return '<div class="card" style="padding:0;overflow:hidden">'+
+    '<div style="padding:18px 22px;border-bottom:1px solid var(--border)">'+cardHead('Approval and sign-off','#0A1628')+'</div>'+
+    '<div class="signoff-card" style="border:none;border-radius:0;margin:0">'+
+    '<div class="signoff-head"><span>Name</span><span>Title / Role</span><span>Signature</span><span>Date</span><span></span></div>'+rows+'</div>'+
+    '<div style="padding:14px 22px"><button class="add-row" data-key="approvers" onclick=\"addRow(this.dataset.key)\">+ Add approver</button></div></div>'+
+    '<div class="card" style="background:var(--gold-light);border-color:var(--gold)">'+
+    '<div style="display:flex;align-items:center;gap:10px">'+
+    '<div style="width:36px;height:36px;background:var(--gold);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>'+
+    '<div><div style="font-size:13px;color:var(--navy)">Ready to finalise?</div><div style="font-size:12px;color:var(--text3);margin-top:2px">Click Preview Charter to review the full document before sharing or printing.</div></div>'+
+    '<button class="bot-btn bot-finish" style="margin-left:auto" onclick="showPreview()">Preview Charter</button></div></div>';
+}
+
+var saveT;
+function autoSave(){clearTimeout(saveT);saveT=setTimeout(save,500);}
+function save(){
+  var id=SECS[cur].id;
+  if(id==='overview'){
+    C.projectName=val('ov-name')||C.projectName;C.status=val('ov-status')||C.status;
+    C.preparedBy=val('ov-preparedBy');C.preparedDate=val('ov-preparedDate');
+    C.version=val('ov-version');C.department=val('ov-dept');
+    C.sponsor=val('ov-sponsor');C.manager=val('ov-pm');
+    C.background=val('ov-bg');C.problemStatement=val('ov-prob');
+    C.projectDescription=val('ov-desc');C.businessCase=val('ov-biz');
+    g('topProjName').value=C.projectName;g('topStatus').value=C.status;
+  }
+  if(id==='scope'){C.inScope=val('sc-in');C.outScope=val('sc-out');C.constraints=val('sc-constraints');}
+  if(id==='timeline'){C.startDate=val('tl-start');C.endDate=val('tl-end');C.methodology=val('tl-method');}
+  if(id==='budget'){C.totalBudget=val('bgt-total');C.currency=val('bgt-currency');C.contingency=val('bgt-contingency');C.budgetSource=val('bgt-source');}
+  updateProgress();
+}
+
+function buildDoc(){
+  const c=C;
+  const isApproved=c.status==='Approved';
+  const isReview=c.status==='Under Review';
+  let sn=0;
+
+  return `<div class="charter-doc">
+
+  <!-- COVER -->
+  <div class="cd-cover">
+    <div class="cd-cover-top-bar"></div>
+    <div class="cd-cover-inner">
+      <div class="cd-cover-top">
+        <div class="cd-cover-org">
+          <div class="cd-cover-org-mark">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <span class="cd-cover-org-name">Project Charter</span>
+        </div>
+        <div class="cd-cover-pills">
+          <span class="cd-pill">v${c.version||'1.0'}</span>
+          <span class="cd-pill">${fd(c.preparedDate)}</span>
+          <span class="cd-pill ${isApproved?'cd-pill-green':isReview?'cd-pill-gold':''}">${c.status}</span>
+        </div>
+      </div>
+      <div class="cd-cover-doctype">Official Project Document</div>
+      <div class="cd-cover-title">${c.projectName||'Untitled Project'}</div>
+    </div>
+  </div>
+
+  <!-- META STRIP -->
+  <div class="cd-meta-strip">
+    <div class="cd-meta-grid">
+      <div class="cd-meta-cell">
+        <div class="cd-meta-label">
+          <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Prepared by
+        </div>
+        <div class="cd-meta-value">${c.preparedBy||'—'}</div>
+      </div>
+      <div class="cd-meta-cell">
+        <div class="cd-meta-label">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          Department
+        </div>
+        <div class="cd-meta-value">${c.department||'—'}</div>
+      </div>
+      <div class="cd-meta-cell">
+        <div class="cd-meta-label">
+          <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Project Sponsor
+        </div>
+        <div class="cd-meta-value">${c.sponsor||'—'}</div>
+      </div>
+      <div class="cd-meta-cell">
+        <div class="cd-meta-label">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          Project Manager
+        </div>
+        <div class="cd-meta-value">${c.manager||'—'}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="cd-body">
+
+  ${(c.background||c.problemStatement||c.projectDescription||c.businessCase)?`
+  <div class="cd-section">
+    ${secHd(++sn,'Project Overview')}
+    ${c.background?`<div style="margin-bottom:12px"><div style="font-size:10px;font-weight:400;color:#94A3B8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Background</div><div class="cd-prose">${c.background}</div></div>`:''}
+    ${c.problemStatement||c.projectDescription||c.businessCase?`<div class="cd-2up">
+      ${c.problemStatement?hl('Problem Statement',c.problemStatement,'#DC2626'):''}
+      ${c.projectDescription?hl('Project Description',c.projectDescription,'#3B82F6'):''}
+    </div>`:''}
+    ${c.businessCase?hl('Business Case & Justification',c.businessCase,'#059669'):''}
+  </div>`:''}
+
+  ${c.objectives.some(o=>o.text)?`
+  <div class="cd-section">
+    ${secHd(++sn,'Objectives')}
+    ${tbl([['#','32px'],['Objective'],['Measurement Method'],['Target / KPI','140px'],['Owner','100px']],
+      c.objectives.filter(o=>o.text).map((o,i)=>`<tr>
+        <td class="row-num">${i+1}</td>
+        <td style="font-weight:400;color:#0F172A">${o.text}</td>
+        <td>${o.measure||'—'}</td>
+        <td>${o.target||'—'}</td>
+        <td>${o.owner||'—'}</td>
+      </tr>`).join(''))}
+  </div>`:''}
+
+  ${(c.inScope||c.outScope||c.constraints||c.deliverables.some(d=>d.item))?`
+  <div class="cd-section">
+    ${secHd(++sn,'Scope')}
+    ${c.inScope||c.outScope?`<div class="cd-2up">
+      ${c.inScope?hl('In Scope',c.inScope,'#059669'):''}
+      ${c.outScope?hl('Out of Scope',c.outScope,'#DC2626'):''}
+    </div>`:''}
+    ${c.constraints?hl('Constraints & Boundaries',c.constraints,'#D97706'):''}
+    ${c.deliverables.some(d=>d.item)?tbl([['#','32px'],['Deliverable'],['Description'],['Due Date','110px'],['Owner','100px']],
+      c.deliverables.filter(d=>d.item).map((d,i)=>`<tr>
+        <td class="row-num">${i+1}</td>
+        <td style="font-weight:400;color:#0F172A">${d.item}</td>
+        <td>${d.description||'—'}</td>
+        <td>${fd(d.dueDate)}</td>
+        <td>${d.owner||'—'}</td>
+      </tr>`).join('')):''}
+  </div>`:''}
+
+  ${c.stakeholders.some(s=>s.name)?`
+  <div class="cd-section">
+    ${secHd(++sn,'Stakeholders')}
+    ${tbl([['Name'],['Title'],['Department','110px'],['Responsibility'],['Influence','90px'],['Engagement','130px']],
+      c.stakeholders.filter(s=>s.name).map(s=>`<tr>
+        <td style="font-weight:400;color:#0F172A">${s.name}</td>
+        <td>${s.title||'—'}</td>
+        <td>${s.department||'—'}</td>
+        <td>${s.responsibility||'—'}</td>
+        <td>${rp(s.influence||'Medium')}</td>
+        <td><span style="font-size:11px;color:#475569;font-weight:400">${s.engagement||'—'}</span></td>
+      </tr>`).join(''))}
+  </div>`:''}
+
+  ${(c.startDate||c.endDate||c.milestones.some(m=>m.name))?`
+  <div class="cd-section">
+    ${secHd(++sn,'Timeline & Milestones')}
+    <div class="cd-2up">
+      <div class="cd-highlight" style="border-left-color:#0F766E">
+        <div class="cd-highlight-lbl">Start Date</div>
+        <div style="font-size:16px;font-weight:400;color:#0F172A;margin-top:2px">${fd(c.startDate)}</div>
+      </div>
+      <div class="cd-highlight" style="border-left-color:#0F766E">
+        <div class="cd-highlight-lbl">End Date</div>
+        <div style="font-size:16px;font-weight:400;color:#0F172A;margin-top:2px">${fd(c.endDate)}</div>
+      </div>
+    </div>
+    ${c.methodology?`<div style="font-size:11px;color:#64748B;margin-bottom:14px;font-weight:400">Methodology: <span style="color:#0F172A">${c.methodology}</span></div>`:''}
+    ${c.milestones.some(m=>m.name)?tbl([['#','32px'],['Milestone'],['Target Date','120px'],['Owner','100px'],['Criteria'],['Status','100px']],
+      c.milestones.filter(m=>m.name).map((m,i)=>`<tr>
+        <td class="row-num">${i+1}</td>
+        <td style="font-weight:400;color:#0F172A">${m.name}</td>
+        <td>${fd(m.date)}</td>
+        <td>${m.owner||'—'}</td>
+        <td>${m.criteria||'—'}</td>
+        <td><span style="font-size:11px;font-weight:400;color:${m.status==='Done'?'#059669':m.status==='Delayed'||m.status==='At Risk'?'#DC2626':'#475569'}">${m.status||'—'}</span></td>
+      </tr>`).join('')):''}
+  </div>`:''}
+
+  ${c.totalBudget?`
+  <div class="cd-section">
+    ${secHd(++sn,'Budget')}
+    <div class="cd-budget-hero">
+      <div class="cd-budget-total">
+        <div class="cd-budget-lbl">Total Approved Budget</div>
+        <div class="cd-budget-val">${c.currency} ${c.totalBudget}</div>
+      </div>
+      ${c.contingency?`<div class="cd-budget-cont"><div class="cd-budget-cont-lbl">Contingency Reserve</div><div class="cd-budget-cont-val">${c.contingency}</div></div>`:''}
+      ${c.budgetSource?`<div class="cd-budget-cont"><div class="cd-budget-cont-lbl">Budget Source</div><div class="cd-budget-cont-val" style="color:#94A3B8">${c.budgetSource}</div></div>`:''}
+    </div>
+    ${c.budgetLines.some(b=>b.category)?tbl([['Category'],['Amount ('+c.currency+')','150px'],['Notes']],
+      c.budgetLines.filter(b=>b.category).map(b=>`<tr>
+        <td style="font-weight:400;color:#0F172A">${b.category}</td>
+        <td style="font-weight:400">${b.amount||'—'}</td>
+        <td style="color:#64748B">${b.notes||'—'}</td>
+      </tr>`).join('')):''}
+  </div>`:''}
+
+  ${c.risks.some(r=>r.risk)?`
+  <div class="cd-section">
+    ${secHd(++sn,'Risk Register')}
+    ${tbl([['#','32px'],['Risk Description'],['Likelihood','100px'],['Impact','90px'],['Rating','90px'],['Mitigation'],['Owner','90px'],['Status','90px']],
+      c.risks.filter(r=>r.risk).map((r,i)=>`<tr>
+        <td class="row-num">${i+1}</td>
+        <td style="font-weight:400;color:#0F172A">${r.risk}</td>
+        <td>${rp(r.likelihood)}</td>
+        <td>${rp(r.impact)}</td>
+        <td>${rp(r.rating)}</td>
+        <td style="color:#475569">${r.mitigation||'—'}</td>
+        <td>${r.owner||'—'}</td>
+        <td><span style="font-size:11px;font-weight:400;color:${r.status==='Closed'?'#059669':r.status==='Open'?'#DC2626':'#64748B'}">${r.status||'—'}</span></td>
+      </tr>`).join(''))}
+  </div>`:''}
+
+  ${(c.assumptions.some(a=>a.text)||c.dependencies.some(d=>d.description))?`
+  <div class="cd-section">
+    ${secHd(++sn,'Assumptions & Dependencies')}
+    ${c.assumptions.some(a=>a.text)?`
+      <div style="font-size:10px;font-weight:400;color:#94A3B8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Assumptions</div>
+      ${tbl([['#','32px'],['Assumption']],
+        c.assumptions.filter(a=>a.text).map((a,i)=>`<tr><td class="row-num">${i+1}</td><td>${a.text}</td></tr>`).join(''))}
+    `:''}
+    ${c.dependencies.some(d=>d.description)?`
+      <div style="font-size:10px;font-weight:400;color:#94A3B8;text-transform:uppercase;letter-spacing:.6px;margin:12px 0 8px">Dependencies</div>
+      ${tbl([['#','32px'],['Dependency'],['Type','110px'],['Owner','100px'],['Required By','110px']],
+        c.dependencies.filter(d=>d.description).map((d,i)=>`<tr><td class="row-num">${i+1}</td><td style="font-weight:400;color:#0F172A">${d.description}</td><td>${d.type||'—'}</td><td>${d.owner||'—'}</td><td>${fd(d.dueBy)}</td></tr>`).join(''))}
+    `:''}
+  </div>`:''}
+
+  ${c.successCriteria.some(s=>s.criterion)?`
+  <div class="cd-section">
+    ${secHd(++sn,'Success Criteria')}
+    ${tbl([['#','32px'],['Criterion'],['KPI / Metric','150px'],['Target','130px'],['Review Date','110px']],
+      c.successCriteria.filter(s=>s.criterion).map((s,i)=>`<tr>
+        <td class="row-num">${i+1}</td>
+        <td style="font-weight:400;color:#0F172A">${s.criterion}</td>
+        <td>${s.kpi||'—'}</td>
+        <td>${s.target||'—'}</td>
+        <td>${fd(s.reviewDate)}</td>
+      </tr>`).join(''))}
+  </div>`:''}
+
+  ${c.approvers.some(a=>a.name)?`
+  <div class="cd-section">
+    ${secHd(++sn,'Sign-off & Approval')}
+    <p style="font-size:12px;color:#64748B;margin-bottom:14px;line-height:1.6">By signing below, the named individuals confirm they have reviewed and approve this Project Charter, and authorise the project to proceed as described.</p>
+    <div class="cd-sig-grid">
+      ${c.approvers.filter(a=>a.name).map(a=>`
+        <div class="cd-sig-box">
+          <div class="cd-sig-head">
+            <div class="cd-sig-name">${a.name}</div>
+            <div class="cd-sig-role">${a.title||'—'}</div>
+          </div>
+          <div class="cd-sig-body">
+            <div class="cd-sig-field">
+              <div class="cd-sig-field-lbl">Signature</div>
+              <div class="cd-sig-line"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+              <div>
+                <div class="cd-sig-field-lbl">Date signed</div>
+                <div class="cd-sig-date">${fd(a.date)}</div>
+              </div>
+              <div style="font-size:10px;color:#94A3B8;font-style:italic">Approved ✓</div>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>
+  </div>`:''}
+
+  </div><!-- end cd-body -->
+
+  <!-- FOOTER -->
+  <div class="cd-footer">
+    <div class="cd-footer-left">CONFIDENTIAL &nbsp;·&nbsp; ${c.projectName||'Project Charter'} &nbsp;·&nbsp; v${c.version||'1.0'}</div>
+    <div class="cd-footer-right">Prepared: ${fd(c.preparedDate)} &nbsp;·&nbsp; Status: <span class="cd-footer-gold">${c.status}</span></div>
+  </div>
+
+</div>`;
+}
+
+
+function showPreview(){save();g('modalBody').innerHTML=buildDoc();g('modalBg').classList.add('open');}
+
+function printCharter(){
+  save();
+  var doc=buildDoc();
+  var pc=g('printContainer');
+  pc.innerHTML=doc;
+  pc.style.display='block';
+  setTimeout(function(){
+    window.print();
+    setTimeout(function(){pc.style.display='none';},500);
+  },120);
+}
+function closeModal(){g('modalBg').classList.remove('open');}
+function handleBgClick(e){if(e.target===g('modalBg'))closeModal();}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
+
+function takeSnapshot(){
+  save();
+  var overlay=g('snapOverlay');
+  overlay.style.display='flex';
+  var pc=g('printContainer');
+  pc.innerHTML=buildDoc();
+  pc.style.display='block';
+  pc.style.position='fixed';
+  pc.style.top='-9999px';
+  pc.style.width='900px';
+  pc.style.background='#fff';
+  setTimeout(function(){
+    html2canvas(pc,{scale:1.5,useCORS:true,backgroundColor:'#ffffff',logging:false,width:900}).then(function(canvas){
+      var url=canvas.toDataURL('image/png');
+      g('snapImg').src=url;
+      var proj=(C.projectName||'charter').replace(/\s+/g,'-').toLowerCase();
+      g('snapTitle').textContent=C.projectName||'Charter Snapshot';
+      g('snapDownloadBtn').onclick=function(){
+        var a=document.createElement('a');a.href=url;
+        a.download=proj+'-charter-snapshot.png';a.click();
+        toast('Snapshot downloaded');
+      };
+      pc.style.display='none';pc.style.position='';pc.style.top='';pc.style.width='';
+    }).catch(function(){
+      pc.style.display='none';toast('Snapshot failed');overlay.style.display='none';
+    });
+  },200);
+}
+function closeSnap(){g('snapOverlay').style.display='none';}
+
+
+async function downloadPPT(){
+  save();
+  toast('Generating PowerPoint...');
+  try{
+    const c=C;
+    const fd=s=>{if(!s)return '—';try{return new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}catch{return s;}};
+    const pptx=new PptxGenJS();
+    pptx.layout='LAYOUT_WIDE';
+    pptx.title=c.projectName||'Project Charter';
+
+    const NAVY='1E3A5F',BLUE='2E6DB4',LB='EEF4FB',
+          TXTD='1E2535',TXTS='475569',TXTM='94A3B8',WHITE='FFFFFF',
+          BDR='C7D7F0',LH=0.32,SW=13.33,SH=7.5;
+
+    const slide=()=>pptx.addSlide();
+
+    const hdr=(sl,title,sub)=>{
+      sl.addShape('rect',{x:0,y:0,w:SW,h:0.08,fill:{color:NAVY}});
+      sl.addShape('rect',{x:0,y:0.08,w:SW,h:0.04,fill:{color:BLUE}});
+      sl.addText(title,{x:0.5,y:0.18,w:12,h:0.55,fontSize:20,color:TXTD,fontFace:'Segoe UI'});
+      if(sub)sl.addText(sub,{x:0.5,y:0.7,w:12,h:0.25,fontSize:10,color:TXTS,fontFace:'Segoe UI',italic:true});
+      sl.addShape('line',{x:0.5,y:1.05,w:SW-1,h:0,line:{color:BDR,width:0.5}});
+    };
+
+    const foot=(sl,n,tot)=>{
+      sl.addShape('line',{x:0,y:SH-0.35,w:SW,h:0,line:{color:BDR,width:0.5}});
+      sl.addText((c.projectName||'Project Charter')+' · CONFIDENTIAL',{x:0.5,y:SH-0.3,w:9,h:0.22,fontSize:8,color:TXTM,fontFace:'Segoe UI'});
+      sl.addText(n+' / '+tot,{x:SW-1.2,y:SH-0.3,w:0.9,h:0.22,fontSize:8,color:TXTM,align:'right',fontFace:'Segoe UI'});
+    };
+
+    const tblOpts=(colW)=>({x:0.5,y:1.18,w:SW-1,colW,border:{pt:0.5,color:BDR},
+      fill:{color:WHITE},fontFace:'Segoe UI',fontSize:9,color:TXTS,rowH:LH,
+      thead:true,headFill:{color:LB},headColor:NAVY,headFontSize:9,autoPage:false});
+
+    // Count slides
+    const secs=['cover','overview',
+      c.objectives.some(o=>o.text)?'objectives':null,
+      (c.inScope||c.outScope||c.deliverables.some(d=>d.item))?'scope':null,
+      c.stakeholders.some(s=>s.name)?'stakeholders':null,
+      (c.startDate||c.milestones.some(m=>m.name))?'timeline':null,
+      c.totalBudget?'budget':null,
+      c.risks.some(r=>r.risk)?'risks':null,
+      (c.assumptions.some(a=>a.text)||c.dependencies.some(d=>d.description))?'assumptions':null,
+      c.successCriteria.some(s=>s.criterion)?'success':null,
+      c.approvers.some(a=>a.name)?'signoff':null,
+    ].filter(Boolean);
+    const T=secs.length;
+    let sn=0;
+
+    // ── COVER
+    sn++;
+    const cv=slide();
+    cv.addShape('rect',{x:0,y:0,w:SW,h:0.1,fill:{color:NAVY}});
+    cv.addShape('rect',{x:0,y:0.1,w:SW,h:0.04,fill:{color:BLUE}});
+    cv.addShape('rect',{x:0,y:SH-0.08,w:SW,h:0.08,fill:{color:NAVY}});
+    cv.addText('PROJECT CHARTER',{x:0.6,y:0.35,w:12,h:0.35,fontSize:10,color:TXTM,fontFace:'Segoe UI',charSpacing:4});
+    cv.addText(c.projectName||'Untitled Project',{x:0.6,y:0.7,w:12,h:1.4,fontSize:36,color:TXTD,fontFace:'Segoe UI',wrap:true});
+    cv.addShape('line',{x:0.6,y:2.25,w:SW-1.2,h:0,line:{color:BDR,width:0.75}});
+    const meta=[['Prepared by',c.preparedBy||'—'],['Department',c.department||'—'],['Sponsor',c.sponsor||'—'],['Manager',c.manager||'—']];
+    meta.forEach(([l,v],i)=>{
+      const x=0.6+(i*3.2);
+      cv.addText(l.toUpperCase(),{x,y:2.35,w:3,h:0.22,fontSize:7,color:TXTM,fontFace:'Segoe UI',charSpacing:0.5});
+      cv.addText(v,{x,y:2.57,w:3,h:0.32,fontSize:12,color:TXTD,fontFace:'Segoe UI'});
+    });
+    const pills=[[`Version ${c.version||'1.0'}`],[fd(c.preparedDate)],[c.status]];
+    pills.forEach(([t],i)=>{
+      cv.addShape('rect',{x:0.6+(i*2.2),y:3.1,w:2,h:0.32,fill:{color:LB},line:{color:BDR,width:0.5}});
+      cv.addText(t,{x:0.6+(i*2.2),y:3.1,w:2,h:0.32,fontSize:9,color:BLUE,align:'center',fontFace:'Segoe UI'});
+    });
+
+    // ── OVERVIEW
+    sn++;
+    const ov=slide();
+    hdr(ov,'Project Overview','Background, problem statement and project description');
+    let ry=1.22;
+    const addBox=(sl,label,val,x,y,w,h,accentCol)=>{
+      sl.addShape('rect',{x,y,w:0.04,h,fill:{color:accentCol}});
+      sl.addShape('rect',{x:x+0.04,y,w:w-0.04,h,fill:{color:'F8FAFC'},line:{color:BDR,width:0.5}});
+      sl.addText(label.toUpperCase(),{x:x+0.18,y:y+0.07,w:w-0.3,h:0.18,fontSize:7,color:TXTM,fontFace:'Segoe UI',charSpacing:0.5});
+      sl.addText(val||'—',{x:x+0.18,y:y+0.25,w:w-0.3,h:h-0.32,fontSize:10,color:TXTD,fontFace:'Segoe UI',wrap:true});
+    };
+    if(c.background){addBox(ov,'Background',c.background,0.5,ry,SW-1,0.9,NAVY);ry+=1.02;}
+    if(c.problemStatement){addBox(ov,'Problem Statement',c.problemStatement,0.5,ry,(SW-1.1)/2,0.72,'DC2626');
+      if(c.projectDescription)addBox(ov,'Project Description',c.projectDescription,0.5+(SW-1.1)/2+0.1,ry,(SW-1.1)/2,0.72,'2E6DB4');
+      ry+=0.84;}
+    if(c.businessCase){addBox(ov,'Business Case',c.businessCase,0.5,ry,SW-1,0.72,'059669');}
+    foot(ov,sn,T);
+
+    // ── OBJECTIVES
+    if(c.objectives.some(o=>o.text)){
+      sn++;const os=slide();hdr(os,'Objectives','What the project must achieve and how success will be measured');
+      const rows=[['#','Objective','Measurement Method','Target / KPI','Owner']];
+      c.objectives.filter(o=>o.text).forEach((o,i)=>rows.push([String(i+1),o.text,o.measure||'—',o.target||'—',o.owner||'—']));
+      os.addTable(rows,{...tblOpts([0.4,3.5,2.8,2,1.6])});
+      foot(os,sn,T);
+    }
+
+    // ── SCOPE
+    if(c.inScope||c.outScope||c.deliverables.some(d=>d.item)){
+      sn++;const sc=slide();hdr(sc,'Scope','Project boundaries and key deliverables');
+      let sy=1.22;
+      if(c.inScope||c.outScope){
+        const hw=(SW-1.1)/2;
+        if(c.inScope){
+          sc.addShape('rect',{x:0.5,y:sy,w:0.04,h:0.8,fill:{color:'059669'}});
+          sc.addShape('rect',{x:0.54,y:sy,w:hw-0.04,h:0.8,fill:{color:'F8FAFC'},line:{color:BDR,width:0.5}});
+          sc.addText('IN SCOPE',{x:0.68,y:sy+0.07,w:hw-0.3,h:0.18,fontSize:7,color:TXTM,fontFace:'Segoe UI'});
+          sc.addText(c.inScope,{x:0.68,y:sy+0.25,w:hw-0.3,h:0.48,fontSize:9,color:TXTD,fontFace:'Segoe UI',wrap:true});
+        }
+        if(c.outScope){
+          const ox=0.5+hw+0.1;
+          sc.addShape('rect',{x:ox,y:sy,w:0.04,h:0.8,fill:{color:'DC2626'}});
+          sc.addShape('rect',{x:ox+0.04,y:sy,w:hw-0.04,h:0.8,fill:{color:'F8FAFC'},line:{color:BDR,width:0.5}});
+          sc.addText('OUT OF SCOPE',{x:ox+0.18,y:sy+0.07,w:hw-0.3,h:0.18,fontSize:7,color:TXTM,fontFace:'Segoe UI'});
+          sc.addText(c.outScope,{x:ox+0.18,y:sy+0.25,w:hw-0.3,h:0.48,fontSize:9,color:TXTD,fontFace:'Segoe UI',wrap:true});
+        }
+        sy+=0.92;
+      }
+      if(c.deliverables.some(d=>d.item)){
+        sc.addText('DELIVERABLES',{x:0.5,y:sy,w:5,h:0.22,fontSize:8,color:BLUE,fontFace:'Segoe UI'});sy+=0.24;
+        const rows=[['#','Deliverable','Description','Due Date','Owner']];
+        c.deliverables.filter(d=>d.item).forEach((d,i)=>rows.push([String(i+1),d.item,d.description||'—',fd(d.dueDate),d.owner||'—']));
+        sc.addTable(rows,{...tblOpts([0.4,2.5,3.8,1.5,2.1]),y:sy});
+      }
+      foot(sc,sn,T);
+    }
+
+    // ── STAKEHOLDERS
+    if(c.stakeholders.some(s=>s.name)){
+      sn++;const sh=slide();hdr(sh,'Stakeholders','Key people and their roles');
+      const rows=[['Name','Title','Department','Responsibility','Influence','Engagement']];
+      c.stakeholders.filter(s=>s.name).forEach(s=>rows.push([s.name,s.title||'—',s.department||'—',s.responsibility||'—',s.influence||'—',s.engagement||'—']));
+      sh.addTable(rows,{...tblOpts([2,1.8,1.6,2.5,1.1,1.8])});
+      foot(sh,sn,T);
+    }
+
+    // ── TIMELINE
+    if(c.startDate||c.milestones.some(m=>m.name)){
+      sn++;const tl=slide();hdr(tl,'Timeline & Milestones','Project schedule and key checkpoints');
+      const dates=[[fd(c.startDate),'Start Date','1E3A5F'],[fd(c.endDate),'End Date','2E6DB4'],[c.methodology||'—','Methodology','64748B']];
+      dates.forEach(([v,l,col],i)=>{
+        const x=0.5+(i*4.1);
+        tl.addShape('rect',{x,y:1.18,w:3.9,h:0.8,fill:{color:LB},line:{color:BDR,width:0.5}});
+        tl.addText(l.toUpperCase(),{x:x+0.15,y:1.25,w:3.6,h:0.2,fontSize:7,color:TXTM,fontFace:'Segoe UI'});
+        tl.addText(v,{x:x+0.15,y:1.44,w:3.6,h:0.45,fontSize:15,color:col,fontFace:'Segoe UI'});
+      });
+      if(c.milestones.some(m=>m.name)){
+        const rows=[['#','Milestone','Target Date','Owner','Criteria','Status']];
+        c.milestones.filter(m=>m.name).forEach((m,i)=>rows.push([String(i+1),m.name,fd(m.date),m.owner||'—',m.criteria||'—',m.status||'—']));
+        tl.addTable(rows,{...tblOpts([0.4,3.8,1.6,1.6,2.2,1.7]),y:2.12});
+      }
+      foot(tl,sn,T);
+    }
+
+    // ── BUDGET
+    if(c.totalBudget){
+      sn++;const bg=slide();hdr(bg,'Budget','Financial resources and breakdown');
+      bg.addShape('rect',{x:0.5,y:1.18,w:SW-1,h:0.9,fill:{color:LB},line:{color:BDR,width:0.5}});
+      bg.addText('TOTAL BUDGET',{x:0.7,y:1.25,w:4,h:0.22,fontSize:8,color:TXTM,fontFace:'Segoe UI'});
+      bg.addText(`${c.currency} ${c.totalBudget}`,{x:0.7,y:1.46,w:5,h:0.5,fontSize:22,color:NAVY,fontFace:'Segoe UI'});
+      bg.addText('CONTINGENCY',{x:6,y:1.25,w:2.5,h:0.22,fontSize:8,color:TXTM,fontFace:'Segoe UI'});
+      bg.addText(c.contingency||'—',{x:6,y:1.46,w:2.5,h:0.5,fontSize:14,color:BLUE,fontFace:'Segoe UI'});
+      bg.addText('SOURCE',{x:9.5,y:1.25,w:3,h:0.22,fontSize:8,color:TXTM,fontFace:'Segoe UI'});
+      bg.addText(c.budgetSource||'—',{x:9.5,y:1.46,w:3,h:0.5,fontSize:12,color:TXTS,fontFace:'Segoe UI'});
+      if(c.budgetLines.some(b=>b.category)){
+        const rows=[['Category',`Amount (${c.currency})`,'Notes']];
+        c.budgetLines.filter(b=>b.category).forEach(b=>rows.push([b.category,b.amount||'—',b.notes||'—']));
+        bg.addTable(rows,{...tblOpts([3.8,2.8,5.7]),y:2.22});
+      }
+      foot(bg,sn,T);
+    }
+
+    // ── RISKS
+    if(c.risks.some(r=>r.risk)){
+      sn++;const rs=slide();hdr(rs,'Risk Register','Known risks, likelihood, impact and mitigation');
+      const rows=[['#','Risk','Likelihood','Impact','Rating','Mitigation','Owner','Status']];
+      c.risks.filter(r=>r.risk).forEach((r,i)=>rows.push([String(i+1),r.risk,r.likelihood,r.impact,r.rating,r.mitigation||'—',r.owner||'—',r.status||'—']));
+      rs.addTable(rows,{...tblOpts([0.35,2.8,1,0.9,0.9,2.5,1.1,1.05])});
+      foot(rs,sn,T);
+    }
+
+    // ── ASSUMPTIONS
+    if(c.assumptions.some(a=>a.text)||c.dependencies.some(d=>d.description)){
+      sn++;const as=slide();hdr(as,'Assumptions & Dependencies');
+      let ay=1.22;
+      if(c.assumptions.some(a=>a.text)){
+        as.addText('ASSUMPTIONS',{x:0.5,y:ay,w:5,h:0.22,fontSize:8,color:BLUE,fontFace:'Segoe UI'});ay+=0.25;
+        const rows=[['#','Assumption']];
+        c.assumptions.filter(a=>a.text).forEach((a,i)=>rows.push([String(i+1),a.text]));
+        as.addTable(rows,{...tblOpts([0.4,SW-1.4]),y:ay});
+        ay+=0.35+rows.length*LH;
+      }
+      if(c.dependencies.some(d=>d.description)){
+        as.addText('DEPENDENCIES',{x:0.5,y:ay,w:5,h:0.22,fontSize:8,color:BLUE,fontFace:'Segoe UI'});ay+=0.25;
+        const rows=[['#','Dependency','Type','Owner','Required By']];
+        c.dependencies.filter(d=>d.description).forEach((d,i)=>rows.push([String(i+1),d.description,d.type||'—',d.owner||'—',fd(d.dueBy)]));
+        as.addTable(rows,{...tblOpts([0.4,4.5,1.5,1.8,1.8]),y:ay});
+      }
+      foot(as,sn,T);
+    }
+
+    // ── SUCCESS CRITERIA
+    if(c.successCriteria.some(s=>s.criterion)){
+      sn++;const sc=slide();hdr(sc,'Success Criteria','Measurable definitions of project success');
+      const rows=[['#','Criterion','KPI / Metric','Target','Review Date']];
+      c.successCriteria.filter(s=>s.criterion).forEach((s,i)=>rows.push([String(i+1),s.criterion,s.kpi||'—',s.target||'—',fd(s.reviewDate)]));
+      sc.addTable(rows,{...tblOpts([0.4,3.6,2.8,2,2.5])});
+      foot(sc,sn,T);
+    }
+
+    // ── SIGN-OFF
+    if(c.approvers.some(a=>a.name)){
+      sn++;const sg=slide();hdr(sg,'Sign-off & Approval','Formal approval by project sponsors and stakeholders');
+      sg.addText('By signing, the named individuals confirm they have reviewed and approve this Project Charter.',
+        {x:0.5,y:1.15,w:SW-1,h:0.28,fontSize:9,color:TXTS,fontFace:'Segoe UI',italic:true});
+      const appr=c.approvers.filter(a=>a.name);
+      const cols=Math.min(appr.length,3);
+      const bw=(SW-1-(cols-1)*0.3)/cols;
+      appr.forEach((a,i)=>{
+        const row=Math.floor(i/3),col=i%3;
+        const bx=0.5+col*(bw+0.3),by=1.55+row*2.1;
+        sg.addShape('rect',{x:bx,y:by,w:bw,h:0.55,fill:{color:LB},line:{color:BDR,width:0.5}});
+        sg.addText(a.name,{x:bx+0.15,y:by+0.1,w:bw-0.3,h:0.22,fontSize:12,color:TXTD,fontFace:'Segoe UI'});
+        sg.addText(a.title||'—',{x:bx+0.15,y:by+0.32,w:bw-0.3,h:0.18,fontSize:9,color:TXTS,fontFace:'Segoe UI'});
+        sg.addShape('rect',{x:bx,y:by+0.55,w:bw,h:1.1,fill:{color:WHITE},line:{color:BDR,width:0.5}});
+        sg.addText('Signature',{x:bx+0.15,y:by+0.62,w:bw-0.3,h:0.18,fontSize:7,color:TXTM,fontFace:'Segoe UI'});
+        sg.addShape('line',{x:bx+0.15,y:by+1.38,w:bw-0.3,h:0,line:{color:BDR,width:0.75}});
+        sg.addText('Date: '+fd(a.date),{x:bx+0.15,y:by+1.44,w:bw-0.3,h:0.16,fontSize:8,color:TXTS,fontFace:'Segoe UI'});
+      });
+      foot(sg,sn,T);
+    }
+
+    const proj=(c.projectName||'charter').replace(/\s+/g,'-').toLowerCase();
+    await pptx.writeFile({fileName:proj+'-charter.pptx'});
+    toast('PowerPoint downloaded');
+  }catch(e){
+    console.error(e);
+    toast('PowerPoint failed: '+e.message);
+  }
+}
+
+/* DOCX */
+function downloadDOCX(){
+  save();
+  const c=C;
+  const fd=s=>{if(!s)return '—';try{return new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}catch{return s;}};
+
+  // Pure XML-based Word document — no HTML rendering, so colors print correctly
+  const tbl=(heads,rows)=>{
+    const hcells=heads.map(h=>`<w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:color="C7D7F0"/><w:bottom w:val="single" w:sz="4" w:color="C7D7F0"/><w:left w:val="single" w:sz="4" w:color="C7D7F0"/><w:right w:val="single" w:sz="4" w:color="C7D7F0"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="EEF4FB"/></w:tcPr><w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:color w:val="1E3A5F"/><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:t>${esc(h)}</w:t></w:r></w:p></w:tc>`).join('');
+    const bodyrows=rows.map(cells=>`<w:tr>${cells.map(cell=>`<w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:color="C7D7F0"/><w:bottom w:val="single" w:sz="4" w:color="C7D7F0"/><w:left w:val="single" w:sz="4" w:color="C7D7F0"/><w:right w:val="single" w:sz="4" w:color="C7D7F0"/></w:tcBorders></w:tcPr><w:p><w:r><w:rPr><w:color w:val="475569"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t xml:space="preserve">${esc(cell)}</w:t></w:r></w:p></w:tc>`).join('')}</w:tr>`).join('');
+    return `<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9000" w:type="dxa"/><w:tblBorders><w:insideH w:val="single" w:sz="4" w:color="C7D7F0"/><w:insideV w:val="single" w:sz="4" w:color="C7D7F0"/></w:tblBorders></w:tblPr><w:tr>${hcells}</w:tr>${bodyrows}</w:tbl><w:p/>`;
+  };
+
+  const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  const secTitle=(t,n)=>`<w:p><w:pPr><w:pStyle w:val="Heading2"/><w:spacing w:before="280" w:after="100"/></w:pPr>
+    <w:r><w:rPr><w:color w:val="1E3A5F"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t>${n}  ${esc(t)}</w:t></w:r></w:p>`;
+
+  const para=(text,color='475569',sz=20)=>`<w:p><w:r><w:rPr><w:color w:val="${color}"/><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${esc(text)}</w:t></w:r></w:p>`;
+
+  const labelVal=(label,val)=>`<w:p><w:pPr><w:spacing w:before="60" w:after="20"/></w:pPr>
+    <w:r><w:rPr><w:color w:val="94A3B8"/><w:sz w:val="14"/><w:szCs w:val="14"/></w:rPr><w:t xml:space="preserve">${esc(label.toUpperCase())}  </w:t></w:r>
+    <w:r><w:rPr><w:color w:val="1E2535"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t>${esc(val||'—')}</w:t></w:r></w:p>`;
+
+  let sn=0;
+  const body=[];
+
+  // Title
+  body.push(`<w:p><w:pPr><w:pStyle w:val="Title"/><w:spacing w:before="0" w:after="120"/></w:pPr>
+    <w:r><w:rPr><w:color w:val="1E2535"/><w:sz w:val="52"/><w:szCs w:val="52"/></w:rPr><w:t>${esc(c.projectName||'Project Charter')}</w:t></w:r></w:p>`);
+  body.push(`<w:p><w:r><w:rPr><w:color w:val="2E6DB4"/><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:t>PROJECT CHARTER  ·  ${esc(`Version ${c.version||'1.0'}`)}  ·  ${esc(fd(c.preparedDate))}  ·  ${esc(c.status)}</w:t></w:r></w:p><w:p/>`);
+
+  // Meta table
+  body.push(tbl(['Prepared by','Department','Project Sponsor','Project Manager'],
+    [[c.preparedBy||'—',c.department||'—',c.sponsor||'—',c.manager||'—']]));
+
+  // Overview
+  sn++;body.push(secTitle('Project Overview',sn+'.'));
+  if(c.background){body.push(para('Background','64748B',16));body.push(para(c.background));}
+  if(c.problemStatement){body.push(labelVal('Problem Statement',c.problemStatement));}
+  if(c.projectDescription){body.push(labelVal('Project Description',c.projectDescription));}
+  if(c.businessCase){body.push(labelVal('Business Case',c.businessCase));}
+
+  // Objectives
+  if(c.objectives.some(o=>o.text)){
+    sn++;body.push(secTitle('Objectives',sn+'.'));
+    body.push(tbl(['#','Objective','Measurement Method','Target / KPI','Owner'],
+      c.objectives.filter(o=>o.text).map((o,i)=>[String(i+1),o.text,o.measure||'—',o.target||'—',o.owner||'—'])));
+  }
+
+  // Scope
+  if(c.inScope||c.outScope||c.deliverables.some(d=>d.item)){
+    sn++;body.push(secTitle('Scope',sn+'.'));
+    if(c.inScope){body.push(labelVal('In Scope',c.inScope));}
+    if(c.outScope){body.push(labelVal('Out of Scope',c.outScope));}
+    if(c.constraints){body.push(labelVal('Constraints',c.constraints));}
+    if(c.deliverables.some(d=>d.item)){
+      body.push(para('Deliverables','64748B',16));
+      body.push(tbl(['#','Deliverable','Description','Due Date','Owner'],
+        c.deliverables.filter(d=>d.item).map((d,i)=>[String(i+1),d.item,d.description||'—',fd(d.dueDate),d.owner||'—'])));
+    }
+  }
+
+  // Stakeholders
+  if(c.stakeholders.some(s=>s.name)){
+    sn++;body.push(secTitle('Stakeholders',sn+'.'));
+    body.push(tbl(['Name','Title','Department','Responsibility','Influence','Engagement'],
+      c.stakeholders.filter(s=>s.name).map(s=>[s.name,s.title||'—',s.department||'—',s.responsibility||'—',s.influence||'—',s.engagement||'—'])));
+  }
+
+  // Timeline
+  if(c.startDate||c.milestones.some(m=>m.name)){
+    sn++;body.push(secTitle('Timeline & Milestones',sn+'.'));
+    body.push(labelVal('Start Date',fd(c.startDate)));
+    body.push(labelVal('End Date',fd(c.endDate)));
+    if(c.methodology)body.push(labelVal('Methodology',c.methodology));
+    if(c.milestones.some(m=>m.name)){
+      body.push(para('Milestones','64748B',16));
+      body.push(tbl(['#','Milestone','Target Date','Owner','Criteria','Status'],
+        c.milestones.filter(m=>m.name).map((m,i)=>[String(i+1),m.name,fd(m.date),m.owner||'—',m.criteria||'—',m.status||'—'])));
+    }
+  }
+
+  // Budget
+  if(c.totalBudget){
+    sn++;body.push(secTitle('Budget',sn+'.'));
+    body.push(labelVal('Total Budget',`${c.currency} ${c.totalBudget}`));
+    if(c.contingency)body.push(labelVal('Contingency',c.contingency));
+    if(c.budgetSource)body.push(labelVal('Budget Source',c.budgetSource));
+    if(c.budgetLines.some(b=>b.category)){
+      body.push(tbl(['Category',`Amount (${c.currency})`,'Notes'],
+        c.budgetLines.filter(b=>b.category).map(b=>[b.category,b.amount||'—',b.notes||'—'])));
+    }
+  }
+
+  // Risks
+  if(c.risks.some(r=>r.risk)){
+    sn++;body.push(secTitle('Risk Register',sn+'.'));
+    body.push(tbl(['#','Risk','Likelihood','Impact','Rating','Mitigation','Owner','Status'],
+      c.risks.filter(r=>r.risk).map((r,i)=>[String(i+1),r.risk,r.likelihood,r.impact,r.rating,r.mitigation||'—',r.owner||'—',r.status||'—'])));
+  }
+
+  // Assumptions
+  if(c.assumptions.some(a=>a.text)||c.dependencies.some(d=>d.description)){
+    sn++;body.push(secTitle('Assumptions & Dependencies',sn+'.'));
+    if(c.assumptions.some(a=>a.text)){
+      body.push(para('Assumptions','64748B',16));
+      body.push(tbl(['#','Assumption'],c.assumptions.filter(a=>a.text).map((a,i)=>[String(i+1),a.text])));
+    }
+    if(c.dependencies.some(d=>d.description)){
+      body.push(para('Dependencies','64748B',16));
+      body.push(tbl(['#','Dependency','Type','Owner','Required By'],
+        c.dependencies.filter(d=>d.description).map((d,i)=>[String(i+1),d.description,d.type||'—',d.owner||'—',fd(d.dueBy)])));
+    }
+  }
+
+  // Success Criteria
+  if(c.successCriteria.some(s=>s.criterion)){
+    sn++;body.push(secTitle('Success Criteria',sn+'.'));
+    body.push(tbl(['#','Criterion','KPI / Metric','Target','Review Date'],
+      c.successCriteria.filter(s=>s.criterion).map((s,i)=>[String(i+1),s.criterion,s.kpi||'—',s.target||'—',fd(s.reviewDate)])));
+  }
+
+  // Sign-off
+  if(c.approvers.some(a=>a.name)){
+    sn++;body.push(secTitle('Sign-off & Approval',sn+'.'));
+    body.push(para('By signing, the named individuals confirm they have reviewed and approve this Project Charter.','64748B',18));
+    body.push(tbl(['Name','Title / Role','Signature','Date'],
+      c.approvers.filter(a=>a.name).map(a=>[a.name,a.title||'—','___________________',fd(a.date)])));
+  }
+
+  // Footer line
+  body.push(`<w:p/><w:p><w:pPr><w:pBdr><w:top w:val="single" w:sz="4" w:space="1" w:color="C7D7F0"/></w:pBdr></w:pPr>
+    <w:r><w:rPr><w:color w:val="94A3B8"/><w:sz w:val="14"/><w:szCs w:val="14"/></w:rPr><w:t>CONFIDENTIAL  ·  ${esc(c.projectName||'Project Charter')}  ·  v${esc(c.version||'1.0')}  ·  Prepared: ${esc(fd(c.preparedDate))}</w:t></w:r></w:p>`);
+
+  const docxml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<w:body>
+${body.join('\n')}
+<w:sectPr>
+  <w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080" w:header="720" w:footer="720" w:gutter="0"/>
+</w:sectPr>
+</w:body>
+</w:document>`;
+
+  // Build minimal docx (ZIP with just document.xml + required parts)
+  const stylexml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="20"/><w:szCs w:val="20"/><w:color w:val="1E2535"/></w:rPr></w:rPrDefault></w:docDefaults>
+  <w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:spacing w:after="120"/></w:pPr></w:style>
+  <w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="0" w:after="200"/></w:pPr><w:rPr><w:sz w:val="52"/></w:rPr></w:style>
+  <w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="280" w:after="80"/></w:pPr><w:rPr><w:sz w:val="22"/></w:rPr></w:style>
+  <w:style w:type="table" w:styleId="TableGrid"><w:name w:val="Table Grid"/><w:tblPr><w:tblBorders><w:top w:val="single" w:sz="4" w:color="C7D7F0"/><w:left w:val="single" w:sz="4" w:color="C7D7F0"/><w:bottom w:val="single" w:sz="4" w:color="C7D7F0"/><w:right w:val="single" w:sz="4" w:color="C7D7F0"/><w:insideH w:val="single" w:sz="4" w:color="C7D7F0"/><w:insideV w:val="single" w:sz="4" w:color="C7D7F0"/></w:tblBorders></w:tblPr></w:style>
+</w:styles>`;
+
+  const relsxml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+  const apprels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+  const contenttypes=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+</Types>`;
+
+  // Use JSZip if available, otherwise fall back to Blob approach
+  if(typeof JSZip!=='undefined'){
+    const zip=new JSZip();
+    zip.file('[Content_Types].xml',contenttypes);
+    zip.folder('_rels').file('.rels',apprels);
+    zip.folder('word').file('document.xml',docxml);
+    zip.folder('word').file('styles.xml',stylexml);
+    zip.folder('word/_rels').file('document.xml.rels',relsxml);
+    zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}).then(blob=>{
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+      a.download=`${(c.projectName||'charter').replace(/\s+/g,'-').toLowerCase()}-charter.docx`;a.click();
+      toast('Word document downloaded');
+    });
+  } else {
+    // Fallback: clean HTML-based doc (still better than before)
+    const cleanHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <style>
+      body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.7;margin:2cm 2.5cm;color:#1E2535}
+      h1{font-size:22pt;color:#1E2535;border-bottom:3px solid #1E3A5F;padding-bottom:8pt;margin-bottom:4pt}
+      h2{font-size:12pt;color:#1E3A5F;border-left:3px solid #2E6DB4;padding-left:8pt;margin:18pt 0 8pt;text-transform:uppercase;letter-spacing:1px}
+      table{border-collapse:collapse;width:100%;margin-bottom:12pt}
+      th{background:#EEF4FB;color:#1E3A5F;padding:6pt 8pt;font-size:9pt;border:1pt solid #C7D7F0;text-align:left}
+      td{padding:6pt 8pt;border:1pt solid #C7D7F0;font-size:10pt;color:#475569}
+      tr:nth-child(even) td{background:#F8FAFC}
+      .meta-lbl{font-size:8pt;color:#94A3B8;text-transform:uppercase;letter-spacing:1px}
+      .val{font-size:11pt;color:#1E2535;margin-bottom:8pt}
+      .footer{border-top:1pt solid #C7D7F0;padding-top:6pt;font-size:8pt;color:#94A3B8;margin-top:24pt}
+    </style></head><body>
+    <p style="font-size:9pt;color:#2E6DB4;text-transform:uppercase;letter-spacing:2px;margin-bottom:4pt">Official Project Document</p>
+    <h1>${esc(c.projectName||'Project Charter')}</h1>
+    <p style="color:#64748B;font-size:9pt;margin-bottom:14pt">Version ${esc(c.version||'1.0')} &nbsp;·&nbsp; ${esc(fd(c.preparedDate))} &nbsp;·&nbsp; ${esc(c.status)}</p>
+    <table><tr><th>Prepared by</th><th>Department</th><th>Sponsor</th><th>Manager</th></tr>
+    <tr><td>${esc(c.preparedBy||'—')}</td><td>${esc(c.department||'—')}</td><td>${esc(c.sponsor||'—')}</td><td>${esc(c.manager||'—')}</td></tr></table>
+    ${c.background?`<h2>1. Overview</h2><div class="meta-lbl">Background</div><p class="val">${esc(c.background)}</p>`:''}
+    ${c.problemStatement?`<div class="meta-lbl">Problem Statement</div><p class="val">${esc(c.problemStatement)}</p>`:''}
+    ${c.projectDescription?`<div class="meta-lbl">Project Description</div><p class="val">${esc(c.projectDescription)}</p>`:''}
+    ${c.businessCase?`<div class="meta-lbl">Business Case</div><p class="val">${esc(c.businessCase)}</p>`:''}
+    ${c.objectives.some(o=>o.text)?`<h2>2. Objectives</h2><table><tr><th>#</th><th>Objective</th><th>Measurement</th><th>Target</th><th>Owner</th></tr>${c.objectives.filter(o=>o.text).map((o,i)=>`<tr><td>${i+1}</td><td>${esc(o.text)}</td><td>${esc(o.measure||'—')}</td><td>${esc(o.target||'—')}</td><td>${esc(o.owner||'—')}</td></tr>`).join('')}</table>`:''}
+    ${(c.inScope||c.outScope)?`<h2>3. Scope</h2>${c.inScope?`<div class="meta-lbl">In Scope</div><p class="val">${esc(c.inScope)}</p>`:''}${c.outScope?`<div class="meta-lbl">Out of Scope</div><p class="val">${esc(c.outScope)}</p>`:''}${c.deliverables.some(d=>d.item)?`<table><tr><th>#</th><th>Deliverable</th><th>Description</th><th>Due Date</th><th>Owner</th></tr>${c.deliverables.filter(d=>d.item).map((d,i)=>`<tr><td>${i+1}</td><td>${esc(d.item)}</td><td>${esc(d.description||'—')}</td><td>${esc(fd(d.dueDate))}</td><td>${esc(d.owner||'—')}</td></tr>`).join('')}</table>`:''}`:''}
+    ${c.stakeholders.some(s=>s.name)?`<h2>4. Stakeholders</h2><table><tr><th>Name</th><th>Title</th><th>Department</th><th>Responsibility</th><th>Influence</th></tr>${c.stakeholders.filter(s=>s.name).map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.title||'—')}</td><td>${esc(s.department||'—')}</td><td>${esc(s.responsibility||'—')}</td><td>${esc(s.influence||'—')}</td></tr>`).join('')}</table>`:''}
+    ${c.startDate?`<h2>5. Timeline</h2><p><span class="meta-lbl">Start:</span> ${esc(fd(c.startDate))} &nbsp;&nbsp; <span class="meta-lbl">End:</span> ${esc(fd(c.endDate))} &nbsp;&nbsp; <span class="meta-lbl">Methodology:</span> ${esc(c.methodology||'—')}</p>${c.milestones.some(m=>m.name)?`<table><tr><th>#</th><th>Milestone</th><th>Date</th><th>Owner</th><th>Status</th></tr>${c.milestones.filter(m=>m.name).map((m,i)=>`<tr><td>${i+1}</td><td>${esc(m.name)}</td><td>${esc(fd(m.date))}</td><td>${esc(m.owner||'—')}</td><td>${esc(m.status||'—')}</td></tr>`).join('')}</table>`:''}`:''}
+    ${c.totalBudget?`<h2>6. Budget</h2><p><span class="meta-lbl">Total:</span> ${esc(c.currency)} ${esc(c.totalBudget)} &nbsp;&nbsp; <span class="meta-lbl">Contingency:</span> ${esc(c.contingency||'—')} &nbsp;&nbsp; <span class="meta-lbl">Source:</span> ${esc(c.budgetSource||'—')}</p>`:''}
+    ${c.risks.some(r=>r.risk)?`<h2>7. Risk Register</h2><table><tr><th>#</th><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th><th>Owner</th></tr>${c.risks.filter(r=>r.risk).map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.risk)}</td><td>${esc(r.likelihood)}</td><td>${esc(r.impact)}</td><td>${esc(r.mitigation||'—')}</td><td>${esc(r.owner||'—')}</td></tr>`).join('')}</table>`:''}
+    ${c.successCriteria.some(s=>s.criterion)?`<h2>8. Success Criteria</h2><table><tr><th>#</th><th>Criterion</th><th>KPI</th><th>Target</th><th>Review Date</th></tr>${c.successCriteria.filter(s=>s.criterion).map((s,i)=>`<tr><td>${i+1}</td><td>${esc(s.criterion)}</td><td>${esc(s.kpi||'—')}</td><td>${esc(s.target||'—')}</td><td>${esc(fd(s.reviewDate))}</td></tr>`).join('')}</table>`:''}
+    ${c.approvers.some(a=>a.name)?`<h2>9. Sign-off</h2><p style="font-size:9pt;color:#64748B;font-style:italic">By signing below, the named individuals confirm they approve this Project Charter.</p><table><tr><th>Name</th><th>Title</th><th>Signature</th><th>Date</th></tr>${c.approvers.filter(a=>a.name).map(a=>`<tr><td>${esc(a.name)}</td><td>${esc(a.title||'—')}</td><td style="color:#94A3B8;font-style:italic">___________________</td><td>${esc(fd(a.date))}</td></tr>`).join('')}</table>`:''}
+    <div class="footer">CONFIDENTIAL &nbsp;·&nbsp; ${esc(c.projectName||'Project Charter')} &nbsp;·&nbsp; v${esc(c.version||'1.0')} &nbsp;·&nbsp; Prepared: ${esc(fd(c.preparedDate))} &nbsp;·&nbsp; ${esc(c.status)}</div>
+    </body></html>`;
+    const blob=new Blob(['﻿'+cleanHtml],{type:'application/msword;charset=utf-8'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download=`${(c.projectName||'charter').replace(/\s+/g,'-').toLowerCase()}-charter.doc`;a.click();
+    toast('Word document downloaded');
+  }
+}
+
+/* ─── EXPORT / IMPORT ─── */
+/* ─── EXPORT / IMPORT ─── */
+function exportJSON(){
+  save();
+  const slug=(C.projectName||'charter').replace(/\s+/g,'-').toLowerCase();
+  const a=document.createElement('a');
+  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify({version:1,exportedAt:new Date().toISOString(),charter:C},null,2));
+  a.download=`${slug}-charter.json`;a.click();
+  toast('Charter exported as JSON');
+}
+
+function importJSON(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const p=JSON.parse(ev.target.result);
+      if(!p.charter)throw 0;
+      if(!confirm('Replace current charter with imported data?')){e.target.value='';return;}
+      C={...C,...p.charter};
+      g('topProjName').value=C.projectName||'';
+      g('topStatus').value=C.status||'Draft';
+      cur=0;render();renderSidebar();updateProgress();
+      toast(`Imported: ${C.projectName||'charter'}`);
+    }catch{toast('Import failed — invalid file');}
+    e.target.value='';
+  };
+  r.readAsText(file);
+}
+
+function exportCSV(){
+  save();
+  const rows=[['Section','Field','Value']];
+  const add=(sec,field,val)=>rows.push([sec,field,String(val||'')]);
+  add('Overview','Project name',C.projectName);add('Overview','Status',C.status);
+  add('Overview','Prepared by',C.preparedBy);add('Overview','Date',C.preparedDate);
+  add('Overview','Department',C.department);add('Overview','Sponsor',C.sponsor);
+  add('Overview','Manager',C.manager);add('Overview','Background',C.background);
+  add('Overview','Problem statement',C.problemStatement);
+  C.objectives.filter(o=>o.text).forEach((o,i)=>{add(`Objective ${i+1}`,'Text',o.text);add(`Objective ${i+1}`,'Measure',o.measure);add(`Objective ${i+1}`,'Target',o.target);add(`Objective ${i+1}`,'Owner',o.owner);});
+  add('Scope','In scope',C.inScope);add('Scope','Out of scope',C.outScope);add('Scope','Constraints',C.constraints);
+  C.deliverables.filter(d=>d.item).forEach((d,i)=>{add(`Deliverable ${i+1}`,'Item',d.item);add(`Deliverable ${i+1}`,'Description',d.description);add(`Deliverable ${i+1}`,'Due',d.dueDate);add(`Deliverable ${i+1}`,'Owner',d.owner);});
+  C.stakeholders.filter(s=>s.name).forEach((s,i)=>{add(`Stakeholder ${i+1}`,'Name',s.name);add(`Stakeholder ${i+1}`,'Title',s.title);add(`Stakeholder ${i+1}`,'Influence',s.influence);});
+  add('Timeline','Start',C.startDate);add('Timeline','End',C.endDate);add('Timeline','Methodology',C.methodology);
+  C.milestones.filter(m=>m.name).forEach((m,i)=>{add(`Milestone ${i+1}`,'Name',m.name);add(`Milestone ${i+1}`,'Date',m.date);add(`Milestone ${i+1}`,'Status',m.status);});
+  add('Budget','Total',C.totalBudget);add('Budget','Currency',C.currency);add('Budget','Contingency',C.contingency);
+  C.budgetLines.filter(b=>b.category).forEach((b,i)=>{add(`Budget line ${i+1}`,'Category',b.category);add(`Budget line ${i+1}`,'Amount',b.amount);});
+  C.risks.filter(r=>r.risk).forEach((r,i)=>{add(`Risk ${i+1}`,'Description',r.risk);add(`Risk ${i+1}`,'Likelihood',r.likelihood);add(`Risk ${i+1}`,'Impact',r.impact);add(`Risk ${i+1}`,'Mitigation',r.mitigation);});
+  C.successCriteria.filter(s=>s.criterion).forEach((s,i)=>{add(`Success ${i+1}`,'Criterion',s.criterion);add(`Success ${i+1}`,'KPI',s.kpi);add(`Success ${i+1}`,'Target',s.target);});
+  C.approvers.filter(a=>a.name).forEach((a,i)=>{add(`Approver ${i+1}`,'Name',a.name);add(`Approver ${i+1}`,'Title',a.title);add(`Approver ${i+1}`,'Date',a.date);});
+  const csv=rows.map(r=>r.map(v=>`"${v.replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download=`${(C.projectName||'charter').replace(/\s+/g,'-').toLowerCase()}-charter.csv`;a.click();
+  toast('Exported as CSV');
+}
+
+function exportDOCX(){
+  save();
+  const fd=s=>{if(!s)return '—';try{return new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}catch{return s;}};
+  const tbl=(hs,rows)=>`<table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;width:100%;margin-bottom:14px"><thead><tr>${hs.map(h=>`<th style="background:#0A1628;color:#fff;font-size:11pt;text-align:left;padding:8px">${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
+  const sec=(t,c,color='#0A1628')=>`<h2 style="color:${color};font-size:13pt;border-left:4px solid ${color};padding-left:10px;margin:22pt 0 10pt">${t}</h2>${c}`;
+  const box=(l,v)=>`<div style="background:#F8FAFC;border-radius:6px;padding:10px 14px;margin-bottom:10px"><div style="font-size:9pt;color:#94A3B8;text-transform:uppercase;letter-spacing:1px;font-weight:400;margin-bottom:3px">${l}</div><div style="font-size:12pt;color:#0F172A">${v||'—'}</div></div>`;
+  const c=C;
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+    body{font-family:Calibri,Arial,sans-serif;font-size:12pt;line-height:1.7;margin:2cm;color:#1a1a2e}
+    h1{font-size:22pt;color:#0A1628;margin-bottom:6pt}
+    table{border-collapse:collapse;width:100%}td,th{border:1px solid #CBD5E1;padding:8px;font-size:11pt}
+    th{background:#0A1628;color:#fff;text-align:left}tr:nth-child(even)td{background:#F8FAFC}
+  </style></head><body>
+  <div style="background:#0A1628;color:#fff;padding:28px 32px;margin:-32px -32px 28px;border-radius:0 0 0 0">
+    <div style="font-size:9pt;color:#C9A84C;text-transform:uppercase;letter-spacing:1px;font-weight:400;margin-bottom:8px">Project Charter</div>
+    <h1 style="color:#fff;margin:0 0 6px">${c.projectName||'Untitled Project'}</h1>
+    <div style="color:#94A3B8;font-size:11pt">Version ${c.version||'1.0'} &nbsp;|&nbsp; ${fd(c.preparedDate)} &nbsp;|&nbsp; ${c.status}</div>
+  </div>
+  <table style="margin-bottom:20px"><tr><th>Prepared by</th><th>Department</th><th>Sponsor</th><th>Manager</th></tr>
+  <tr><td>${c.preparedBy||'—'}</td><td>${c.department||'—'}</td><td>${c.sponsor||'—'}</td><td>${c.manager||'—'}</td></tr></table>
+  ${c.background?sec('Background',`<p>${c.background}</p>`):''}
+  ${c.problemStatement?`<p>Problem statement: ${c.problemStatement}</p>`:''}
+  ${c.projectDescription?`<p>Project description: ${c.projectDescription}</p>`:''}
+  ${c.objectives.some(o=>o.text)?sec('Objectives',tbl(['#','Objective','Measurement','Target','Owner'],c.objectives.filter(o=>o.text).map((o,i)=>`<tr><td>${i+1}</td><td>${o.text}</td><td>${o.measure||'—'}</td><td>${o.target||'—'}</td><td>${o.owner||'—'}</td></tr>`).join('')),'#059669'):''}
+  ${(c.inScope||c.outScope)?sec('Scope',`<p>In scope: ${c.inScope||'—'}</p><p>Out of scope: ${c.outScope||'—'}</p>${c.constraints?`<p>Constraints: ${c.constraints}</p>`:''}${c.deliverables.some(d=>d.item)?tbl(['Deliverable','Description','Due date','Owner'],c.deliverables.filter(d=>d.item).map(d=>`<tr><td>${d.item}</td><td>${d.description||'—'}</td><td>${fd(d.dueDate)}</td><td>${d.owner||'—'}</td></tr>`).join('')):''}`):''}
+  ${c.stakeholders.some(s=>s.name)?sec('Stakeholders',tbl(['Name','Title','Department','Responsibility','Influence','Engagement'],c.stakeholders.filter(s=>s.name).map(s=>`<tr><td>${s.name}</td><td>${s.title||'—'}</td><td>${s.department||'—'}</td><td>${s.responsibility||'—'}</td><td>${s.influence||'—'}</td><td>${s.engagement||'—'}</td></tr>`).join('')),'#D97706'):''}
+  ${c.startDate?sec('Timeline',`<p>Start: ${fd(c.startDate)} &nbsp;&nbsp; End: ${fd(c.endDate)} &nbsp;&nbsp; Methodology: ${c.methodology||'—'}</p>${c.milestones.some(m=>m.name)?tbl(['Milestone','Date','Owner','Criteria','Status'],c.milestones.filter(m=>m.name).map(m=>`<tr><td>${m.name}</td><td>${fd(m.date)}</td><td>${m.owner||'—'}</td><td>${m.criteria||'—'}</td><td>${m.status||'—'}</td></tr>`).join('')):''}`):''}
+  ${c.totalBudget?sec('Budget',`<p>Total: ${c.currency} ${c.totalBudget} &nbsp;|&nbsp; Contingency: ${c.contingency||'—'} &nbsp;|&nbsp; Source: ${c.budgetSource||'—'}</p>${c.budgetLines.some(b=>b.category)?tbl(['Category','Amount ('+c.currency+')','Notes'],c.budgetLines.filter(b=>b.category).map(b=>`<tr><td>${b.category}</td><td>${b.amount||'—'}</td><td>${b.notes||'—'}</td></tr>`).join('')):''}`):''}
+  ${c.risks.some(r=>r.risk)?sec('Risk Register',tbl(['Risk','Likelihood','Impact','Rating','Mitigation','Owner','Status'],c.risks.filter(r=>r.risk).map(r=>`<tr><td>${r.risk}</td><td>${r.likelihood}</td><td>${r.impact}</td><td>${r.rating}</td><td>${r.mitigation||'—'}</td><td>${r.owner||'—'}</td><td>${r.status||'—'}</td></tr>`).join('')),'#DC2626'):''}
+  ${c.assumptions.some(a=>a.text)?sec('Assumptions',tbl(['#','Assumption'],c.assumptions.filter(a=>a.text).map((a,i)=>`<tr><td>${i+1}</td><td>${a.text}</td></tr>`).join(''))):''}
+  ${c.dependencies.some(d=>d.description)?sec('Dependencies',tbl(['Dependency','Type','Owner','Required by'],c.dependencies.filter(d=>d.description).map(d=>`<tr><td>${d.description}</td><td>${d.type||'—'}</td><td>${d.owner||'—'}</td><td>${fd(d.dueBy)}</td></tr>`).join(''))):''}
+  ${c.successCriteria.some(s=>s.criterion)?sec('Success Criteria',tbl(['Criterion','KPI','Target','Review date'],c.successCriteria.filter(s=>s.criterion).map(s=>`<tr><td>${s.criterion}</td><td>${s.kpi||'—'}</td><td>${s.target||'—'}</td><td>${fd(s.reviewDate)}</td></tr>`).join('')),'#059669'):''}
+  ${c.approvers.some(a=>a.name)?sec('Sign-off',tbl(['Name','Title','Signature','Date'],c.approvers.filter(a=>a.name).map(a=>`<tr><td>${a.name}</td><td>${a.title||'—'}</td><td style="font-style:italic;color:#94A3B8">___________________</td><td>${fd(a.date)}</td></tr>`).join(''))):''}
+  </body></html>`;
+  const blob=new Blob([html],{type:'application/msword'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`${(C.projectName||'charter').replace(/\s+/g,'-').toLowerCase()}-charter.doc`;a.click();
+  toast('Exported as Word document');
+}
+
+/* TOAST */
+
+/* INIT */
+
+function exportJSON(){
+  save();
+  var slug=(C.projectName||'charter').replace(/\s+/g,'-').toLowerCase();
+  var a=document.createElement('a');
+  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify({version:1,exportedAt:new Date().toISOString(),charter:C},null,2));
+  a.download=slug+'-charter.json';a.click();
+  toast('Charter exported as JSON');
+}
+
+function importJSON(e){
+  var file=e.target.files[0];if(!file)return;
+  var r=new FileReader();
+  r.onload=function(ev){
+    try{
+      var p=JSON.parse(ev.target.result);
+      if(!p.charter)throw new Error('Invalid');
+      if(!confirm('Replace current charter with imported data?')){e.target.value='';return;}
+      C=Object.assign({},C,p.charter);
+      g('topProjName').value=C.projectName||'';
+      g('topStatus').value=C.status||'Draft';
+      cur=0;render();renderSidebar();updateProgress();
+      toast('Imported: '+(C.projectName||'charter'));
+    }catch(err){toast('Import failed -- invalid file');}
+    e.target.value='';
+  };
+  r.readAsText(file);
+}
+
+function exportCSV(){
+  save();
+  var rows=[['Section','Field','Value']];
+  function add(s,f,v){rows.push([s,f,String(v||'')]);}
+  add('Overview','Project name',C.projectName);add('Overview','Status',C.status);
+  add('Overview','Prepared by',C.preparedBy);add('Overview','Date',C.preparedDate);
+  add('Overview','Department',C.department);add('Overview','Sponsor',C.sponsor);
+  add('Overview','Manager',C.manager);add('Overview','Background',C.background);
+  add('Overview','Problem statement',C.problemStatement);
+  C.objectives.filter(function(o){return o.text;}).forEach(function(o,i){add('Objective '+(i+1),'Text',o.text);add('Objective '+(i+1),'Measure',o.measure);add('Objective '+(i+1),'Target',o.target);add('Objective '+(i+1),'Owner',o.owner);});
+  add('Scope','In scope',C.inScope);add('Scope','Out of scope',C.outScope);add('Scope','Constraints',C.constraints);
+  C.deliverables.filter(function(d){return d.item;}).forEach(function(d,i){add('Deliverable '+(i+1),'Item',d.item);add('Deliverable '+(i+1),'Description',d.description);});
+  C.stakeholders.filter(function(s){return s.name;}).forEach(function(s,i){add('Stakeholder '+(i+1),'Name',s.name);add('Stakeholder '+(i+1),'Influence',s.influence);});
+  add('Timeline','Start',C.startDate);add('Timeline','End',C.endDate);add('Timeline','Methodology',C.methodology);
+  C.milestones.filter(function(m){return m.name;}).forEach(function(m,i){add('Milestone '+(i+1),'Name',m.name);add('Milestone '+(i+1),'Date',m.date);add('Milestone '+(i+1),'Status',m.status);});
+  add('Budget','Total',C.totalBudget);add('Budget','Currency',C.currency);add('Budget','Contingency',C.contingency);
+  C.risks.filter(function(r){return r.risk;}).forEach(function(r,i){add('Risk '+(i+1),'Description',r.risk);add('Risk '+(i+1),'Likelihood',r.likelihood);add('Risk '+(i+1),'Impact',r.impact);add('Risk '+(i+1),'Mitigation',r.mitigation);});
+  C.successCriteria.filter(function(s){return s.criterion;}).forEach(function(s,i){add('Success '+(i+1),'Criterion',s.criterion);add('Success '+(i+1),'KPI',s.kpi);add('Success '+(i+1),'Target',s.target);});
+  C.approvers.filter(function(a){return a.name;}).forEach(function(a,i){add('Approver '+(i+1),'Name',a.name);add('Approver '+(i+1),'Title',a.title);add('Approver '+(i+1),'Date',a.date);});
+  var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download=(C.projectName||'charter').replace(/\s+/g,'-').toLowerCase()+'-charter.csv';a.click();
+  toast('Exported as CSV');
+}
+
+var toastT;
+function toast(msg){
+  var t=g('toast');g('toastMsg').textContent=msg;t.classList.add('show');
+  clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove('show');},2500);
+}
+
+renderSidebar();render();updateProgress();
+</script>
+</body>
+</html>
