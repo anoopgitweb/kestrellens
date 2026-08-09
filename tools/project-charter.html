@@ -327,6 +327,16 @@ body{font-family:'Segoe UI','Inter',system-ui,sans-serif;background:var(--slate)
   @page{margin:0;size:A4}
 }
 
+/* Landing page */
+.tool-landing{position:fixed;inset:0;z-index:5000;background:#fff;overflow-y:auto;color:#172033;font-family:Inter,Segoe UI,Arial,sans-serif}
+.tool-landing.is-hidden{display:none}.landing-top{height:76px;display:flex;align-items:center;justify-content:space-between;padding:0 6vw;background:#fff}
+.landing-brand{display:flex;align-items:center;gap:10px;font-family:Georgia,serif;font-size:18px;font-weight:700}.landing-brand-mark{width:34px;height:34px;border-radius:9px;background:#1e3a5f;display:grid;place-items:center}.landing-brand-mark svg{width:18px;stroke:#fff;fill:none}
+.landing-links{display:flex;gap:30px;color:#64748b;font-size:13px}.landing-hero{padding:0 6vw}.landing-hero-inner{min-height:420px;padding:58px 52px;background:#1e3a5f;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:40px;position:relative;overflow:hidden}
+.landing-copy{position:relative;z-index:2;max-width:520px}.landing-kicker{font-size:11px;letter-spacing:.25em;text-transform:uppercase;color:#f2c96d;margin-bottom:18px}.landing-title{font-family:Georgia,serif;font-size:clamp(36px,4.6vw,58px);line-height:1.08}.landing-title span{color:#f2c96d}.landing-sub{max-width:470px;margin-top:18px;color:rgba(255,255,255,.78);font-size:15px;line-height:1.65}
+.landing-art{width:340px;height:270px;position:relative;z-index:2;flex-shrink:0}.landing-art svg{width:100%;height:100%}.landing-orb{position:absolute;border-radius:50%;background:rgba(255,255,255,.06)}
+.landing-actions{display:grid;grid-template-columns:repeat(3,1fr);margin:0 6vw;min-height:270px}.landing-card{border:0;text-align:left;padding:40px 36px;display:flex;flex-direction:column;align-items:flex-start;gap:12px;cursor:pointer;font:inherit;transition:filter .15s,transform .15s}.landing-card:hover{filter:brightness(.96)}.landing-card svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:1.8}.landing-card h2{font-size:19px;margin:4px 0 0}.landing-card p{font-size:13.5px;line-height:1.6;opacity:.82;max-width:300px}.landing-card strong{margin-top:auto;padding:9px 17px;border:1.5px solid currentColor;border-radius:8px;font-size:12px}
+@media(max-width:800px){.landing-links{display:none}.landing-hero-inner{padding:42px 28px;min-height:360px}.landing-art{display:none}.landing-actions{grid-template-columns:1fr}.landing-card{min-height:210px}}
+
 </style>
 </head>
 <body>
@@ -334,6 +344,11 @@ body{font-family:'Segoe UI','Inter',system-ui,sans-serif;background:var(--slate)
 <body>
 
 <!-- PREVIEW MODAL -->
+<section class="tool-landing" id="toolLanding" aria-label="Project Charter Pro welcome">
+  <div class="landing-top"><div class="landing-brand"><span class="landing-brand-mark"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></svg></span>Project Charter Pro</div><div class="landing-links"><span>Plan</span><span>Align</span><span>Approve</span></div></div>
+  <div class="landing-hero"><div class="landing-hero-inner"><span class="landing-orb" style="width:280px;height:280px;right:-80px;top:-100px"></span><span class="landing-orb" style="width:170px;height:170px;left:42%;bottom:-95px"></span><div class="landing-copy"><div class="landing-kicker">Project Charter Pro</div><h1 class="landing-title">Turn a project idea into an <span>approved plan.</span></h1><p class="landing-sub">Define the case, scope, stakeholders, milestones, budget, risks, and success measures in one guided workspace.</p></div><div class="landing-art"><svg viewBox="0 0 340 270"><rect x="58" y="28" width="220" height="210" rx="13" fill="#fff" opacity=".18" transform="rotate(5 168 133)"/><rect x="42" y="20" width="220" height="210" rx="13" fill="#fff"/><rect x="65" y="49" width="86" height="9" rx="4" fill="#f2c96d"/><rect x="65" y="72" width="150" height="7" rx="3" fill="#d8e0e9"/><rect x="65" y="88" width="124" height="7" rx="3" fill="#d8e0e9"/><rect x="65" y="119" width="45" height="45" rx="8" fill="#dbeafe"/><path d="M78 141l9 9 17-20" fill="none" stroke="#1e3a5f" stroke-width="5"/><rect x="126" y="120" width="98" height="7" rx="3" fill="#d8e0e9"/><rect x="126" y="138" width="75" height="7" rx="3" fill="#d8e0e9"/><rect x="65" y="187" width="159" height="9" rx="4" fill="#eef2f7"/></svg></div></div></div>
+  <div class="landing-actions"><button class="landing-card" style="background:#f2c96d;color:#172033" onclick="enterCharter()"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><h2>Create a project charter</h2><p>Start with the guided ten-section charter and build a complete project foundation.</p><strong>Start building</strong></button><button class="landing-card" style="background:#2f7d76;color:#fff" onclick="importCharterFromLanding()"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg><h2>Import an existing charter</h2><p>Open a previously exported Charter Pro JSON file and continue where you left off.</p><strong>Import JSON</strong></button><button class="landing-card" style="background:#dbeafe;color:#172033" onclick="enterCharter(4)"><svg viewBox="0 0 24 24"><path d="M3 5h18v14H3zM7 9h4M7 13h10M7 16h7"/></svg><h2>Plan milestones</h2><p>Jump directly into timeline and milestone planning, then complete the rest as needed.</p><strong>Open timeline</strong></button></div>
+</section>
 <div class="modal-bg" id="modalBg" onclick="handleBgClick(event)">
   <div class="modal">
     <div class="modal-hd">
@@ -493,6 +508,8 @@ const SECS=[
 ];
 
 var cur=0;
+function enterCharter(section){g('toolLanding').classList.add('is-hidden');if(Number.isInteger(section)){cur=section;render();updateProgress()}}
+function importCharterFromLanding(){enterCharter();setTimeout(function(){g('importFile').click()},0)}
 var C={
   projectName:'',status:'Draft',preparedBy:'',preparedDate:'',version:'1.0',department:'',sponsor:'',manager:'',
   background:'',problemStatement:'',projectDescription:'',businessCase:'',
