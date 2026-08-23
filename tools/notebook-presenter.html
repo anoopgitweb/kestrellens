@@ -3530,24 +3530,23 @@ function adminExportHighlights(){
   a.click();URL.revokeObjectURL(url);
 }
 function adminExportCSV(){
-  const cols=['Notebook','Chapter','Page Heading','Page Details','Image URL','Video URL','Page Order','Notes','Meta'];
+  const cols=['Notebook','Chapter','Page Heading','Page Details','Video URL','Page Order'];
   const header=cols.join(',');
-  const rows=csvRows.map((r,ri)=>cols.map(c=>{
-    let v;
-    if(c==='Notes'){
-      const heading=r['Page Heading']||'';
-      const ch=(r['Chapter']||'').trim();
-      const idx=slides.findIndex(s=>s.type==='content'&&s.heading===heading&&s.chapter===ch);
-      v=(idx>=0&&Array.isArray(notesArr[idx])&&notesArr[idx].length) ? JSON.stringify(notesArr[idx]) : '';
-    } else if(c==='Meta'){
-      v=ri===0 ? JSON.stringify({chosenLayout,structOptions,chapterColors}) : '';
-    } else {
-      v=String(r[c]||'');
-    }
-    return v.includes(',')||v.includes('"')||v.includes('\n') ? '"'+v.replace(/"/g,'""')+'"' : v;
+  const aliases={
+    'Notebook':['Notebook','notebook'],
+    'Chapter':['Chapter','chapter'],
+    'Page Heading':['Page Heading','page_heading','Heading','heading'],
+    'Page Details':['Page Details','page_details','Details','details'],
+    'Video URL':['Video URL','video_url','Video','video'],
+    'Page Order':['Page Order','page_order','Order','order']
+  };
+  const rows=csvRows.map(r=>cols.map(c=>{
+    const key=aliases[c].find(k=>r[k]!==undefined&&r[k]!==null);
+    const v=String(key?r[key]:'');
+    return /[",\r\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
   }).join(','));
-  const csv=[header,...rows].join('\n');
-  const blob=new Blob([csv],{type:'text/csv'});
+  const csv='\uFEFF'+[header,...rows].join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   a.href=url;a.download=(notebookTitle||'notebook').replace(/\s+/g,'_')+'.csv';
@@ -3691,32 +3690,21 @@ async function adminExportPPT(){
 
 
 /* ── TOOLTIP POSITIONING ── */
-document.addEventListener('mousemove', e => {
-  const tip = e.target.closest('.cell-tip');
-  if (!tip) return;
-  const box = tip.querySelector('.tip-box');
-  if (!box) return;
-  const x = e.clientX + 14;
-  const y = e.clientY + 14;
-  const bw = box.offsetWidth || 320;
-  const bh = box.offsetHeight || 80;
-  box.style.left = (x + bw > window.innerWidth ? x - bw - 28 : x) + 'px';
-  box.style.top  = (y + bh > window.innerHeight ? y - bh - 14 : y) + 'px';
-});
-
-
-/* ── TOOLTIP POSITIONING ── */
 document.addEventListener('mousemove',function(e){
   const tip=e.target.closest('.cell-tip');
   if(!tip) return;
   const box=tip.querySelector('.tip-box');
   if(!box) return;
-  const x=e.clientX+16;
-  const y=e.clientY+16;
-  const bw=320;
-  const bh=100;
-  box.style.left=(x+bw>window.innerWidth?e.clientX-bw-8:x)+'px';
-  box.style.top=(y+bh>window.innerHeight?e.clientY-bh-8:y)+'px';
+  const gap=10;
+  const margin=8;
+  const bw=box.offsetWidth||Math.min(320,window.innerWidth-margin*2);
+  const bh=box.offsetHeight||80;
+  const rect=tip.getBoundingClientRect();
+  const left=Math.min(Math.max(rect.left,margin),window.innerWidth-bw-margin);
+  let top=rect.top-bh-gap;
+  if(top<margin) top=Math.min(rect.bottom+gap,window.innerHeight-bh-margin);
+  box.style.left=left+'px';
+  box.style.top=Math.max(margin,top)+'px';
 });
 
 
