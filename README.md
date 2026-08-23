@@ -45,6 +45,28 @@ OPENAI_NOTEBOOK_MODEL=gpt-5.6-terra
 
 The regular **Ask** mode continues to use the existing Wikipedia and Google News workflow without OpenAI. OpenAI-generated notebooks remain drafts until the signed-in user confirms that they should be saved to their private Supabase Jot Down workspace.
 
+### Google Drive notebook images
+
+New Learning Experience page images are stored as private files in a Google
+Drive folder. Supabase continues to provide authentication and notebook data.
+Configure these server-only Render environment variables:
+
+```text
+GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON={the complete service-account JSON object}
+GOOGLE_DRIVE_FOLDER_ID=the_target_shared_drive_folder_id
+GOOGLE_DRIVE_SHARED_DRIVE_ID=the_shared_drive_id
+```
+
+Enable the Google Drive API and add the service-account email as a Content
+manager of the target Shared Drive or folder. Never expose the service-account
+JSON in browser code or commit it to Git. The application stores the returned
+Drive file ID in the private notebook content and streams images through the
+authenticated backend; it does not create public Drive links.
+
+Existing notebook images with Supabase Storage paths remain readable during
+the transition. New images use Drive IDs prefixed with `gdrive:`. Existing
+files should be migrated separately after Drive configuration is verified.
+
 ### Shared timeline refresh
 
 The timeline reads its normal views and filters from Supabase. **Refresh timeline** performs a cached 48-hour discovery scan and inserts only URL-unique articles. To let a refresh initiated by any user save to the shared database, add the server-only Supabase service role key in Render:

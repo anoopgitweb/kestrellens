@@ -15,6 +15,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
@@ -52,6 +53,9 @@ QUICK_BYTES_NOTEBOOK_TITLE = "Daily Learnings"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY") or ""
 OPENAI_ASK_MODEL = os.environ.get("OPENAI_ASK_MODEL") or "gpt-5.6-luna"
 OPENAI_NOTEBOOK_MODEL = os.environ.get("OPENAI_NOTEBOOK_MODEL") or "gpt-5.6-terra"
+GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON") or ""
+GOOGLE_DRIVE_FOLDER_ID = (os.environ.get("GOOGLE_DRIVE_FOLDER_ID") or "").strip()
+GOOGLE_DRIVE_SHARED_DRIVE_ID = (os.environ.get("GOOGLE_DRIVE_SHARED_DRIVE_ID") or "").strip()
 CACHE_SECONDS = 15 * 60
 QUOTE_CACHE_SECONDS = 60
 IST = ZoneInfo("Asia/Kolkata")
@@ -122,6 +126,22 @@ def _html_response(handler, status, text):
         handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
         handler.send_header("Pragma", "no-cache")
         handler.send_header("Expires", "0")
+        handler.end_headers()
+        handler.wfile.write(body)
+    except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+        return
+
+
+def _binary_response(handler, status, payload, content_type="application/octet-stream", filename=""):
+    body = bytes(payload or b"")
+    try:
+        handler.send_response(status)
+        handler.send_header("Content-Type", content_type)
+        handler.send_header("Content-Length", str(len(body)))
+        handler.send_header("Cache-Control", "private, no-store, max-age=0")
+        if filename:
+            safe_name = str(filename).replace('"', "").replace("\r", "").replace("\n", "")
+            handler.send_header("Content-Disposition", f'inline; filename="{safe_name}"')
         handler.end_headers()
         handler.wfile.write(body)
     except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
@@ -654,6 +674,106 @@ def _save_jot_note(payload, user_id, access_token):
 def _delete_jot_item(table, item_id, label, access_token):
     encoded = urllib.parse.quote(_jot_uuid(item_id, f"{label} id"), safe="")
     return _supabase_table_request(table, "DELETE", f"?id=eq.{encoded}", access_token=access_token)
+
+
+def _google_drive_configured():
+    return bool(GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON and GOOGLE_DRIVE_FOLDER_ID)
+
+
+def _google_drive_service():
+    if not _google_drive_configured():
+        raise RuntimeError("Google Drive image storage is not configured.")
+    try:
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+    except ImportError as exc:
+        raise RuntimeError("Google Drive dependencies are not installed.") from exc
+    try:
+        credentials_info = json.loads(GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON is invalid JSON.") from exc
+    credentials = service_account.Credentials.from_service_account_info(
+        credentials_info,
+        scopes=["https://www.googleapis.com/auth/drive"],
+    )
+    return build("drive", "v3", credentials=credentials, cache_discovery=False)
+
+
+def _assert_owned_jot_subtopic(subtopic_id, access_token):
+    encoded = urllib.parse.quote(_jot_uuid(subtopic_id, "Subtopic id"), safe="")
+    rows = _supabase_table_request(
+        "note_subtopics", "GET", f"?id=eq.{encoded}&select=id", access_token=access_token
+    )
+    if not rows:
+        raise PermissionError("The selected chapter was not found.")
+
+
+def _drive_file_metadata(service, file_id):
+    return service.files().get(
+        fileId=str(file_id or "").strip(),
+        fields="id,name,mimeType,size,trashed,appProperties",
+        supportsAllDrives=True,
+    ).execute()
+
+
+def _assert_drive_file_owner(metadata, user_id):
+    owner_id = str((metadata.get("appProperties") or {}).get("kestreliqUserId") or "")
+    if not owner_id or not hmac.compare_digest(owner_id, str(user_id or "")):
+        raise PermissionError("This private image does not belong to your account.")
+    if metadata.get("trashed"):
+        raise FileNotFoundError("The image has been deleted.")
+
+
+def _upload_jot_drive_image(payload, content_type, user_id, subtopic_id, access_token):
+    if not payload:
+        raise ValueError("Image data is required.")
+    if len(payload) > 2 * 1024 * 1024:
+        raise ValueError("The optimized image must be 2 MB or smaller.")
+    if content_type not in {"image/webp", "image/jpeg", "image/png"}:
+        raise ValueError("Only WebP, JPEG, or PNG notebook images are supported.")
+    _assert_owned_jot_subtopic(subtopic_id, access_token)
+    from googleapiclient.http import MediaIoBaseUpload
+    extension = {"image/webp": "webp", "image/jpeg": "jpg", "image/png": "png"}[content_type]
+    metadata = {
+        "name": f"kestreliq-{uuid.uuid4()}.{extension}",
+        "parents": [GOOGLE_DRIVE_FOLDER_ID],
+        "appProperties": {
+            "kestreliqUserId": str(user_id),
+            "kestreliqSubtopicId": str(subtopic_id),
+            "kestreliqMediaType": "notebook-image",
+        },
+    }
+    media = MediaIoBaseUpload(io.BytesIO(payload), mimetype=content_type, resumable=False)
+    created = _google_drive_service().files().create(
+        body=metadata,
+        media_body=media,
+        fields="id,name,mimeType,size",
+        supportsAllDrives=True,
+    ).execute()
+    return created
+
+
+def _download_jot_drive_image(file_id, user_id):
+    service = _google_drive_service()
+    metadata = _drive_file_metadata(service, file_id)
+    _assert_drive_file_owner(metadata, user_id)
+    if not str(metadata.get("mimeType") or "").startswith("image/"):
+        raise ValueError("The requested Drive file is not an image.")
+    payload = service.files().get_media(fileId=metadata["id"], supportsAllDrives=True).execute()
+    return payload, metadata
+
+
+def _delete_jot_drive_images(file_ids, user_id):
+    service = _google_drive_service()
+    deleted = []
+    for file_id in dict.fromkeys(str(item or "").strip() for item in file_ids):
+        if not file_id:
+            continue
+        metadata = _drive_file_metadata(service, file_id)
+        _assert_drive_file_owner(metadata, user_id)
+        service.files().delete(fileId=file_id, supportsAllDrives=True).execute()
+        deleted.append(file_id)
+    return deleted
 
 
 def _profile_for_user(user, access_token):
@@ -3712,6 +3832,7 @@ class Handler(BaseHTTPRequestHandler):
                 "supabaseUrl": SUPABASE_URL,
                 "supabaseAnonKey": SUPABASE_ANON_KEY,
                 "configured": bool(SUPABASE_URL and SUPABASE_ANON_KEY),
+                "googleDriveImagesConfigured": _google_drive_configured(),
             })
             return
         if self.path == "/api/profile":
@@ -3783,6 +3904,29 @@ class Handler(BaseHTTPRequestHandler):
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 _json_response(self, 503, {"error": "Jot Down is temporarily unavailable.", "detail": str(exc)})
             return
+        if self.path.startswith("/api/jot-media"):
+            access_token = _bearer_token(self)
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            file_id = (query.get("file_id") or query.get("fileId") or [""])[0]
+            try:
+                user = _supabase_auth_user(access_token)
+                payload, metadata = _download_jot_drive_image(file_id, user["id"])
+                _binary_response(
+                    self,
+                    200,
+                    payload,
+                    metadata.get("mimeType") or "application/octet-stream",
+                    metadata.get("name") or "notebook-image",
+                )
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
+            except FileNotFoundError as exc:
+                _json_response(self, 404, {"error": str(exc)})
+            except Exception as exc:
+                _json_response(self, 503, {"error": "Private image is temporarily unavailable.", "detail": str(exc)})
+            return
         if self.path.startswith("/api/timeline-signals"):
             try:
                 query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -3798,6 +3942,40 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         post_path = self.path.split("?", 1)[0].rstrip("/")
+        if post_path == "/api/jot-media":
+            access_token = _bearer_token(self)
+            content_type = str(self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+            subtopic_id = str(self.headers.get("X-KestrelIQ-Subtopic-Id") or "").strip()
+            try:
+                user = _supabase_auth_user(access_token)
+                length = int(self.headers.get("Content-Length") or 0)
+                if length <= 0 or length > 2 * 1024 * 1024:
+                    raise ValueError("The optimized image must be between 1 byte and 2 MB.")
+                created = _upload_jot_drive_image(
+                    self.rfile.read(length), content_type, user["id"], subtopic_id, access_token
+                )
+                _json_response(self, 201, {"fileId": created.get("id"), "name": created.get("name")})
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
+            except Exception as exc:
+                _json_response(self, 503, {"error": "Could not upload the image to Google Drive.", "detail": str(exc)})
+            return
+        if post_path == "/api/jot-media/delete":
+            payload = _read_json(self)
+            access_token = _bearer_token(self)
+            try:
+                user = _supabase_auth_user(access_token)
+                file_ids = payload.get("fileIds") if isinstance(payload.get("fileIds"), list) else []
+                _json_response(self, 200, {"deleted": _delete_jot_drive_images(file_ids, user["id"])})
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
+            except Exception as exc:
+                _json_response(self, 503, {"error": "Could not delete the Google Drive image.", "detail": str(exc)})
+            return
         if post_path == "/api/timeline-bootstrap":
             try:
                 result = _bootstrap_timeline_database(_bearer_token(self))
