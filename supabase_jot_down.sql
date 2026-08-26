@@ -32,6 +32,24 @@ create table if not exists public.notes (
   updated_at timestamptz not null default now()
 );
 
+-- Idempotent learning-time events. Notebook and chapter totals are derived by
+-- summing these page events, so a single active interval is never counted twice.
+create table if not exists public.jot_time_events (
+  id uuid primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  topic_id uuid not null references public.note_topics(id) on delete cascade,
+  subtopic_id uuid not null references public.note_subtopics(id) on delete cascade,
+  page_key text not null check (char_length(page_key) between 1 and 120),
+  page_title text not null default '' check (char_length(page_title) <= 200),
+  seconds integer not null check (seconds between 1 and 300),
+  recorded_at timestamptz not null default now()
+);
+
+create index if not exists jot_time_events_user_topic_idx
+  on public.jot_time_events(user_id, topic_id, recorded_at);
+create index if not exists jot_time_events_user_subtopic_idx
+  on public.jot_time_events(user_id, subtopic_id, recorded_at);
+
 create index if not exists note_topics_user_order_idx
   on public.note_topics(user_id, sort_order, created_at);
 create index if not exists note_subtopics_user_topic_order_idx
@@ -42,6 +60,7 @@ create index if not exists notes_user_subtopic_idx
 alter table public.note_topics enable row level security;
 alter table public.note_subtopics enable row level security;
 alter table public.notes enable row level security;
+alter table public.jot_time_events enable row level security;
 
 drop policy if exists "Users manage their note topics" on public.note_topics;
 create policy "Users manage their note topics"
@@ -99,9 +118,26 @@ create policy "Users manage their notes"
     )
   );
 
+drop policy if exists "Users manage their Jot Down time" on public.jot_time_events;
+create policy "Users manage their Jot Down time"
+  on public.jot_time_events
+  for all
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.note_subtopics subtopic
+      where subtopic.id = subtopic_id
+        and subtopic.topic_id = topic_id
+        and subtopic.user_id = auth.uid()
+    )
+  );
+
 grant select, insert, update, delete on public.note_topics to authenticated;
 grant select, insert, update, delete on public.note_subtopics to authenticated;
 grant select, insert, update, delete on public.notes to authenticated;
+grant select, insert, delete on public.jot_time_events to authenticated;
 
 -- Private, user-scoped storage for pasted images and optional page attachments.
 -- Images are compressed to WebP; documents are limited to 5 MB by the bucket.

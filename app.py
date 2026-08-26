@@ -417,7 +417,62 @@ def _list_jot_down(user_id, access_token):
         f"?user_id=eq.{encoded_user}&select=*&order=updated_at.desc",
         access_token=access_token,
     )
-    return {"topics": topics, "subtopics": subtopics, "notes": notes}
+    return {"topics": topics, "subtopics": subtopics, "notes": notes, "timeTracking": _list_jot_time(user_id, access_token)}
+
+
+def _list_jot_time(user_id, access_token):
+    encoded_user = urllib.parse.quote(str(user_id), safe="")
+    events = _supabase_table_request(
+        "jot_time_events", "GET",
+        f"?user_id=eq.{encoded_user}&select=topic_id,subtopic_id,page_key,page_title,seconds",
+        access_token=access_token,
+    )
+    topics, chapters, pages = {}, {}, {}
+    for event in events:
+        seconds = max(0, int(event.get("seconds") or 0))
+        topic_id = str(event.get("topic_id") or "")
+        subtopic_id = str(event.get("subtopic_id") or "")
+        page_key = str(event.get("page_key") or "")
+        topics[topic_id] = topics.get(topic_id, 0) + seconds
+        chapters[subtopic_id] = chapters.get(subtopic_id, 0) + seconds
+        key = f"{subtopic_id}:{page_key}"
+        page = pages.setdefault(key, {"seconds": 0, "title": str(event.get("page_title") or "")})
+        page["seconds"] += seconds
+        if event.get("page_title"):
+            page["title"] = str(event["page_title"])
+    return {"topics": topics, "chapters": chapters, "pages": pages}
+
+
+def _save_jot_time(payload, user_id, access_token):
+    if not isinstance(payload, dict):
+        raise ValueError("Time tracking details are required.")
+    event_id = _jot_uuid(payload.get("eventId"), "Time event id")
+    topic_id = _jot_uuid(payload.get("topicId"), "Notebook id")
+    subtopic_id = _jot_uuid(payload.get("subtopicId"), "Chapter id")
+    page_key = str(payload.get("pageKey") or "").strip()[:120]
+    page_title = str(payload.get("pageTitle") or "").strip()[:200]
+    try:
+        seconds = int(payload.get("seconds") or 0)
+    except (TypeError, ValueError):
+        seconds = 0
+    if not page_key or not 1 <= seconds <= 300:
+        raise ValueError("A valid page and 1-300 active seconds are required.")
+    encoded_subtopic = urllib.parse.quote(subtopic_id, safe="")
+    owned = _supabase_table_request(
+        "note_subtopics", "GET",
+        f"?id=eq.{encoded_subtopic}&topic_id=eq.{urllib.parse.quote(topic_id, safe='')}&select=id",
+        access_token=access_token,
+    )
+    if not owned:
+        raise ValueError("The selected notebook page was not found.")
+    record = {"id": event_id, "user_id": user_id, "topic_id": topic_id,
+              "subtopic_id": subtopic_id, "page_key": page_key,
+              "page_title": page_title, "seconds": seconds}
+    _supabase_table_request(
+        "jot_time_events", "POST", "?on_conflict=id", [record],
+        access_token=access_token, prefer="resolution=ignore-duplicates,return=minimal",
+    )
+    return _list_jot_time(user_id, access_token)
 
 
 class _QuickByteHtmlParser(HTMLParser):
@@ -4318,6 +4373,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/jot-down/note",
             "/api/jot-down/topic/delete",
             "/api/jot-down/subtopic/delete",
+            "/api/jot-down/time",
         }:
             payload = _read_json(self)
             access_token = _bearer_token(self)
@@ -4329,6 +4385,9 @@ class Handler(BaseHTTPRequestHandler):
                     _save_jot_subtopic(payload, user["id"], access_token)
                 elif post_path == "/api/jot-down/note":
                     _save_jot_note(payload, user["id"], access_token)
+                elif post_path == "/api/jot-down/time":
+                    _json_response(self, 200, {"timeTracking": _save_jot_time(payload, user["id"], access_token)})
+                    return
                 elif post_path == "/api/jot-down/topic/delete":
                     _delete_jot_item("note_topics", payload.get("id"), "Topic", access_token)
                 else:
