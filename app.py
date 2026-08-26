@@ -446,30 +446,42 @@ def _list_jot_time(user_id, access_token):
 def _save_jot_time(payload, user_id, access_token):
     if not isinstance(payload, dict):
         raise ValueError("Time tracking details are required.")
-    event_id = _jot_uuid(payload.get("eventId"), "Time event id")
-    topic_id = _jot_uuid(payload.get("topicId"), "Notebook id")
-    subtopic_id = _jot_uuid(payload.get("subtopicId"), "Chapter id")
-    page_key = str(payload.get("pageKey") or "").strip()[:120]
-    page_title = str(payload.get("pageTitle") or "").strip()[:200]
-    try:
-        seconds = int(payload.get("seconds") or 0)
-    except (TypeError, ValueError):
-        seconds = 0
-    if not page_key or not 1 <= seconds <= 300:
-        raise ValueError("A valid page and 1-300 active seconds are required.")
-    encoded_subtopic = urllib.parse.quote(subtopic_id, safe="")
+    raw_events = payload.get("events")
+    if not isinstance(raw_events, list):
+        raw_events = [payload]
+    if not raw_events or len(raw_events) > 200:
+        raise ValueError("Between 1 and 200 time events are required.")
+    records, notebook_pairs = [], set()
+    for event in raw_events:
+        if not isinstance(event, dict):
+            raise ValueError("Each time event must be an object.")
+        event_id = _jot_uuid(event.get("eventId"), "Time event id")
+        topic_id = _jot_uuid(event.get("topicId"), "Notebook id")
+        subtopic_id = _jot_uuid(event.get("subtopicId"), "Chapter id")
+        page_key = str(event.get("pageKey") or "").strip()[:120]
+        page_title = str(event.get("pageTitle") or "").strip()[:200]
+        try:
+            seconds = int(event.get("seconds") or 0)
+        except (TypeError, ValueError):
+            seconds = 0
+        if not page_key or not 1 <= seconds <= 300:
+            raise ValueError("A valid page and 1-300 active seconds are required.")
+        notebook_pairs.add((topic_id, subtopic_id))
+        records.append({"id": event_id, "user_id": user_id, "topic_id": topic_id,
+                        "subtopic_id": subtopic_id, "page_key": page_key,
+                        "page_title": page_title, "seconds": seconds})
+    subtopic_ids = sorted({subtopic_id for _, subtopic_id in notebook_pairs})
+    encoded_ids = ",".join(urllib.parse.quote(value, safe="") for value in subtopic_ids)
     owned = _supabase_table_request(
         "note_subtopics", "GET",
-        f"?id=eq.{encoded_subtopic}&topic_id=eq.{urllib.parse.quote(topic_id, safe='')}&select=id",
+        f"?id=in.({encoded_ids})&select=id,topic_id",
         access_token=access_token,
     )
-    if not owned:
-        raise ValueError("The selected notebook page was not found.")
-    record = {"id": event_id, "user_id": user_id, "topic_id": topic_id,
-              "subtopic_id": subtopic_id, "page_key": page_key,
-              "page_title": page_title, "seconds": seconds}
+    owned_pairs = {(str(item.get("topic_id") or ""), str(item.get("id") or "")) for item in owned}
+    if not notebook_pairs.issubset(owned_pairs):
+        raise ValueError("One or more notebook pages were not found.")
     _supabase_table_request(
-        "jot_time_events", "POST", "?on_conflict=id", [record],
+        "jot_time_events", "POST", "?on_conflict=id", records,
         access_token=access_token, prefer="resolution=ignore-duplicates,return=minimal",
     )
     return _list_jot_time(user_id, access_token)
