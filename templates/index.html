@@ -1939,6 +1939,10 @@
   .jot-mode-page-pane{display:none;min-width:0;min-height:0;grid-template-rows:minmax(0,1fr) auto;overflow:hidden;border-right:1px solid rgba(255,255,255,.13);background:linear-gradient(180deg,rgba(0,34,43,.72),rgba(0,25,32,.58))}.jot-mode-page-nav{display:grid;min-width:0;min-height:0;margin:0!important;padding:0 1px 12px!important;overflow-x:hidden;overflow-y:auto;border-right:0;background:transparent;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:#28dcca rgba(255,255,255,.045)}.jot-mode-page-pane>.jot-pane-footer{margin:0;padding:9px 12px 10px}.jot-mode-page-pane>.jot-pane-footer .jot-pane-actions{margin-left:auto}
   .jot-pane-footer,.jot-mode-page-pane>.jot-pane-footer{height:64px;min-height:64px;padding:10px 12px}
   .jot-reader-actions .jot-rating{width:auto;padding:0 9px!important;font-size:11px;white-space:nowrap}.jot-reader-actions .jot-rating[aria-pressed="true"]{background:rgba(40,220,202,.22);border-color:#28dcca}.jot-reader-actions{flex-wrap:nowrap;min-width:0;overflow-x:auto}.jot-reader-actions>.jot-rating{flex-shrink:0}.jot-daily-content{max-height:70vh;overflow:auto;padding:24px}.jot-daily-content h2{color:#fff;line-height:1.4}.jot-daily-context{color:#82babb;font-size:12px}.jot-daily-answer{white-space:pre-wrap;line-height:1.8;color:#d5e8e9;border-top:1px solid rgba(40,220,202,.2);padding-top:18px;margin-top:18px}.jot-daily-controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}.jot-daily-controls button{padding:9px 14px;border:1px solid rgba(40,220,202,.4);border-radius:9px;background:#073c44;color:#eaffff}.jot-daily-controls button:disabled{opacity:.4}.jot-daily-toolbar{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px;color:#8dc8c6;font-size:12px}.jot-daily-status{margin-top:14px;color:#8fd6cc;line-height:1.5}
+  #jotCopyPageBtn{flex:0 0 31px;width:31px;height:31px;display:grid;place-items:center;padding:0;border:1px solid rgba(40,220,202,.34);border-radius:9px;background:rgba(40,220,202,.08);color:#dffffd;font-size:19px;cursor:pointer}
+  #jotCopyPageBtn:hover{border-color:#28dcca;background:rgba(40,220,202,.16)}
+  #jotCopyPageBtn:focus-visible{outline:2px solid #28dcca;outline-offset:2px}
+  .jot-editor.page-creator-open #jotCopyPageBtn,.jot-editor.edit-mode #jotCopyPageBtn{display:none}
   #jotFocusControls{margin-left:0;gap:7px}
   #jotFocusControls button{width:31px;min-width:31px;height:31px!important;padding:0!important;flex:0 0 31px;font-size:17px}
   #jotFocusPosition{white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -2420,7 +2424,7 @@
           <footer class="jot-pane-footer"><div class="jot-pane-actions" aria-label="Chapter actions"><button id="jotAddSubtopicBtn" class="jot-icon-action" type="button" data-tooltip="Create chapter" aria-label="Create chapter" onclick="createJotSubtopic(event,state.activeJotTopicId)">＋</button></div></footer>
         </aside>
         <article id="jotEditor" class="jot-editor view-mode">
-          <div class="jot-editor-pane-head"><div class="jot-pane-heading"><h2>Pages</h2><span id="jotEditorPageCount" class="jot-pane-count">0</span><span id="jotTimeSummary" class="jot-time-summary" title="Active learning time">0m notebook · 0m chapter · 0m page</span></div><div class="jot-editor-head-actions"><span id="jotSaveStatus" class="jot-save-status" role="status" aria-live="polite" hidden>Ready</span><label for="jotViewSelect" class="jot-learning-mode-label jot-view-control">Learning mode</label><select id="jotViewSelect" class="jot-view-select jot-view-control" aria-label="Choose learning mode" onchange="setJotViewMode(this.value)"><option value="cards">▦ Pages</option><option value="numbered">1. Numbered list</option><option value="reading">☰ Reading</option><option value="focus">◎ Focus</option><option value="flashcards">◫ Flashcards</option><option value="table">▤ Table</option><option value="daily">↻ Daily Review</option></select></div><label class="jot-pane-search jot-page-pane-search"><span aria-hidden="true">⌕</span><input id="jotPageSearch" type="search" placeholder="Search pages…" aria-label="Search pages" oninput="filterJotPane('pages',this.value)"></label></div>
+          <div class="jot-editor-pane-head"><div class="jot-pane-heading"><h2>Pages</h2><span id="jotEditorPageCount" class="jot-pane-count">0</span><span id="jotTimeSummary" class="jot-time-summary" title="Active learning time">0m notebook · 0m chapter · 0m page</span></div><div class="jot-editor-head-actions"><span id="jotSaveStatus" class="jot-save-status" role="status" aria-live="polite" hidden>Ready</span><label for="jotViewSelect" class="jot-learning-mode-label jot-view-control">Learning mode</label><select id="jotViewSelect" class="jot-view-select jot-view-control" aria-label="Choose learning mode" onchange="setJotViewMode(this.value)"><option value="cards">▦ Pages</option><option value="numbered">1. Numbered list</option><option value="reading">☰ Reading</option><option value="focus">◎ Focus</option><option value="flashcards">◫ Flashcards</option><option value="table">▤ Table</option><option value="daily">↻ Daily Review</option></select><button id="jotCopyPageBtn" class="jot-view-control" type="button" title="Copy selected text or current page" aria-label="Copy selected text or current page" onmousedown="event.preventDefault()" onclick="copyJotPageText()">⧉</button></div><label class="jot-pane-search jot-page-pane-search"><span aria-hidden="true">⌕</span><input id="jotPageSearch" type="search" placeholder="Search pages…" aria-label="Search pages" oninput="filterJotPane('pages',this.value)"></label></div>
           <div class="jot-mode-page-pane">
             <nav id="jotModePageNav" class="jot-subtopic-list jot-mode-page-nav" aria-label="Pages in this chapter"></nav>
             <footer class="jot-pane-footer"><div class="jot-pane-actions" aria-label="Page actions"><button id="jotPageNotesBtn" class="jot-icon-action" type="button" data-tooltip="Add a new page note" aria-label="Add a new page note" onclick="openSelectedJotNotes('add')">▤</button><button id="jotEditPageBtn" class="jot-icon-action" type="button" data-tooltip="Edit selected page" aria-label="Edit selected page" onclick="openJotPageEditor()">✎</button><button id="jotAddPageBtn" class="jot-icon-action" type="button" data-tooltip="Create page" aria-label="Create page" onclick="openJotPageCreator()">＋</button></div></footer>
@@ -3624,6 +3628,22 @@ const JOT_NOTE_APPEND_MARKER="\n\n──────── Add a new note below 
 function jotPageNotesText(notes=[]){return notes.map(note=>`[${jotDate(note.created_at||new Date().toISOString(),true)} IST]\n${note.text}`).join("\n\n")}
 
 // Daily Review scheduling is local-calendar based; stored timestamps are UTC.
+function jotCopyText() {
+  const selection=window.getSelection(), regions=[$("jotCanvas"),$("jotPageDetail")].filter(Boolean);
+  if(selection && !selection.isCollapsed && regions.some(root=>root.contains(selection.anchorNode)&&root.contains(selection.focusNode)))return selection.toString().trim();
+  const page=selectedJotSpeechPage();if(!page)return "";
+  const heading=page.item.querySelector(".jot-card-heading")?.textContent?.trim()||"";
+  const content=page.item.querySelector(".jot-card-content")?.cloneNode(true);
+  content?.querySelectorAll("button,.jot-focus-timer,.jot-focus-page-number,.jot-video-data,[data-video-url]").forEach(node=>node.remove());
+  content?.querySelectorAll("br").forEach(node=>node.replaceWith(document.createTextNode("\n")));
+  return [heading,content?.textContent?.trim()].filter(Boolean).join("\n\n");
+}
+async function copyJotPageText() {
+  const text=jotCopyText();
+  if(!text){showToast("Nothing to copy","Select a page with text first.");return;}
+  try{await navigator.clipboard.writeText(text);showToast("Copied","The text is ready to paste.");}
+  catch(error){showToast("Could not copy","Please select the text and press Ctrl+C, or allow clipboard access in your browser.");}
+}
 function nextJotReview(previous, rating, now = new Date()) {
   if (!["confident", "practice"].includes(rating)) throw new Error("Invalid review rating");
   const entry = {rating, reviewedAt: now.toISOString()};
