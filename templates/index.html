@@ -3692,7 +3692,7 @@ async function persistJotRating(target, rating) {
   try {
     await jotRequest("/api/jot-down/note", {subtopic_id: target.chapterId, title: note.title, content: cleanJotHtml(template.innerHTML)});
     renderJotPages(); return true;
-  } finally { jotDailySaving = false; state.jotSaving = false; syncJotRatingControls(); }
+  } finally { jotDailySaving = false; state.jotSaving = false; updateJotSaveState(); syncJotRatingControls(); }
 }
 async function rateCurrentJotPage(rating) {
   const selected = selectedJotSpeechPage(); if (!selected) return;
