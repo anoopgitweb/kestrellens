@@ -3808,13 +3808,14 @@ class Handler(BaseHTTPRequestHandler):
         _json_response(self, 200, {"ok": True})
 
     def do_GET(self):
-        if self.path in {"/", "/index.html"}:
+        request_path = urllib.parse.urlparse(self.path).path
+        if request_path in {"/", "/index.html"}:
             if not INDEX_FILE.exists():
                 _html_response(self, 500, "templates/index.html is missing.")
                 return
             _html_response(self, 200, INDEX_FILE.read_text(encoding="utf-8"))
             return
-        tool_path = urllib.parse.urlparse(self.path).path.rstrip("/")
+        tool_path = request_path.rstrip("/")
         if tool_path in TOOL_PAGES:
             tool_file = TOOL_DIR / TOOL_PAGES[tool_path]
             if not tool_file.exists():
