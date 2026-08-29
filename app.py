@@ -4843,7 +4843,7 @@ class Handler(BaseHTTPRequestHandler):
                     _delete_jot_item("note_topics", payload.get("id"), "Topic", access_token)
                 else:
                     _delete_jot_item("note_subtopics", payload.get("id"), "Subtopic", access_token)
-                _json_response(self, 200, _list_jot_down(user["id"], access_token))
+                _json_response(self, 200, _list_jot_down(user, access_token))
             except ValueError as exc:
                 _json_response(self, 400, {"error": str(exc)})
             except PermissionError as exc:
