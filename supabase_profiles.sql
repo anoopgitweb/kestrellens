@@ -8,6 +8,7 @@ create table if not exists public.profiles (
   tool_access jsonb not null default '[]'::jsonb,
   openai_enabled boolean not null default false,
   notebook_access boolean not null default false,
+  notebook_ids jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -19,6 +20,7 @@ alter table public.profiles add column if not exists stock_symbol text not null 
 alter table public.profiles add column if not exists tool_access jsonb not null default '[]'::jsonb;
 alter table public.profiles add column if not exists openai_enabled boolean not null default false;
 alter table public.profiles add column if not exists notebook_access boolean not null default false;
+alter table public.profiles add column if not exists notebook_ids jsonb not null default '[]'::jsonb;
 alter table public.profiles add column if not exists created_at timestamptz not null default now();
 alter table public.profiles add column if not exists updated_at timestamptz not null default now();
 

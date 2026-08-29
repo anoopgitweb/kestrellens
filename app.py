@@ -400,7 +400,27 @@ def _jot_order(payload):
         return 0
 
 
-def _list_jot_down(user_id, access_token):
+def _list_jot_down(user, access_token):
+    user_id = str(user.get("id") or "")
+    if not _is_timeline_admin(user):
+        profile = _profile_for_user(user, access_token)
+        allowed_ids = _normalize_notebook_ids(profile.get("notebook_ids"))
+        if not allowed_ids:
+            return {"topics": [], "subtopics": [], "notes": [], "timeTracking": {"topics": {}, "chapters": {}, "pages": {}}}
+        admin_catalog = {str(item.get("id") or ""): item for item in _admin_notebooks()}
+        allowed_ids = [item_id for item_id in allowed_ids if item_id in admin_catalog]
+        if not allowed_ids:
+            return {"topics": [], "subtopics": [], "notes": [], "timeTracking": {"topics": {}, "chapters": {}, "pages": {}}}
+        encoded_topics = ",".join(urllib.parse.quote(item_id, safe="") for item_id in allowed_ids)
+        topics = _supabase_table_request("note_topics", "GET", f"?id=in.({encoded_topics})&select=*&order=sort_order.asc,created_at.asc", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
+        subtopics = _supabase_table_request("note_subtopics", "GET", f"?topic_id=in.({encoded_topics})&select=*&order=sort_order.asc,created_at.asc", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
+        subtopic_ids = [str(item.get("id") or "") for item in subtopics if item.get("id")]
+        if subtopic_ids:
+            encoded_subtopics = ",".join(urllib.parse.quote(item_id, safe="") for item_id in subtopic_ids)
+            notes = _supabase_table_request("notes", "GET", f"?subtopic_id=in.({encoded_subtopics})&select=*&order=updated_at.desc", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
+        else:
+            notes = []
+        return {"topics": topics, "subtopics": subtopics, "notes": notes, "timeTracking": {"topics": {}, "chapters": {}, "pages": {}}}
     encoded_user = urllib.parse.quote(str(user_id), safe="")
     topics = _supabase_table_request(
         "note_topics",
@@ -823,10 +843,21 @@ def _upload_jot_drive_image(payload, content_type, user_id, subtopic_id, access_
     return created
 
 
-def _download_jot_drive_image(file_id, user_id):
+def _download_jot_drive_image(file_id, user, access_token):
     service = _google_drive_service()
     metadata = _drive_file_metadata(service, file_id)
-    _assert_drive_file_owner(metadata, user_id)
+    owner_id = str((metadata.get("appProperties") or {}).get("kestreliqUserId") or "")
+    user_id = str(user.get("id") or "")
+    if owner_id != user_id:
+        profile = _profile_for_user(user, access_token)
+        allowed_topics = _normalize_notebook_ids(profile.get("notebook_ids"))
+        subtopic_id = str((metadata.get("appProperties") or {}).get("kestreliqSubtopicId") or "")
+        encoded_subtopic = urllib.parse.quote(subtopic_id, safe="")
+        rows = _supabase_table_request("note_subtopics", "GET", f"?id=eq.{encoded_subtopic}&select=topic_id,user_id&limit=1", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY) if subtopic_id else []
+        if not rows or str(rows[0].get("topic_id") or "") not in allowed_topics or str(rows[0].get("user_id") or "") != owner_id:
+            raise PermissionError("This private image is not part of an assigned notebook.")
+    if metadata.get("trashed"):
+        raise FileNotFoundError("The image has been deleted.")
     if not str(metadata.get("mimeType") or "").startswith("image/"):
         raise ValueError("The requested Drive file is not an image.")
     payload = service.files().get_media(fileId=metadata["id"], supportsAllDrives=True).execute()
@@ -859,6 +890,7 @@ def _profile_for_user(user, access_token):
         "tool_access": profile.get("tool_access") if isinstance(profile.get("tool_access"), list) else [],
         "openai_enabled": bool(profile.get("openai_enabled")),
         "notebook_access": bool(profile.get("notebook_access")),
+        "notebook_ids": _normalize_notebook_ids(profile.get("notebook_ids")),
         "is_admin": _is_timeline_admin(user),
         "created_at": profile.get("created_at") or "",
     }
@@ -905,6 +937,7 @@ def _create_admin_user(payload, requesting_user):
     tool_access = _normalize_tool_access(payload.get("tool_access"))
     openai_enabled = bool(payload.get("openai_enabled"))
     notebook_access = bool(payload.get("notebook_access"))
+    notebook_ids = _normalize_notebook_ids(payload.get("notebook_ids")) if notebook_access else []
     if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email_address):
         raise ValueError("Enter a valid email address.")
     if len(password) < 8:
@@ -938,6 +971,7 @@ def _create_admin_user(payload, requesting_user):
         "tool_access": tool_access,
         "openai_enabled": openai_enabled,
         "notebook_access": notebook_access,
+        "notebook_ids": notebook_ids,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     _supabase_table_request(
@@ -954,6 +988,20 @@ def _is_timeline_admin(user):
 def _normalize_tool_access(value):
     valid = set(TOOL_KEYS.values())
     return sorted({str(item or "").strip() for item in (value if isinstance(value, list) else []) if str(item or "").strip() in valid})
+
+
+def _normalize_notebook_ids(value):
+    return sorted({str(item or "").strip().lower() for item in (value if isinstance(value, list) else []) if re.fullmatch(r"[0-9a-fA-F-]{36}", str(item or "").strip())})
+
+
+def _admin_notebooks():
+    encoded_email = urllib.parse.quote(TIMELINE_ADMIN_EMAIL, safe="")
+    profiles = _supabase_table_request("profiles", "GET", f"?email=eq.{encoded_email}&select=id&limit=1", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
+    if not profiles:
+        return []
+    admin_id = str(profiles[0].get("id") or "")
+    encoded_admin = urllib.parse.quote(admin_id, safe="")
+    return _supabase_table_request("note_topics", "GET", f"?user_id=eq.{encoded_admin}&select=id,title,sort_order&order=sort_order.asc,created_at.asc", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
 
 
 def _assert_notebook_access(user, access_token):
@@ -983,7 +1031,7 @@ def _admin_profiles(requesting_user):
         row = profiles.get(user_id, {})
         metadata = auth_user.get("user_metadata") if isinstance(auth_user.get("user_metadata"), dict) else {}
         email_address = row.get("email") or auth_user.get("email") or ""
-        users.append({"id": user_id, "email": email_address, "full_name": row.get("full_name") or metadata.get("full_name") or "", "company": row.get("company") or metadata.get("company") or "", "stock_symbol": row.get("stock_symbol") or metadata.get("stock_symbol") or "", "tool_access": _normalize_tool_access(row.get("tool_access")), "openai_enabled": bool(row.get("openai_enabled")), "notebook_access": bool(row.get("notebook_access")), "is_admin": str(email_address).lower() == TIMELINE_ADMIN_EMAIL})
+        users.append({"id": user_id, "email": email_address, "full_name": row.get("full_name") or metadata.get("full_name") or "", "company": row.get("company") or metadata.get("company") or "", "stock_symbol": row.get("stock_symbol") or metadata.get("stock_symbol") or "", "tool_access": _normalize_tool_access(row.get("tool_access")), "openai_enabled": bool(row.get("openai_enabled")), "notebook_access": bool(row.get("notebook_access")), "notebook_ids": _normalize_notebook_ids(row.get("notebook_ids")), "is_admin": str(email_address).lower() == TIMELINE_ADMIN_EMAIL})
     return sorted(users, key=lambda item: str(item.get("email") or "").lower())
 
 
@@ -993,7 +1041,10 @@ def _update_admin_access(payload, requesting_user):
     user_id = str((payload or {}).get("id") or "").strip()
     if not user_id:
         raise ValueError("Select a user.")
-    record = {"tool_access": _normalize_tool_access(payload.get("tool_access")), "openai_enabled": bool(payload.get("openai_enabled")), "notebook_access": bool(payload.get("notebook_access")), "updated_at": datetime.now(timezone.utc).isoformat()}
+    notebook_access = bool(payload.get("notebook_access"))
+    requested_notebooks = set(_normalize_notebook_ids(payload.get("notebook_ids")))
+    available_notebooks = {str(item.get("id") or "") for item in _admin_notebooks()}
+    record = {"tool_access": _normalize_tool_access(payload.get("tool_access")), "openai_enabled": bool(payload.get("openai_enabled")), "notebook_access": notebook_access, "notebook_ids": sorted(requested_notebooks & available_notebooks) if notebook_access else [], "updated_at": datetime.now(timezone.utc).isoformat()}
     existing = _supabase_table_request("profiles", "GET", f"?id=eq.{urllib.parse.quote(user_id, safe='')}&select=id,email,full_name,company,stock_symbol", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
     if existing:
         _supabase_table_request("profiles", "PATCH", f"?id=eq.{urllib.parse.quote(user_id, safe='')}", record, access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
@@ -4084,7 +4135,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/admin/users":
             try:
                 user = _supabase_auth_user(_bearer_token(self))
-                _json_response(self, 200, {"users": _admin_profiles(user)})
+                users = _admin_profiles(user)
+                _json_response(self, 200, {"users": users, "notebooks": _admin_notebooks()})
             except PermissionError as exc:
                 _json_response(self, 403, {"error": str(exc)})
             except Exception as exc:
@@ -4144,7 +4196,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 user = _supabase_auth_user(access_token)
                 _assert_notebook_access(user, access_token)
-                _json_response(self, 200, _list_jot_down(user["id"], access_token))
+                _json_response(self, 200, _list_jot_down(user, access_token))
             except PermissionError as exc:
                 _json_response(self, 401, {"error": str(exc)})
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
@@ -4157,7 +4209,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 user = _supabase_auth_user(access_token)
                 _assert_notebook_access(user, access_token)
-                payload, metadata = _download_jot_drive_image(file_id, user["id"])
+                payload, metadata = _download_jot_drive_image(file_id, user, access_token)
                 _binary_response(
                     self,
                     200,
