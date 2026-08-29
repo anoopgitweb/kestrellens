@@ -36,6 +36,8 @@ TOOL_PAGES = {
     "/tools/change-analyzer": "change-analyzer.html",
     "/tools/dashboard-creator": "dashboard-creator.html",
 }
+TOOL_KEYS = {path: path.rsplit("/", 1)[-1] for path in TOOL_PAGES}
+TOOL_KEYS = {path: path.rsplit("/", 1)[-1] for path in TOOL_PAGES}
 FORTUNE_FILE = ASSET_DIR / "fortune500-2026.json"
 GLOBAL_2000_FILE = ASSET_DIR / "forbes-global2000-2026.json"
 GLOBAL_2000_URL = "https://www.forbes.com/forbesapi/org/global2000/2026/position/true.json?limit=2000"
@@ -44,6 +46,7 @@ SUPABASE_URL = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY") or ""
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or ""
 TIMELINE_ADMIN_EMAIL = (os.environ.get("TIMELINE_ADMIN_EMAIL") or "anoopviswanathan@outlook.com").strip().lower()
+TOOL_LAUNCH_SECRET = (os.environ.get("TOOL_LAUNCH_SECRET") or SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY or "kestreliq-local-tool-launch").encode("utf-8")
 QUICK_BYTES_SYNC_TOKEN = os.environ.get("QUICK_BYTES_SYNC_TOKEN") or ""
 QUICK_BYTES_SOURCE_USER_ID = (os.environ.get("QUICK_BYTES_SOURCE_USER_ID") or "").strip()
 QUICK_BYTES_SOURCE_EMAIL = (
@@ -852,6 +855,11 @@ def _profile_for_user(user, access_token):
         "email": profile.get("email") or user.get("email") or "",
         "full_name": profile.get("full_name") or "",
         "company": profile.get("company") or "",
+        "stock_symbol": profile.get("stock_symbol") or "",
+        "tool_access": profile.get("tool_access") if isinstance(profile.get("tool_access"), list) else [],
+        "openai_enabled": bool(profile.get("openai_enabled")),
+        "notebook_access": bool(profile.get("notebook_access")),
+        "is_admin": _is_timeline_admin(user),
         "created_at": profile.get("created_at") or "",
     }
 
@@ -861,15 +869,19 @@ def _save_profile(payload, user, access_token):
         raise ValueError("Profile details are required.")
     full_name = str(payload.get("full_name") or payload.get("fullName") or "").strip()
     company = str(payload.get("company") or "").strip()
+    stock_symbol = re.sub(r"[^A-Za-z0-9.^-]", "", str(payload.get("stock_symbol") or payload.get("stockSymbol") or "").strip()).upper()
     if len(full_name) > 120:
         raise ValueError("Full name must be 120 characters or fewer.")
     if len(company) > 160:
         raise ValueError("Company must be 160 characters or fewer.")
+    if len(stock_symbol) > 20:
+        raise ValueError("Stock symbol must be 20 characters or fewer.")
     record = {
         "id": user["id"],
         "email": str(user.get("email") or "").strip()[:320],
         "full_name": full_name,
         "company": company,
+        "stock_symbol": stock_symbol,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     _supabase_table_request(
@@ -889,6 +901,10 @@ def _create_admin_user(payload, requesting_user):
     password = str(payload.get("password") or "")
     full_name = str(payload.get("full_name") or payload.get("fullName") or "").strip()
     company = str(payload.get("company") or "").strip()
+    stock_symbol = re.sub(r"[^A-Za-z0-9.^-]", "", str(payload.get("stock_symbol") or "").strip()).upper()
+    tool_access = _normalize_tool_access(payload.get("tool_access"))
+    openai_enabled = bool(payload.get("openai_enabled"))
+    notebook_access = bool(payload.get("notebook_access"))
     if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email_address):
         raise ValueError("Enter a valid email address.")
     if len(password) < 8:
@@ -899,7 +915,7 @@ def _create_admin_user(payload, requesting_user):
         "email": email_address,
         "password": password,
         "email_confirm": True,
-        "user_metadata": {"full_name": full_name, "company": company},
+        "user_metadata": {"full_name": full_name, "company": company, "stock_symbol": stock_symbol},
     }
     data = json.dumps(auth_payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(f"{SUPABASE_URL}/auth/v1/admin/users", data=data, method="POST")
@@ -918,17 +934,96 @@ def _create_admin_user(payload, requesting_user):
         "email": email_address,
         "full_name": full_name,
         "company": company,
+        "stock_symbol": stock_symbol,
+        "tool_access": tool_access,
+        "openai_enabled": openai_enabled,
+        "notebook_access": notebook_access,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     _supabase_table_request(
         "profiles", "POST", "?on_conflict=id", [profile_record],
         access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY,
     )
-    return {"id": user_id, "email": email_address, "full_name": full_name, "company": company}
+    return {**profile_record, "is_admin": False}
 
 
 def _is_timeline_admin(user):
     return str((user or {}).get("email") or "").strip().lower() == TIMELINE_ADMIN_EMAIL
+
+
+def _normalize_tool_access(value):
+    valid = set(TOOL_KEYS.values())
+    return sorted({str(item or "").strip() for item in (value if isinstance(value, list) else []) if str(item or "").strip() in valid})
+
+
+def _assert_notebook_access(user, access_token):
+    profile = _profile_for_user(user, access_token)
+    if not (_is_timeline_admin(user) or profile.get("notebook_access")):
+        raise PermissionError("Ask the administrator to enable Discover & Learn Notebooks for you.")
+    return profile
+
+
+def _admin_profiles(requesting_user):
+    if not _is_timeline_admin(requesting_user):
+        raise PermissionError("Only the KestrelIQ administrator can manage access.")
+    if not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is required to manage users.")
+    rows = _supabase_table_request("profiles", "GET", "?select=*&order=email.asc", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
+    profiles = {str(row.get("id") or ""): row for row in rows}
+    req = urllib.request.Request(f"{SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000", method="GET")
+    req.add_header("apikey", SUPABASE_SERVICE_ROLE_KEY)
+    req.add_header("Authorization", f"Bearer {SUPABASE_SERVICE_ROLE_KEY}")
+    req.add_header("Accept", "application/json")
+    with _urlopen_with_retry(req, timeout=20, retries=1) as response:
+        auth_payload = json.loads(response.read().decode("utf-8", errors="replace") or "{}")
+    auth_users = auth_payload.get("users") if isinstance(auth_payload, dict) else auth_payload
+    users = []
+    for auth_user in auth_users if isinstance(auth_users, list) else []:
+        user_id = str(auth_user.get("id") or "")
+        row = profiles.get(user_id, {})
+        metadata = auth_user.get("user_metadata") if isinstance(auth_user.get("user_metadata"), dict) else {}
+        email_address = row.get("email") or auth_user.get("email") or ""
+        users.append({"id": user_id, "email": email_address, "full_name": row.get("full_name") or metadata.get("full_name") or "", "company": row.get("company") or metadata.get("company") or "", "stock_symbol": row.get("stock_symbol") or metadata.get("stock_symbol") or "", "tool_access": _normalize_tool_access(row.get("tool_access")), "openai_enabled": bool(row.get("openai_enabled")), "notebook_access": bool(row.get("notebook_access")), "is_admin": str(email_address).lower() == TIMELINE_ADMIN_EMAIL})
+    return sorted(users, key=lambda item: str(item.get("email") or "").lower())
+
+
+def _update_admin_access(payload, requesting_user):
+    if not _is_timeline_admin(requesting_user):
+        raise PermissionError("Only the KestrelIQ administrator can manage access.")
+    user_id = str((payload or {}).get("id") or "").strip()
+    if not user_id:
+        raise ValueError("Select a user.")
+    record = {"tool_access": _normalize_tool_access(payload.get("tool_access")), "openai_enabled": bool(payload.get("openai_enabled")), "notebook_access": bool(payload.get("notebook_access")), "updated_at": datetime.now(timezone.utc).isoformat()}
+    existing = _supabase_table_request("profiles", "GET", f"?id=eq.{urllib.parse.quote(user_id, safe='')}&select=id,email,full_name,company,stock_symbol", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
+    if existing:
+        _supabase_table_request("profiles", "PATCH", f"?id=eq.{urllib.parse.quote(user_id, safe='')}", record, access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
+    else:
+        auth_req = urllib.request.Request(f"{SUPABASE_URL}/auth/v1/admin/users/{urllib.parse.quote(user_id, safe='')}", method="GET")
+        auth_req.add_header("apikey", SUPABASE_SERVICE_ROLE_KEY)
+        auth_req.add_header("Authorization", f"Bearer {SUPABASE_SERVICE_ROLE_KEY}")
+        with _urlopen_with_retry(auth_req, timeout=20, retries=1) as response:
+            auth_user = json.loads(response.read().decode("utf-8", errors="replace") or "{}")
+        metadata = auth_user.get("user_metadata") if isinstance(auth_user.get("user_metadata"), dict) else {}
+        _supabase_table_request("profiles", "POST", "?on_conflict=id", [{"id": user_id, "email": auth_user.get("email") or "", "full_name": metadata.get("full_name") or "", "company": metadata.get("company") or "", "stock_symbol": metadata.get("stock_symbol") or "", **record}], access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
+    return record
+
+
+def _tool_launch_token(user_id, tool_key, expires):
+    message = f"{user_id}|{tool_key}|{expires}".encode("utf-8")
+    signature = hmac.new(TOOL_LAUNCH_SECRET, message, hashlib.sha256).hexdigest()
+    return f"{user_id}.{expires}.{signature}"
+
+
+def _valid_tool_launch(token, tool_key):
+    try:
+        user_id, expires_raw, signature = str(token or "").split(".", 2)
+        expires = int(expires_raw)
+    except (ValueError, TypeError):
+        return False
+    if expires < int(time.time()):
+        return False
+    expected = _tool_launch_token(user_id, tool_key, expires).rsplit(".", 1)[-1]
+    return hmac.compare_digest(signature, expected)
 
 
 def _timeline_signal_article(row):
@@ -3886,6 +3981,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         tool_path = request_path.rstrip("/")
         if tool_path in TOOL_PAGES:
+            launch = (urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("launch") or [""])[0]
+            if not _valid_tool_launch(launch, TOOL_KEYS[tool_path]):
+                _html_response(self, 401, "<h1>Authentication required</h1><p>Open this tool from your signed-in KestrelIQ Tool Kit.</p>")
+                return
             tool_file = TOOL_DIR / TOOL_PAGES[tool_path]
             if not tool_file.exists():
                 _html_response(self, 404, "Tool not found.")
@@ -3982,6 +4081,15 @@ class Handler(BaseHTTPRequestHandler):
             except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 _json_response(self, 503, {"error": "Profile is temporarily unavailable.", "detail": str(exc)})
             return
+        if self.path == "/api/admin/users":
+            try:
+                user = _supabase_auth_user(_bearer_token(self))
+                _json_response(self, 200, {"users": _admin_profiles(user)})
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
+            except Exception as exc:
+                _json_response(self, 503, {"error": "Could not load users.", "detail": str(exc)})
+            return
         if self.path == "/api/favorites":
             access_token = _bearer_token(self)
             try:
@@ -4035,6 +4143,7 @@ class Handler(BaseHTTPRequestHandler):
             access_token = _bearer_token(self)
             try:
                 user = _supabase_auth_user(access_token)
+                _assert_notebook_access(user, access_token)
                 _json_response(self, 200, _list_jot_down(user["id"], access_token))
             except PermissionError as exc:
                 _json_response(self, 401, {"error": str(exc)})
@@ -4047,6 +4156,7 @@ class Handler(BaseHTTPRequestHandler):
             file_id = (query.get("file_id") or query.get("fileId") or [""])[0]
             try:
                 user = _supabase_auth_user(access_token)
+                _assert_notebook_access(user, access_token)
                 payload, metadata = _download_jot_drive_image(file_id, user["id"])
                 _binary_response(
                     self,
@@ -4079,6 +4189,47 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         post_path = self.path.split("?", 1)[0].rstrip("/")
+        if post_path.startswith("/api/jot-down") or post_path.startswith("/api/jot-media"):
+            try:
+                notebook_token = _bearer_token(self)
+                notebook_user = _supabase_auth_user(notebook_token)
+                _assert_notebook_access(notebook_user, notebook_token)
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
+                return
+            except Exception as exc:
+                _json_response(self, 503, {"error": "Could not verify notebook access.", "detail": str(exc)})
+                return
+        if post_path == "/api/tool-launch":
+            try:
+                access_token = _bearer_token(self)
+                user = _supabase_auth_user(access_token)
+                payload = _read_json(self)
+                tool_key = str(payload.get("tool") or "").strip()
+                if tool_key not in TOOL_KEYS.values():
+                    raise ValueError("Unknown toolkit app.")
+                profile = _profile_for_user(user, access_token)
+                if not (_is_timeline_admin(user) or tool_key in _normalize_tool_access(profile.get("tool_access"))):
+                    raise PermissionError("Ask the administrator to enable this toolkit app for you.")
+                expires = int(time.time()) + 90
+                _json_response(self, 200, {"url": f"/tools/{tool_key}?launch={urllib.parse.quote(_tool_launch_token(user['id'], tool_key, expires))}"})
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
+            return
+        if post_path == "/api/admin/access":
+            try:
+                user = _supabase_auth_user(_bearer_token(self))
+                result = _update_admin_access(_read_json(self), user)
+                _json_response(self, 200, {"access": result})
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
+            except Exception as exc:
+                _json_response(self, 503, {"error": "Could not update access.", "detail": str(exc)})
+            return
         if post_path == "/api/jot-media":
             access_token = _bearer_token(self)
             content_type = str(self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
@@ -4257,6 +4408,9 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 access_token = _bearer_token(self)
                 user = _supabase_auth_user(access_token)
+                profile = _profile_for_user(user, access_token)
+                if not (_is_timeline_admin(user) or profile.get("openai_enabled")):
+                    raise PermissionError("Ask the administrator to enable Ask OpenAI for you.")
             except PermissionError as exc:
                 _json_response(self, 401, {"error": str(exc)})
                 return

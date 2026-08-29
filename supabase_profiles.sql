@@ -4,6 +4,10 @@ create table if not exists public.profiles (
   email text,
   full_name text not null default '',
   company text not null default '',
+  stock_symbol text not null default '',
+  tool_access jsonb not null default '[]'::jsonb,
+  openai_enabled boolean not null default false,
+  notebook_access boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -11,6 +15,10 @@ create table if not exists public.profiles (
 alter table public.profiles add column if not exists email text;
 alter table public.profiles add column if not exists full_name text not null default '';
 alter table public.profiles add column if not exists company text not null default '';
+alter table public.profiles add column if not exists stock_symbol text not null default '';
+alter table public.profiles add column if not exists tool_access jsonb not null default '[]'::jsonb;
+alter table public.profiles add column if not exists openai_enabled boolean not null default false;
+alter table public.profiles add column if not exists notebook_access boolean not null default false;
 alter table public.profiles add column if not exists created_at timestamptz not null default now();
 alter table public.profiles add column if not exists updated_at timestamptz not null default now();
 
