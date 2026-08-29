@@ -21,5 +21,9 @@ assert.match(html, /function showMemberSignalRadar\(/);
 assert.match(html, /const fullHome=!state\.session\|\|canUseOwnerDashboard\(\)\|\|state\.memberHomeExpanded/);
 assert.match(html, /class="member-signal-field"/);
 assert.match(html, /@keyframes memberParticle/);
+assert.match(html, /\.member-learning-grid\{grid-template-columns:1fr!important\}/);
+assert.match(html, /\.member-welcome,\.member-welcome \*\{font-weight:400!important\}/);
+assert.match(html, /grid\.innerHTML=progress\.length\?progress\.map\(/);
+assert.doesNotMatch(html, /progress\.slice\(0,6\)\.map\(/);
 
 console.log('Member welcome: personalized routes, assigned learning progress, access gating and motion fallback passed');
