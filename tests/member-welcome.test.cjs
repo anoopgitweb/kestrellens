@@ -15,5 +15,11 @@ assert.match(html, /await loadJotDown\(false\)/);
 assert.match(html, /prefers-reduced-motion:reduce/);
 assert.match(html, /\.member-progress\{display:block;position:relative;width:100%;height:6px/);
 assert.match(html, /\.member-progress i\{display:block;position:absolute;inset:0 auto 0 0;max-width:100%/);
+assert.match(html, /member-landing-only \.home-shell>#memberWelcome~\*/);
+assert.match(html, /onclick="showMemberSignalRadar\(\)"/);
+assert.match(html, /function showMemberSignalRadar\(/);
+assert.match(html, /const fullHome=!state\.session\|\|canUseOwnerDashboard\(\)\|\|state\.memberHomeExpanded/);
+assert.match(html, /class="member-signal-field"/);
+assert.match(html, /@keyframes memberParticle/);
 
 console.log('Member welcome: personalized routes, assigned learning progress, access gating and motion fallback passed');
