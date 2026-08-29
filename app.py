@@ -1056,7 +1056,19 @@ def _update_admin_access(payload, requesting_user):
             auth_user = json.loads(response.read().decode("utf-8", errors="replace") or "{}")
         metadata = auth_user.get("user_metadata") if isinstance(auth_user.get("user_metadata"), dict) else {}
         _supabase_table_request("profiles", "POST", "?on_conflict=id", [{"id": user_id, "email": auth_user.get("email") or "", "full_name": metadata.get("full_name") or "", "company": metadata.get("company") or "", "stock_symbol": metadata.get("stock_symbol") or "", **record}], access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
-    return record
+    saved_rows = _supabase_table_request("profiles", "GET", f"?id=eq.{urllib.parse.quote(user_id, safe='')}&select=tool_access,openai_enabled,notebook_access,notebook_ids&limit=1", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
+    if not saved_rows:
+        raise RuntimeError("Supabase did not return the saved user access record.")
+    saved = saved_rows[0]
+    persisted = {
+        "tool_access": _normalize_tool_access(saved.get("tool_access")),
+        "openai_enabled": bool(saved.get("openai_enabled")),
+        "notebook_access": bool(saved.get("notebook_access")),
+        "notebook_ids": _normalize_notebook_ids(saved.get("notebook_ids")),
+    }
+    if persisted["notebook_ids"] != record["notebook_ids"] or persisted["notebook_access"] != record["notebook_access"]:
+        raise RuntimeError("Supabase did not persist the notebook assignment. Run the latest supabase_profiles.sql migration and try again.")
+    return persisted
 
 
 def _tool_launch_token(user_id, tool_key, expires):
