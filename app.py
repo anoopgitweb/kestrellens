@@ -881,15 +881,15 @@ def _profile_for_user(user, access_token):
     encoded = urllib.parse.quote(str(user.get("id") or ""), safe="")
     rows = _supabase_table_request("profiles", "GET", f"?id=eq.{encoded}&select=*", access_token=access_token)
     profile = rows[0] if rows else {}
-    signed_notebook_ids = _signed_auth_notebook_ids(user)
-    notebook_ids = signed_notebook_ids if signed_notebook_ids is not None else _normalize_notebook_ids(profile.get("notebook_ids"))
+    raw_tool_access = profile.get("tool_access")
+    notebook_ids = _notebook_ids_from_tool_access(raw_tool_access)
     return {
         "id": user.get("id"),
         "email": profile.get("email") or user.get("email") or "",
         "full_name": profile.get("full_name") or "",
         "company": profile.get("company") or "",
         "stock_symbol": profile.get("stock_symbol") or "",
-        "tool_access": profile.get("tool_access") if isinstance(profile.get("tool_access"), list) else [],
+        "tool_access": _normalize_tool_access(raw_tool_access),
         "openai_enabled": bool(profile.get("openai_enabled")),
         "notebook_access": bool(profile.get("notebook_access")),
         "notebook_ids": notebook_ids,
@@ -996,19 +996,14 @@ def _normalize_notebook_ids(value):
     return sorted({str(item or "").strip().lower() for item in (value if isinstance(value, list) else []) if re.fullmatch(r"[0-9a-fA-F-]{36}", str(item or "").strip())})
 
 
-def _notebook_assignment_signature(user_id, notebook_ids):
-    message = f"{str(user_id or '').strip()}|{'|'.join(_normalize_notebook_ids(notebook_ids))}".encode("utf-8")
-    return hmac.new(TOOL_LAUNCH_SECRET, message, hashlib.sha256).hexdigest()
+def _notebook_ids_from_tool_access(value):
+    prefix = "notebook:"
+    candidates = [str(item or "").strip()[len(prefix):] for item in (value if isinstance(value, list) else []) if str(item or "").strip().lower().startswith(prefix)]
+    return _normalize_notebook_ids(candidates)
 
 
-def _signed_auth_notebook_ids(user):
-    metadata = user.get("user_metadata") if isinstance(user.get("user_metadata"), dict) else {}
-    if "kestreliq_notebook_ids" not in metadata:
-        return None
-    notebook_ids = _normalize_notebook_ids(metadata.get("kestreliq_notebook_ids"))
-    supplied = str(metadata.get("kestreliq_notebook_sig") or "")
-    expected = _notebook_assignment_signature(user.get("id"), notebook_ids)
-    return notebook_ids if supplied and hmac.compare_digest(supplied, expected) else None
+def _tool_access_with_notebooks(tool_access, notebook_ids):
+    return sorted([*_normalize_tool_access(tool_access), *(f"notebook:{item_id}" for item_id in _normalize_notebook_ids(notebook_ids))])
 
 
 def _admin_notebooks():
@@ -1030,33 +1025,6 @@ def _admin_auth_user(user_id):
     with _urlopen_with_retry(req, timeout=20, retries=1) as response:
         result = json.loads(response.read().decode("utf-8", errors="replace") or "{}")
     return result.get("user") if isinstance(result.get("user"), dict) else result
-
-
-def _save_auth_notebook_ids(user_id, notebook_ids):
-    expected = _normalize_notebook_ids(notebook_ids)
-    auth_user = _admin_auth_user(user_id)
-    metadata = auth_user.get("user_metadata") if isinstance(auth_user.get("user_metadata"), dict) else {}
-    assignment_metadata = {
-        **metadata,
-        "kestreliq_notebook_ids": expected,
-        "kestreliq_notebook_sig": _notebook_assignment_signature(user_id, expected),
-    }
-    payload = json.dumps({"user_metadata": assignment_metadata}).encode("utf-8")
-    encoded_id = urllib.parse.quote(str(user_id or ""), safe="")
-    req = urllib.request.Request(f"{SUPABASE_URL}/auth/v1/admin/users/{encoded_id}", data=payload, method="PUT")
-    req.add_header("apikey", SUPABASE_SERVICE_ROLE_KEY)
-    req.add_header("Authorization", f"Bearer {SUPABASE_SERVICE_ROLE_KEY}")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("Accept", "application/json")
-    with _urlopen_with_retry(req, timeout=20, retries=0) as response:
-        saved = json.loads(response.read().decode("utf-8", errors="replace") or "{}")
-    if isinstance(saved.get("user"), dict):
-        saved = saved["user"]
-    returned = _signed_auth_notebook_ids(saved)
-    if returned == expected:
-        return returned
-    verified = _admin_auth_user(user_id)
-    return _signed_auth_notebook_ids(verified) or []
 
 
 def _assert_notebook_access(user, access_token):
@@ -1086,8 +1054,7 @@ def _admin_profiles(requesting_user):
         row = profiles.get(user_id, {})
         metadata = auth_user.get("user_metadata") if isinstance(auth_user.get("user_metadata"), dict) else {}
         email_address = row.get("email") or auth_user.get("email") or ""
-        signed_notebook_ids = _signed_auth_notebook_ids(auth_user)
-        notebook_ids = signed_notebook_ids if signed_notebook_ids is not None else _normalize_notebook_ids(row.get("notebook_ids"))
+        notebook_ids = _notebook_ids_from_tool_access(row.get("tool_access"))
         users.append({"id": user_id, "email": email_address, "full_name": row.get("full_name") or metadata.get("full_name") or "", "company": row.get("company") or metadata.get("company") or "", "stock_symbol": row.get("stock_symbol") or metadata.get("stock_symbol") or "", "tool_access": _normalize_tool_access(row.get("tool_access")), "openai_enabled": bool(row.get("openai_enabled")), "notebook_access": bool(row.get("notebook_access")), "notebook_ids": notebook_ids, "is_admin": str(email_address).lower() == TIMELINE_ADMIN_EMAIL})
     return sorted(users, key=lambda item: str(item.get("email") or "").lower())
 
@@ -1102,7 +1069,7 @@ def _update_admin_access(payload, requesting_user):
     requested_notebooks = set(_normalize_notebook_ids(payload.get("notebook_ids")))
     available_notebooks = {str(item.get("id") or "") for item in _admin_notebooks()}
     assigned_notebooks = sorted(requested_notebooks & available_notebooks) if notebook_access else []
-    record = {"tool_access": _normalize_tool_access(payload.get("tool_access")), "openai_enabled": bool(payload.get("openai_enabled")), "notebook_access": notebook_access, "updated_at": datetime.now(timezone.utc).isoformat()}
+    record = {"tool_access": _tool_access_with_notebooks(payload.get("tool_access"), assigned_notebooks), "openai_enabled": bool(payload.get("openai_enabled")), "notebook_access": notebook_access, "updated_at": datetime.now(timezone.utc).isoformat()}
     existing = _supabase_table_request("profiles", "GET", f"?id=eq.{urllib.parse.quote(user_id, safe='')}&select=id,email,full_name,company,stock_symbol", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
     if existing:
         _supabase_table_request("profiles", "PATCH", f"?id=eq.{urllib.parse.quote(user_id, safe='')}", record, access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
@@ -1110,7 +1077,6 @@ def _update_admin_access(payload, requesting_user):
         auth_user = _admin_auth_user(user_id)
         metadata = auth_user.get("user_metadata") if isinstance(auth_user.get("user_metadata"), dict) else {}
         _supabase_table_request("profiles", "POST", "?on_conflict=id", [{"id": user_id, "email": auth_user.get("email") or "", "full_name": metadata.get("full_name") or "", "company": metadata.get("company") or "", "stock_symbol": metadata.get("stock_symbol") or "", **record}], access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
-    persisted_notebook_ids = _save_auth_notebook_ids(user_id, assigned_notebooks)
     saved_rows = _supabase_table_request("profiles", "GET", f"?id=eq.{urllib.parse.quote(user_id, safe='')}&select=tool_access,openai_enabled,notebook_access&limit=1", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
     if not saved_rows:
         raise RuntimeError("Supabase did not return the saved user access record.")
@@ -1119,7 +1085,7 @@ def _update_admin_access(payload, requesting_user):
         "tool_access": _normalize_tool_access(saved.get("tool_access")),
         "openai_enabled": bool(saved.get("openai_enabled")),
         "notebook_access": bool(saved.get("notebook_access")),
-        "notebook_ids": persisted_notebook_ids,
+        "notebook_ids": _notebook_ids_from_tool_access(saved.get("tool_access")),
     }
     if persisted["notebook_ids"] != assigned_notebooks or persisted["notebook_access"] != notebook_access:
         raise RuntimeError("Supabase did not persist the notebook assignment. Please try saving access again.")
