@@ -881,8 +881,8 @@ def _profile_for_user(user, access_token):
     encoded = urllib.parse.quote(str(user.get("id") or ""), safe="")
     rows = _supabase_table_request("profiles", "GET", f"?id=eq.{encoded}&select=*", access_token=access_token)
     profile = rows[0] if rows else {}
-    app_metadata = user.get("app_metadata") if isinstance(user.get("app_metadata"), dict) else {}
-    notebook_ids = _normalize_notebook_ids(app_metadata.get("notebook_ids")) if "notebook_ids" in app_metadata else _normalize_notebook_ids(profile.get("notebook_ids"))
+    signed_notebook_ids = _signed_auth_notebook_ids(user)
+    notebook_ids = signed_notebook_ids if signed_notebook_ids is not None else _normalize_notebook_ids(profile.get("notebook_ids"))
     return {
         "id": user.get("id"),
         "email": profile.get("email") or user.get("email") or "",
@@ -996,6 +996,21 @@ def _normalize_notebook_ids(value):
     return sorted({str(item or "").strip().lower() for item in (value if isinstance(value, list) else []) if re.fullmatch(r"[0-9a-fA-F-]{36}", str(item or "").strip())})
 
 
+def _notebook_assignment_signature(user_id, notebook_ids):
+    message = f"{str(user_id or '').strip()}|{'|'.join(_normalize_notebook_ids(notebook_ids))}".encode("utf-8")
+    return hmac.new(TOOL_LAUNCH_SECRET, message, hashlib.sha256).hexdigest()
+
+
+def _signed_auth_notebook_ids(user):
+    metadata = user.get("user_metadata") if isinstance(user.get("user_metadata"), dict) else {}
+    if "kestreliq_notebook_ids" not in metadata:
+        return None
+    notebook_ids = _normalize_notebook_ids(metadata.get("kestreliq_notebook_ids"))
+    supplied = str(metadata.get("kestreliq_notebook_sig") or "")
+    expected = _notebook_assignment_signature(user.get("id"), notebook_ids)
+    return notebook_ids if supplied and hmac.compare_digest(supplied, expected) else None
+
+
 def _admin_notebooks():
     encoded_email = urllib.parse.quote(TIMELINE_ADMIN_EMAIL, safe="")
     profiles = _supabase_table_request("profiles", "GET", f"?email=eq.{encoded_email}&select=id&limit=1", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
@@ -1019,7 +1034,14 @@ def _admin_auth_user(user_id):
 
 def _save_auth_notebook_ids(user_id, notebook_ids):
     expected = _normalize_notebook_ids(notebook_ids)
-    payload = json.dumps({"app_metadata": {"notebook_ids": expected}}).encode("utf-8")
+    auth_user = _admin_auth_user(user_id)
+    metadata = auth_user.get("user_metadata") if isinstance(auth_user.get("user_metadata"), dict) else {}
+    assignment_metadata = {
+        **metadata,
+        "kestreliq_notebook_ids": expected,
+        "kestreliq_notebook_sig": _notebook_assignment_signature(user_id, expected),
+    }
+    payload = json.dumps({"user_metadata": assignment_metadata}).encode("utf-8")
     encoded_id = urllib.parse.quote(str(user_id or ""), safe="")
     req = urllib.request.Request(f"{SUPABASE_URL}/auth/v1/admin/users/{encoded_id}", data=payload, method="PUT")
     req.add_header("apikey", SUPABASE_SERVICE_ROLE_KEY)
@@ -1030,13 +1052,11 @@ def _save_auth_notebook_ids(user_id, notebook_ids):
         saved = json.loads(response.read().decode("utf-8", errors="replace") or "{}")
     if isinstance(saved.get("user"), dict):
         saved = saved["user"]
-    saved_metadata = saved.get("app_metadata") if isinstance(saved.get("app_metadata"), dict) else {}
-    returned = _normalize_notebook_ids(saved_metadata.get("notebook_ids"))
+    returned = _signed_auth_notebook_ids(saved)
     if returned == expected:
         return returned
     verified = _admin_auth_user(user_id)
-    verified_metadata = verified.get("app_metadata") if isinstance(verified.get("app_metadata"), dict) else {}
-    return _normalize_notebook_ids(verified_metadata.get("notebook_ids"))
+    return _signed_auth_notebook_ids(verified) or []
 
 
 def _assert_notebook_access(user, access_token):
@@ -1065,9 +1085,9 @@ def _admin_profiles(requesting_user):
         user_id = str(auth_user.get("id") or "")
         row = profiles.get(user_id, {})
         metadata = auth_user.get("user_metadata") if isinstance(auth_user.get("user_metadata"), dict) else {}
-        app_metadata = auth_user.get("app_metadata") if isinstance(auth_user.get("app_metadata"), dict) else {}
         email_address = row.get("email") or auth_user.get("email") or ""
-        notebook_ids = _normalize_notebook_ids(app_metadata.get("notebook_ids")) if "notebook_ids" in app_metadata else _normalize_notebook_ids(row.get("notebook_ids"))
+        signed_notebook_ids = _signed_auth_notebook_ids(auth_user)
+        notebook_ids = signed_notebook_ids if signed_notebook_ids is not None else _normalize_notebook_ids(row.get("notebook_ids"))
         users.append({"id": user_id, "email": email_address, "full_name": row.get("full_name") or metadata.get("full_name") or "", "company": row.get("company") or metadata.get("company") or "", "stock_symbol": row.get("stock_symbol") or metadata.get("stock_symbol") or "", "tool_access": _normalize_tool_access(row.get("tool_access")), "openai_enabled": bool(row.get("openai_enabled")), "notebook_access": bool(row.get("notebook_access")), "notebook_ids": notebook_ids, "is_admin": str(email_address).lower() == TIMELINE_ADMIN_EMAIL})
     return sorted(users, key=lambda item: str(item.get("email") or "").lower())
 
