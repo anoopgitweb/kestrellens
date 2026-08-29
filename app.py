@@ -1013,13 +1013,13 @@ def _admin_auth_user(user_id):
     req.add_header("Authorization", f"Bearer {SUPABASE_SERVICE_ROLE_KEY}")
     req.add_header("Accept", "application/json")
     with _urlopen_with_retry(req, timeout=20, retries=1) as response:
-        return json.loads(response.read().decode("utf-8", errors="replace") or "{}")
+        result = json.loads(response.read().decode("utf-8", errors="replace") or "{}")
+    return result.get("user") if isinstance(result.get("user"), dict) else result
 
 
 def _save_auth_notebook_ids(user_id, notebook_ids):
-    auth_user = _admin_auth_user(user_id)
-    app_metadata = auth_user.get("app_metadata") if isinstance(auth_user.get("app_metadata"), dict) else {}
-    payload = json.dumps({"app_metadata": {**app_metadata, "notebook_ids": _normalize_notebook_ids(notebook_ids)}}).encode("utf-8")
+    expected = _normalize_notebook_ids(notebook_ids)
+    payload = json.dumps({"app_metadata": {"notebook_ids": expected}}).encode("utf-8")
     encoded_id = urllib.parse.quote(str(user_id or ""), safe="")
     req = urllib.request.Request(f"{SUPABASE_URL}/auth/v1/admin/users/{encoded_id}", data=payload, method="PUT")
     req.add_header("apikey", SUPABASE_SERVICE_ROLE_KEY)
@@ -1028,8 +1028,15 @@ def _save_auth_notebook_ids(user_id, notebook_ids):
     req.add_header("Accept", "application/json")
     with _urlopen_with_retry(req, timeout=20, retries=0) as response:
         saved = json.loads(response.read().decode("utf-8", errors="replace") or "{}")
+    if isinstance(saved.get("user"), dict):
+        saved = saved["user"]
     saved_metadata = saved.get("app_metadata") if isinstance(saved.get("app_metadata"), dict) else {}
-    return _normalize_notebook_ids(saved_metadata.get("notebook_ids"))
+    returned = _normalize_notebook_ids(saved_metadata.get("notebook_ids"))
+    if returned == expected:
+        return returned
+    verified = _admin_auth_user(user_id)
+    verified_metadata = verified.get("app_metadata") if isinstance(verified.get("app_metadata"), dict) else {}
+    return _normalize_notebook_ids(verified_metadata.get("notebook_ids"))
 
 
 def _assert_notebook_access(user, access_token):
