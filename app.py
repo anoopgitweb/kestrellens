@@ -228,8 +228,17 @@ def _supabase_table_request(table, method, query="", payload=None, access_token=
     if method in {"POST", "PATCH", "DELETE"}:
         req.add_header("Prefer", prefer or "resolution=merge-duplicates,return=representation")
     retries = 2 if method in {"GET", "PATCH", "DELETE"} else 0
-    with _urlopen_with_retry(req, timeout=15, retries=retries) as response:
-        raw = response.read().decode("utf-8", errors="replace")
+    try:
+        with _urlopen_with_retry(req, timeout=15, retries=retries) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        raw_error = exc.read().decode("utf-8", errors="replace")[:1200]
+        try:
+            error_data = json.loads(raw_error)
+            detail = error_data.get("message") or error_data.get("details") or error_data.get("hint") or raw_error
+        except json.JSONDecodeError:
+            detail = raw_error or str(exc)
+        raise RuntimeError(f"Supabase {table} {method} failed ({exc.code}): {detail}") from exc
     return json.loads(raw) if raw else []
 
 
@@ -890,8 +899,8 @@ def _profile_for_user(user, access_token):
         "company": profile.get("company") or "",
         "stock_symbol": profile.get("stock_symbol") or "",
         "tool_access": _normalize_tool_access(raw_tool_access),
-        "openai_enabled": bool(profile.get("openai_enabled")),
-        "notebook_access": bool(profile.get("notebook_access")),
+        "openai_enabled": bool(profile.get("openai_enabled")) or _access_feature_enabled(raw_tool_access, "openai"),
+        "notebook_access": bool(profile.get("notebook_access")) or _access_feature_enabled(raw_tool_access, "notebooks"),
         "notebook_ids": notebook_ids,
         "is_admin": _is_timeline_admin(user),
         "created_at": profile.get("created_at") or "",
@@ -1006,6 +1015,20 @@ def _tool_access_with_notebooks(tool_access, notebook_ids):
     return sorted([*_normalize_tool_access(tool_access), *(f"notebook:{item_id}" for item_id in _normalize_notebook_ids(notebook_ids))])
 
 
+def _access_feature_enabled(value, feature):
+    token = f"feature:{str(feature or '').strip().lower()}"
+    return token in {str(item or "").strip().lower() for item in (value if isinstance(value, list) else [])}
+
+
+def _encoded_access(tool_access, openai_enabled=False, notebook_access=False, notebook_ids=None):
+    values = _tool_access_with_notebooks(tool_access, notebook_ids if notebook_access else [])
+    if openai_enabled:
+        values.append("feature:openai")
+    if notebook_access:
+        values.append("feature:notebooks")
+    return sorted(set(values))
+
+
 def _admin_notebooks():
     encoded_email = urllib.parse.quote(TIMELINE_ADMIN_EMAIL, safe="")
     profiles = _supabase_table_request("profiles", "GET", f"?email=eq.{encoded_email}&select=id&limit=1", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
@@ -1055,7 +1078,7 @@ def _admin_profiles(requesting_user):
         metadata = auth_user.get("user_metadata") if isinstance(auth_user.get("user_metadata"), dict) else {}
         email_address = row.get("email") or auth_user.get("email") or ""
         notebook_ids = _notebook_ids_from_tool_access(row.get("tool_access"))
-        users.append({"id": user_id, "email": email_address, "full_name": row.get("full_name") or metadata.get("full_name") or "", "company": row.get("company") or metadata.get("company") or "", "stock_symbol": row.get("stock_symbol") or metadata.get("stock_symbol") or "", "tool_access": _normalize_tool_access(row.get("tool_access")), "openai_enabled": bool(row.get("openai_enabled")), "notebook_access": bool(row.get("notebook_access")), "notebook_ids": notebook_ids, "is_admin": str(email_address).lower() == TIMELINE_ADMIN_EMAIL})
+        users.append({"id": user_id, "email": email_address, "full_name": row.get("full_name") or metadata.get("full_name") or "", "company": row.get("company") or metadata.get("company") or "", "stock_symbol": row.get("stock_symbol") or metadata.get("stock_symbol") or "", "tool_access": _normalize_tool_access(row.get("tool_access")), "openai_enabled": bool(row.get("openai_enabled")) or _access_feature_enabled(row.get("tool_access"), "openai"), "notebook_access": bool(row.get("notebook_access")) or _access_feature_enabled(row.get("tool_access"), "notebooks"), "notebook_ids": notebook_ids, "is_admin": str(email_address).lower() == TIMELINE_ADMIN_EMAIL})
     return sorted(users, key=lambda item: str(item.get("email") or "").lower())
 
 
@@ -1069,7 +1092,8 @@ def _update_admin_access(payload, requesting_user):
     requested_notebooks = set(_normalize_notebook_ids(payload.get("notebook_ids")))
     available_notebooks = {str(item.get("id") or "") for item in _admin_notebooks()}
     assigned_notebooks = sorted(requested_notebooks & available_notebooks) if notebook_access else []
-    record = {"tool_access": _tool_access_with_notebooks(payload.get("tool_access"), assigned_notebooks), "openai_enabled": bool(payload.get("openai_enabled")), "notebook_access": notebook_access, "updated_at": datetime.now(timezone.utc).isoformat()}
+    openai_enabled = bool(payload.get("openai_enabled"))
+    record = {"tool_access": _encoded_access(payload.get("tool_access"), openai_enabled, notebook_access, assigned_notebooks), "updated_at": datetime.now(timezone.utc).isoformat()}
     existing = _supabase_table_request("profiles", "GET", f"?id=eq.{urllib.parse.quote(user_id, safe='')}&select=id,email,full_name,company,stock_symbol", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
     if existing:
         _supabase_table_request("profiles", "PATCH", f"?id=eq.{urllib.parse.quote(user_id, safe='')}", record, access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
@@ -1077,14 +1101,14 @@ def _update_admin_access(payload, requesting_user):
         auth_user = _admin_auth_user(user_id)
         metadata = auth_user.get("user_metadata") if isinstance(auth_user.get("user_metadata"), dict) else {}
         _supabase_table_request("profiles", "POST", "?on_conflict=id", [{"id": user_id, "email": auth_user.get("email") or "", "full_name": metadata.get("full_name") or "", "company": metadata.get("company") or "", "stock_symbol": metadata.get("stock_symbol") or "", **record}], access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
-    saved_rows = _supabase_table_request("profiles", "GET", f"?id=eq.{urllib.parse.quote(user_id, safe='')}&select=tool_access,openai_enabled,notebook_access&limit=1", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
+    saved_rows = _supabase_table_request("profiles", "GET", f"?id=eq.{urllib.parse.quote(user_id, safe='')}&select=tool_access&limit=1", access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY)
     if not saved_rows:
         raise RuntimeError("Supabase did not return the saved user access record.")
     saved = saved_rows[0]
     persisted = {
         "tool_access": _normalize_tool_access(saved.get("tool_access")),
-        "openai_enabled": bool(saved.get("openai_enabled")),
-        "notebook_access": bool(saved.get("notebook_access")),
+        "openai_enabled": _access_feature_enabled(saved.get("tool_access"), "openai"),
+        "notebook_access": _access_feature_enabled(saved.get("tool_access"), "notebooks"),
         "notebook_ids": _notebook_ids_from_tool_access(saved.get("tool_access")),
     }
     if persisted["notebook_ids"] != assigned_notebooks or persisted["notebook_access"] != notebook_access:
