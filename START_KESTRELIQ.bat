@@ -16,13 +16,22 @@ if not defined SUPABASE_ANON_KEY (
   set /p "SUPABASE_ANON_KEY=Supabase anonymous or publishable key: "
 )
 
+if not defined SUPABASE_SERVICE_ROLE_KEY (
+  set "SAVE_LOCAL_CONFIG=1"
+  echo.
+  echo The service-role key is required locally for administrator user management.
+  set /p "SUPABASE_SERVICE_ROLE_KEY=Supabase service-role key: "
+)
+
 if not defined SUPABASE_URL goto :missing_config
 if not defined SUPABASE_ANON_KEY goto :missing_config
+if not defined SUPABASE_SERVICE_ROLE_KEY goto :missing_config
 
 if defined SAVE_LOCAL_CONFIG (
   >"%~dp0KESTRELIQ_LOCAL_ENV.bat" echo @echo off
   >>"%~dp0KESTRELIQ_LOCAL_ENV.bat" echo set "SUPABASE_URL=%SUPABASE_URL%"
   >>"%~dp0KESTRELIQ_LOCAL_ENV.bat" echo set "SUPABASE_ANON_KEY=%SUPABASE_ANON_KEY%"
+  >>"%~dp0KESTRELIQ_LOCAL_ENV.bat" echo set "SUPABASE_SERVICE_ROLE_KEY=%SUPABASE_SERVICE_ROLE_KEY%"
   echo.
   echo Local Supabase settings saved outside Git.
 )
