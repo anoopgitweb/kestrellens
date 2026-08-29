@@ -19,6 +19,19 @@ class PlainExplanationTests(unittest.TestCase):
             self.assertNotIn("secret", message)
         self.assertIn("too long", app._plain_explanation_error_message(TimeoutError()))
 
+    def test_content_generation_errors_do_not_expose_provider_details(self):
+        cases = [
+            (app.OpenAIRequestError("Incorrect API key: sk-private", 401, "invalid_api_key"), "authentication failed"),
+            (app.OpenAIRequestError("private billing details", 429, "insufficient_quota"), "quota"),
+            (app.OpenAIRequestError("private model details", 404, "model_not_found"), "model is unavailable"),
+            (app.OpenAIRequestError("private rate details", 429, "rate_limit_exceeded"), "too many requests"),
+        ]
+        for error, expected in cases:
+            message = app._openai_content_error_message(error)
+            self.assertIn(expected, message)
+            self.assertNotIn("private", message)
+            self.assertNotIn("sk-", message)
+
     def test_request_and_output(self):
         response = {"status": "completed", "output": [{"type": "message", "content": [{"type": "output_text", "text": "Simple explanation."}]}]}
         with patch.object(app, "_openai_response_request", return_value=response) as request:

@@ -3833,6 +3833,29 @@ def _plain_explanation_error_message(error):
     return "OpenAI did not return a complete explanation. Try a shorter description. Your existing text has not changed."
 
 
+def _openai_content_error_message(error):
+    if isinstance(error, OpenAIRequestError):
+        if error.status == 401 or error.code == "invalid_api_key":
+            return (
+                "OpenAI authentication failed. Ask the administrator to replace OPENAI_API_KEY in Render "
+                "with a valid OpenAI API key, then redeploy the service."
+            )
+        if error.code == "insufficient_quota":
+            return "The OpenAI API account has no available quota. Ask the administrator to check API billing and spending limits."
+        if error.status in (403, 404) or error.code == "model_not_found":
+            return "The configured content-generation model is unavailable to this API project. Ask the administrator to check OPENAI_NOTEBOOK_MODEL and project permissions."
+        if error.status == 429:
+            return "OpenAI is receiving too many requests. Wait a little and try again."
+        if error.status == 400:
+            return "OpenAI rejected the content-generation request settings. Ask the administrator to check the configured model."
+        return "OpenAI is temporarily unavailable. Please try again later."
+    if isinstance(error, (TimeoutError, socket.timeout)):
+        return "OpenAI took too long to generate the content. Nothing was saved; you can try again."
+    if isinstance(error, urllib.error.URLError):
+        return "The server could not connect to OpenAI. Check its network connection and try again."
+    return str(error) or "OpenAI could not complete this request."
+
+
 def _openai_response_request(body, timeout=120):
     if not OPENAI_API_KEY:
         raise RuntimeError("OpenAI is not configured. Add OPENAI_API_KEY to the Render environment.")
@@ -4640,7 +4663,7 @@ class Handler(BaseHTTPRequestHandler):
                     )
                 _json_response(self, 200, {"query": query, **result})
             except (RuntimeError, urllib.error.URLError, TimeoutError, OSError, KeyError, IndexError, json.JSONDecodeError) as exc:
-                _json_response(self, 502, {"error": str(exc) or "OpenAI could not complete this request."})
+                _json_response(self, 502, {"error": _openai_content_error_message(exc)})
             return
         if post_path == "/api/signal-intelligence":
             payload = _read_json(self)
