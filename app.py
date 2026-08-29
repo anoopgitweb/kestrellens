@@ -900,7 +900,7 @@ def _profile_for_user(user, access_token):
         "stock_symbol": profile.get("stock_symbol") or "",
         "tool_access": _normalize_tool_access(raw_tool_access),
         "openai_enabled": bool(profile.get("openai_enabled")) or _access_feature_enabled(raw_tool_access, "openai"),
-        "notebook_access": bool(profile.get("notebook_access")) or _access_feature_enabled(raw_tool_access, "notebooks"),
+        "notebook_access": bool(profile.get("notebook_access")) or _access_feature_enabled(raw_tool_access, "notebooks") or bool(notebook_ids),
         "notebook_ids": notebook_ids,
         "is_admin": _is_timeline_admin(user),
         "created_at": profile.get("created_at") or "",
@@ -1078,7 +1078,7 @@ def _admin_profiles(requesting_user):
         metadata = auth_user.get("user_metadata") if isinstance(auth_user.get("user_metadata"), dict) else {}
         email_address = row.get("email") or auth_user.get("email") or ""
         notebook_ids = _notebook_ids_from_tool_access(row.get("tool_access"))
-        users.append({"id": user_id, "email": email_address, "full_name": row.get("full_name") or metadata.get("full_name") or "", "company": row.get("company") or metadata.get("company") or "", "stock_symbol": row.get("stock_symbol") or metadata.get("stock_symbol") or "", "tool_access": _normalize_tool_access(row.get("tool_access")), "openai_enabled": bool(row.get("openai_enabled")) or _access_feature_enabled(row.get("tool_access"), "openai"), "notebook_access": bool(row.get("notebook_access")) or _access_feature_enabled(row.get("tool_access"), "notebooks"), "notebook_ids": notebook_ids, "is_admin": str(email_address).lower() == TIMELINE_ADMIN_EMAIL})
+        users.append({"id": user_id, "email": email_address, "full_name": row.get("full_name") or metadata.get("full_name") or "", "company": row.get("company") or metadata.get("company") or "", "stock_symbol": row.get("stock_symbol") or metadata.get("stock_symbol") or "", "tool_access": _normalize_tool_access(row.get("tool_access")), "openai_enabled": bool(row.get("openai_enabled")) or _access_feature_enabled(row.get("tool_access"), "openai"), "notebook_access": bool(row.get("notebook_access")) or _access_feature_enabled(row.get("tool_access"), "notebooks") or bool(notebook_ids), "notebook_ids": notebook_ids, "is_admin": str(email_address).lower() == TIMELINE_ADMIN_EMAIL})
     return sorted(users, key=lambda item: str(item.get("email") or "").lower())
 
 
