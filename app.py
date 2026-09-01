@@ -5,6 +5,7 @@ import csv
 import hashlib
 import hmac
 import io
+import ipaddress
 import json
 import os
 import re
@@ -214,6 +215,48 @@ def _urlopen_with_retry(request, timeout=15, retries=2):
             if attempt >= retries:
                 raise
         time.sleep(0.3 * (2 ** attempt))
+
+
+def _assert_public_image_url(url):
+    value = str(url or "").strip()
+    parsed = urllib.parse.urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError("The copied image URL is not supported.")
+    if parsed.port not in {None, 80, 443}:
+        raise ValueError("The copied image uses an unsupported network port.")
+    try:
+        addresses = {item[4][0] for item in socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM)}
+    except OSError as exc:
+        raise ValueError("The copied image host could not be resolved.") from exc
+    if not addresses:
+        raise ValueError("The copied image host could not be resolved.")
+    for address in addresses:
+        ip = ipaddress.ip_address(address.split("%", 1)[0])
+        if not ip.is_global:
+            raise ValueError("Private or local image addresses cannot be imported.")
+    return value
+
+
+class _JotImageRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return super().redirect_request(req, fp, code, msg, headers, _assert_public_image_url(newurl))
+
+
+def _fetch_remote_jot_image(url):
+    safe_url = _assert_public_image_url(url)
+    request = urllib.request.Request(safe_url, headers={"User-Agent": "Mozilla/5.0 (compatible; KestrelIQ/1.0)", "Accept": "image/*"})
+    opener = urllib.request.build_opener(_JotImageRedirectHandler())
+    with opener.open(request, timeout=12) as response:
+        content_type = str(response.headers.get_content_type() or "").lower()
+        declared = int(response.headers.get("Content-Length") or 0)
+        if declared > 10 * 1024 * 1024:
+            raise ValueError("The copied image is larger than 10 MB.")
+        payload = response.read(10 * 1024 * 1024 + 1)
+    if not content_type.startswith("image/") or content_type in {"image/svg+xml"}:
+        raise ValueError("The copied URL did not return a supported raster image.")
+    if not payload or len(payload) > 10 * 1024 * 1024:
+        raise ValueError("The copied image is empty or larger than 10 MB.")
+    return payload, content_type
 
 
 def _supabase_table_request(table, method, query="", payload=None, access_token=None, api_key=None, prefer=None):
@@ -4627,6 +4670,18 @@ class Handler(BaseHTTPRequestHandler):
                 _json_response(self, 403, {"error": str(exc)})
             except Exception as exc:
                 _json_response(self, 503, {"error": "Could not request notebook access.", "detail": str(exc)})
+            return
+        if post_path == "/api/jot-media/import":
+            try:
+                payload = _read_json(self)
+                image, content_type = _fetch_remote_jot_image(payload.get("url"))
+                _binary_response(self, 200, image, content_type, "pasted-image")
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except urllib.error.HTTPError as exc:
+                _json_response(self, 422, {"error": f"The source website refused the image request ({exc.code})."})
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                _json_response(self, 422, {"error": "The source image could not be downloaded.", "detail": str(exc)})
             return
         if post_path == "/api/jot-media":
             access_token = _bearer_token(self)

@@ -86,7 +86,12 @@ assert.match(html, /id="jotDescriptionRichMode"/);
 assert.match(html, /id="jotDescriptionPlainMode"/);
 assert.match(html, /function setJotDescriptionMode\(/);
 assert.match(html, /jotDescriptionMode==="rich"&&html/);
-assert.match(html, /sanitizeJotDescription\(html,false\)/);
+assert.match(html, /sanitizeJotDescription\(clipboard\.innerHTML,false\)/);
+assert.match(html, /clipboard\.content\.querySelectorAll\("img\[src\]"\)/);
+assert.match(html, /Pasted explanation image/);
+assert.match(html, /Some images were unavailable/);
+assert.match(html, /function fetchJotPastedImageSource\(/);
+assert.match(html, /fetch\("\/api\/jot-media\/import"/);
 assert.match(html, /Promise\.race\(\[downloads,new Promise\(resolve=>setTimeout\(resolve,2500\)\)\]\)/);
 
 console.log('Member welcome: personalized routes, assigned learning progress, access gating and motion fallback passed');

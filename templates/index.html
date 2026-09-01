@@ -4475,6 +4475,10 @@ function setJotDescriptionMode(mode="rich"){
   if(hint)hint.textContent=jotDescriptionMode==="rich"?"Rich Text preserves safe headings, lists, emphasis, colors, and links when pasted. Images still upload privately.":"Plain Text removes formatting from pasted content and keeps only the words and line breaks.";
   host?.focus();
 }
+async function fetchJotPastedImageSource(src){
+  try{const direct=await fetch(src,{cache:"no-store",referrerPolicy:"no-referrer"});if(!direct.ok)throw new Error(`Image request failed (${direct.status})`);return await direct.blob()}
+  catch(error){if(!/^https?:\/\//i.test(src))throw error;await ensureFreshSession();const response=await fetch("/api/jot-media/import",{method:"POST",headers:authHeaders({"Content-Type":"application/json"}),body:JSON.stringify({url:src})}),data=response.ok?null:await response.json().catch(()=>({}));if(!response.ok)throw new Error(data?.error||"The source website did not allow its image to be copied.");return response.blob()}
+}
 async function pasteJotDescription(event){
   event.preventDefault();event.stopPropagation();
   if(state.jotImageUploading){showToast("Upload in progress","Please wait for the image upload.");return;}
@@ -4489,11 +4493,12 @@ async function pasteJotDescription(event){
     }catch(error){marker.remove();showToast("Image upload failed",error.message||"Please paste again.");}
     finally{state.jotImageUploading=false;renderJotCreateState();updateJotPageCreatorPreview();}return;
   }
-  const html=event.clipboardData?.getData("text/html"),text=event.clipboardData?.getData("text/plain")||"",template=document.createElement("template");
-  if(jotDescriptionMode==="rich"&&html){template.innerHTML=sanitizeJotDescription(html,false);if(!template.content.textContent?.trim())template.content.append(document.createTextNode(text))}
+  const html=event.clipboardData?.getData("text/html"),text=event.clipboardData?.getData("text/plain")||"",template=document.createElement("template"),pastedImages=[];
+  if(jotDescriptionMode==="rich"&&html){const clipboard=document.createElement("template");clipboard.innerHTML=html;clipboard.content.querySelectorAll("img[src]").forEach((image,index)=>{const src=String(image.getAttribute("src")||"").trim();if(!/^(data:image\/|blob:|https?:\/\/)/i.test(src)){image.remove();return}const marker=document.createElement("span"),token=`\uE100KestrelImage${Date.now()}-${index}\uE101`;marker.textContent=token;marker.contentEditable="false";pastedImages.push({src,token});image.replaceWith(marker)});template.innerHTML=sanitizeJotDescription(clipboard.innerHTML,false);if(!template.content.textContent?.trim())template.content.append(document.createTextNode(text))}
   else template.content.append(document.createTextNode(text));
   const last=template.content.lastChild;range.deleteContents();range.insertNode(template.content);if(last){range.setStartAfter(last);range.collapse(true);const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);}
-  if(html&&/<img\b/i.test(html))showToast(jotDescriptionMode==="rich"?"Rich text pasted":"Plain text pasted","To insert a diagram, copy the image itself and paste it at the cursor.");
+  if(pastedImages.length){state.jotImageUploading=true;state.jotPageCreatorDirty=true;renderJotCreateState();let imported=0;try{await Promise.all(pastedImages.map(async entry=>{const walker=document.createTreeWalker(host,NodeFilter.SHOW_TEXT);let node,marker=null;while(node=walker.nextNode())if(node.textContent===entry.token){marker=node.parentElement;break}if(!marker)return;try{const source=await fetchJotPastedImageSource(entry.src);if(!source.size||source.size>10*1024*1024)throw new Error("Image is empty or larger than 10 MB");const blob=await compressJotImage(source),path=await uploadJotImage(blob),image=document.createElement("img");jotInlineDraftPaths.push(path);image.dataset.storagePath=path;image.alt="Pasted explanation image";marker.replaceWith(image);imported+=1}catch(_){marker.textContent="[Image could not be copied]"}}))}finally{state.jotImageUploading=false;renderJotCreateState();hydrateJotStorageImages(host);showToast(imported===pastedImages.length?"Rich content pasted":"Some images were unavailable",imported?`${imported} of ${pastedImages.length} copied image${pastedImages.length===1?"":"s"} uploaded privately.`:"The source website did not allow its images to be copied. Try copying each image directly.")}}
+  else if(html&&/<img\b/i.test(html))showToast(jotDescriptionMode==="rich"?"Rich text pasted":"Plain text pasted","To insert a diagram, copy the image itself and paste it at the cursor.");
   updateJotPageCreatorPreview();
 }
 function discardJotInlineDrafts(){if(jotInlineDraftPaths.length)deleteJotStoragePaths(jotInlineDraftPaths);jotInlineDraftPaths=[];}
