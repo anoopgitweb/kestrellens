@@ -77,6 +77,11 @@ for (const id of ['jotPreviewPdf','jotPreviewHtml','jotPreviewJson','jotPreviewM
 assert.match(html, /function createJotStoredZip\(/);
 assert.match(html, /imsmanifest\.xml/);
 assert.match(html, /SCORM_1\.2\.zip/);
+assert.match(html, /id="jotPdfPlayer"/);
+assert.match(html, /function openJotPdfViewer\(/);
+assert.match(html, /function closeJotPdfViewer\(/);
+assert.match(html, /function bindJotAttachmentLinks\(/);
+assert.match(html, /Open \$\{attachment\.name\} in PDF viewer/);
 assert.match(html, /Promise\.race\(\[downloads,new Promise\(resolve=>setTimeout\(resolve,2500\)\)\]\)/);
 
 console.log('Member welcome: personalized routes, assigned learning progress, access gating and motion fallback passed');
