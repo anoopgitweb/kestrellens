@@ -82,6 +82,11 @@ assert.match(html, /function openJotPdfViewer\(/);
 assert.match(html, /function closeJotPdfViewer\(/);
 assert.match(html, /function bindJotAttachmentLinks\(/);
 assert.match(html, /Open \$\{attachment\.name\} in PDF viewer/);
+assert.match(html, /id="jotDescriptionRichMode"/);
+assert.match(html, /id="jotDescriptionPlainMode"/);
+assert.match(html, /function setJotDescriptionMode\(/);
+assert.match(html, /jotDescriptionMode==="rich"&&html/);
+assert.match(html, /sanitizeJotDescription\(html,false\)/);
 assert.match(html, /Promise\.race\(\[downloads,new Promise\(resolve=>setTimeout\(resolve,2500\)\)\]\)/);
 
 console.log('Member welcome: personalized routes, assigned learning progress, access gating and motion fallback passed');
