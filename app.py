@@ -36,6 +36,7 @@ TOOL_PAGES = {
     "/tools/notebook-presenter": "notebook-presenter.html",
     "/tools/change-analyzer": "change-analyzer.html",
     "/tools/dashboard-creator": "dashboard-creator.html",
+    "/tools/presenter-5-step-flow": "presenter-5-step-flow.html",
 }
 TOOL_KEYS = {path: path.rsplit("/", 1)[-1] for path in TOOL_PAGES}
 TOOL_KEYS = {path: path.rsplit("/", 1)[-1] for path in TOOL_PAGES}
