@@ -1300,6 +1300,17 @@ def _admin_feedback(requesting_user):
     )
 
 
+def _admin_talentedge_assessments(requesting_user):
+    if not _is_timeline_admin(requesting_user):
+        raise PermissionError("Only the KestrelIQ administrator can review TalentEdge assessments.")
+    if not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is required to review TalentEdge assessments.")
+    return _supabase_table_request(
+        "talentedge_assessments", "GET", "?select=*&order=updated_at.desc&limit=500",
+        access_token=SUPABASE_SERVICE_ROLE_KEY, api_key=SUPABASE_SERVICE_ROLE_KEY,
+    )
+
+
 def _normalize_tool_access(value):
     valid = set(TOOL_KEYS.values())
     return sorted({str(item or "").strip() for item in (value if isinstance(value, list) else []) if str(item or "").strip() in valid})
@@ -5077,6 +5088,15 @@ class Handler(BaseHTTPRequestHandler):
                 _json_response(self, 403, {"error": str(exc)})
             except Exception as exc:
                 _json_response(self, 503, {"error": "Could not load feedback.", "detail": str(exc)})
+            return
+        if self.path == "/api/admin/talentedge-assessments":
+            try:
+                user = _supabase_auth_user(_bearer_token(self))
+                _json_response(self, 200, {"assessments": _admin_talentedge_assessments(user)})
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
+            except Exception as exc:
+                _json_response(self, 503, {"error": "Could not load TalentEdge assessments.", "detail": str(exc)})
             return
         if self.path == "/api/favorites":
             access_token = _bearer_token(self)

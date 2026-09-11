@@ -85,6 +85,18 @@ class JotRouteTests(unittest.TestCase):
         self.assertEqual(saved["status"], "incomplete")
         self.assertEqual(result, saved)
 
+    def test_admin_can_list_all_talentedge_results(self):
+        user = {"id": "admin-user", "email": "admin@example.com"}
+        rows = [{"id": "session-1", "candidate_name": "Candidate"}]
+        with patch.object(app, "_is_timeline_admin", return_value=True), \
+             patch.object(app, "SUPABASE_SERVICE_ROLE_KEY", "service-key"), \
+             patch.object(app, "_supabase_table_request", return_value=rows) as request:
+            result = app._admin_talentedge_assessments(user)
+
+        self.assertEqual(result, rows)
+        self.assertEqual(request.call_args.args[0], "talentedge_assessments")
+        self.assertIn("order=updated_at.desc", request.call_args.args[2])
+
 
 if __name__ == "__main__":
     unittest.main()
