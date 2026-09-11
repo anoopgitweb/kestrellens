@@ -103,3 +103,37 @@ browser code.
 - Guest watchlist settings are stored in the user's browser local storage.
 - Signed-in users can manage their account details and multiple named Supabase watchlists from their profile. Run `supabase_profiles.sql` and `supabase_watchlists.sql` once in the Supabase SQL editor before enabling these features in production.
 - The current sentiment and strategy scoring are lightweight keyword-based rules and can be upgraded later.
+
+### StatLens statistical analysis (local toolkit)
+
+Open **Tool Kit > Data & Analytics > StatLens — Statistical Analysis**.
+Administrators can enable `statlens` in the existing user tool-access list.
+The signed-in launch route starts the bundled Python app on a free loopback
+port and opens it in the toolkit tab. Repeat launches reuse that process.
+This integration is for KestrelIQ running on the same computer as the browser;
+remote launches show a local-use explanation rather than redirecting to the
+remote visitor's computer. StatLens itself remains a local, single-user tool.
+
+The app is bundled in `tools/statlens`. The launcher uses its `.venv` when
+available, otherwise the Codex bundled Python runtime, then the current Python.
+On another machine, install `tools/statlens/requirements.txt` into its virtual
+environment. PPT export also requires the Node/artifact-tool runtime described
+by the StatLens setup. Uploaded datasets stay in local process memory.
+Restart KestrelIQ after installing this integration.
+
+
+### Slide Studio PPT Maker (local toolkit)
+
+Open **Tool Kit > Presenters > Slide Studio — PPT Maker**.
+Administrators can enable `slide-studio` in the existing user tool-access list.
+The authenticated, local-only launch starts the offline Flask app on a free
+loopback port and reuses it for subsequent launches. It supports editable
+slides, statistical charts, images, themes, previews and PowerPoint export.
+The files live in `tools/slide-studio`. The launcher uses that folder's `.venv`,
+otherwise the bundled Codex Python runtime, then the current Python interpreter.
+On another machine install `tools/slide-studio/requirements.txt` into its `.venv`.
+No AI or external service is used by Slide Studio. KestrelIQ sign-in still uses
+its existing authentication. Save project files before closing KestrelIQ:
+browser autosave belongs to the app's port, which may change after a restart.
+Use Open project to transfer a project from the standalone app on port 5050.
+Restart KestrelIQ after installing this integration.

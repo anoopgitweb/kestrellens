@@ -45,10 +45,35 @@ create table if not exists public.jot_time_events (
   recorded_at timestamptz not null default now()
 );
 
+-- PS Assessments keeps each learner's page-level result separate from shared
+-- notebook content. This preserves progress when trainers edit or reassign a
+-- notebook and makes learner reporting possible without parsing note HTML.
+create table if not exists public.ps_assessments (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  topic_id uuid not null references public.note_topics(id) on delete cascade,
+  subtopic_id uuid not null references public.note_subtopics(id) on delete cascade,
+  page_key text not null check (char_length(page_key) between 1 and 120),
+  page_title text not null default '' check (char_length(page_title) <= 200),
+  rating text not null check (rating in ('confident', 'practice')),
+  score smallint not null default 0 check (score between 0 and 100),
+  review_count integer not null default 1 check (review_count > 0),
+  first_assessed_at timestamptz not null default now(),
+  last_reviewed_at timestamptz not null default now(),
+  completed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, subtopic_id, page_key)
+);
+
 create index if not exists jot_time_events_user_topic_idx
   on public.jot_time_events(user_id, topic_id, recorded_at);
 create index if not exists jot_time_events_user_subtopic_idx
   on public.jot_time_events(user_id, subtopic_id, recorded_at);
+create index if not exists ps_assessments_user_topic_idx
+  on public.ps_assessments(user_id, topic_id, last_reviewed_at desc);
+create index if not exists ps_assessments_user_subtopic_idx
+  on public.ps_assessments(user_id, subtopic_id, page_key);
 
 create index if not exists note_topics_user_order_idx
   on public.note_topics(user_id, sort_order, created_at);
@@ -61,6 +86,7 @@ alter table public.note_topics enable row level security;
 alter table public.note_subtopics enable row level security;
 alter table public.notes enable row level security;
 alter table public.jot_time_events enable row level security;
+alter table public.ps_assessments enable row level security;
 
 drop policy if exists "Users manage their note topics" on public.note_topics;
 create policy "Users manage their note topics"
@@ -134,10 +160,19 @@ create policy "Users manage their Jot Down time"
     )
   );
 
+drop policy if exists "Users manage their PS Assessments" on public.ps_assessments;
+create policy "Users manage their PS Assessments"
+  on public.ps_assessments
+  for all
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
 grant select, insert, update, delete on public.note_topics to authenticated;
 grant select, insert, update, delete on public.note_subtopics to authenticated;
 grant select, insert, update, delete on public.notes to authenticated;
 grant select, insert, delete on public.jot_time_events to authenticated;
+grant select, insert, update, delete on public.ps_assessments to authenticated;
 
 -- Private, user-scoped storage for pasted images and optional page attachments.
 -- Images are compressed to WebP; documents are limited to 5 MB by the bucket.

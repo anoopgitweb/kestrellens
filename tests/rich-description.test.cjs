@@ -11,7 +11,7 @@ function fn(name){return lines.find(l=>l.startsWith('function '+name+'(')||l.sta
     const page=await browser.newPage({viewport:{width:1000,height:850}});
     await page.setContent('<div id="jotNewPageDescription" contenteditable="true"></div><div id="jotCanvas"></div><div id="jotPlainLanguageCopy">Plain explanation</div><textarea id="jotNotesDraft">Saved notes</textarea><button id="jotPopupRead-plain"></button><button id="jotPopupRead-notes"></button><button id="jotPopupStop-plain"></button><button id="jotPopupStop-notes"></button>');
     const helpers='function bindJotImageZoom(){}function cancelJotPlainGeneration(){}\n'+html.slice(html.indexOf('let jotInlineDraftPaths'),html.indexOf('function jotCopyText()'));
-    await page.addScriptTag({content:`const $=id=>document.getElementById(id);const state={};let hydrated=0;function hydrateJotStorageImages(){hydrated++}function bindJotCardTooltips(){}function showToast(){}function updateJotPageCreatorPreview(){}function renderJotCreateState(){}async function compressJotImage(file){return file}async function uploadJotImage(){return 'private/diagram.webp'}function deleteJotStoragePaths(){}function stopJotReadAloud(){stopJotPopupSpeech()}\n${helpers}\n${fn('jotCardParts')}\n${fn('prepareJotCardItems')}\n${fn('restoreJotCardItems')}\n${fn('cleanJotHtml')}`});
+    await page.addScriptTag({content:`const $=id=>document.getElementById(id);const state={};let hydrated=0;function hydrateJotStorageImages(){hydrated++}function bindJotCardTooltips(){}function showToast(){}function updateJotPageCreatorPreview(){}function renderJotCreateState(){}async function compressJotImage(file){return file}async function uploadJotImage(){return 'private/diagram.webp'}function deleteJotStoragePaths(){}function stopJotReadAloud(){stopJotPopupSpeech()}\n${helpers}\n${fn('bindJotAttachmentLinks')}\n${fn('jotCardParts')}\n${fn('prepareJotCardItems')}\n${fn('restoreJotCardItems')}\n${fn('cleanJotHtml')}`});
     const result=await page.evaluate(async()=>{
       const clean=sanitizeJotDescription('<p onclick="evil()">Before <b>bold</b></p><img data-storage-path="private/image" src="https://example.invalid/x" onerror="evil()"><p>After</p><script>evil()</script><a href="javascript:evil()">Bad</a>');
       if(/onclick|onerror|<script|javascript:|src=/.test(clean))throw Error('Unsafe markup retained');
@@ -30,6 +30,24 @@ function fn(name){return lines.find(l=>l.startsWith('function '+name+'(')||l.sta
       if(host.children[1].tagName!=='IMG'||host.children[2].textContent!=='After')throw Error('Paste did not use cursor position');
       if(state.jotImageUploading)throw Error('Upload state stuck');
       const persisted=cleanJotHtml(host.innerHTML);if(!persisted.includes('data-storage-path="private/diagram.webp"'))throw Error('Private image path missing');
+      const previousDescription=host.innerHTML;host.replaceChildren();host.focus();
+      const pasteRange=document.createRange();pasteRange.selectNodeContents(host);window.getSelection().removeAllRanges();window.getSelection().addRange(pasteRange);
+      await pasteJotDescription({preventDefault(){},stopPropagation(){},clipboardData:{items:[],getData:type=>type==='text/html'?'<b style="color:red">Plain</b><a href="https://example.com"> link</a>':'Plain link\nSecond line'}});
+      if(host.textContent!=='Plain link\nSecond line'||host.children.length)throw Error('Paste retained formatting');
+      const colorRange=document.createRange();colorRange.selectNodeContents(host);window.getSelection().removeAllRanges();window.getSelection().addRange(colorRange);jotDescriptionColorRange=colorRange;
+      formatJotDescriptionColor('#2563eb');
+      if(!sanitizeJotDescription(host.innerHTML).includes('color:'))throw Error('Chosen color not persisted');
+      formatJotDescriptionHighlight('#806500');
+      formatJotDescription('underline');
+      const formatted=sanitizeJotDescription(host.innerHTML);
+      if(!formatted.includes('background-color:')||!(/underline|<u>/.test(formatted)))throw Error('Highlight or underline lost on save');
+      host.textContent='Animate this sentence';const animationRange=document.createRange();animationRange.selectNodeContents(host);window.getSelection().removeAllRanges();window.getSelection().addRange(animationRange);
+      toggleJotDescriptionAnimation();
+      if(!sanitizeJotDescription(host.innerHTML).includes('data-reader-animate="glow"'))throw Error('Animation not saved');
+      toggleJotDescriptionAnimation();if(host.querySelector('[data-reader-animate]'))throw Error('Animation toggle did not remove mark');
+      const blocks=sanitizeJotDescription('<h2>Heading</h2><h3>Subheading</h3><hr><blockquote>Callout</blockquote><a href="https://example.com">Link</a>');
+      for(const tag of ['h2','h3','hr','blockquote','a'])if(!blocks.includes('<'+tag))throw Error('Formatting removed: '+tag);
+      host.innerHTML=previousDescription;
       let spoken=[],cancelled=0,paused=0,resumed=0;
       Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{speak:u=>spoken.push(u),cancel:()=>cancelled++,pause:()=>paused++,resume:()=>resumed++}});
       window.SpeechSynthesisUtterance=function(text){this.text=text};
@@ -42,6 +60,14 @@ function fn(name){return lines.find(l=>l.startsWith('function '+name+'(')||l.sta
       return {clean, persisted, cancelled};
     });
     assert.ok(result.cancelled>=2);
+    await page.addScriptTag({content:`const jotImmersiveDetectedHeadings=new Map();let jotSpeechSourceText='Same Same';const jotSpeechSentences=[{start:0,text:'Same Same'}];function jotSpeechPageText(item){return item.querySelector('.jot-card-content').textContent}`});
+    await page.evaluate(()=>{
+      const item=document.createElement('li');item.innerHTML='<div class="jot-card-content">Same <span data-reader-animate="glow">Same</span></div>';
+      const scenes=document.createElement('div');scenes.innerHTML='<span class="jot-immersive-sentence" data-sentence-index="0">Same <span class="jot-key-term">Same</span></span>';
+      applyJotSelectedAnimations(item,scenes);
+      if(scenes.querySelectorAll('.jot-selected-animation').length!==1||!scenes.querySelector('.jot-key-term .jot-selected-animation'))throw Error('Wrong repeated word animated or glossary markup lost');
+      if(scenes.textContent!=='Same Same')throw Error('Animation changed narration text');
+    });
     await page.addScriptTag({content:`
       let savedContent='', removedPaths=[];
       function activeJotSubtopic(){return {id:'chapter',title:'Chapter'}}

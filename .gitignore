@@ -1,3 +1,19 @@
 __pycache__/
 *.pyc
 KESTRELIQ_LOCAL_ENV.bat
+
+# Local StatLens runtime and generated files
+statlens-integration-backup-*/
+tools/statlens/.runtime/
+tools/statlens/.venv/
+tools/statlens/.ppt-build/
+tools/statlens/.ppt-output/
+
+# Local Slide Studio runtime, backups and uploaded media
+slide-studio-integration-backup-*/
+tools/slide-studio/.packages/
+tools/slide-studio/.venv/
+assets/presenter-media/
+
+# Local Slide Studio runtime, backups and uploaded media
+tools/slide-studio/static/statistics-review.html

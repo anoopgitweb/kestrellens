@@ -5,6 +5,12 @@ const html = fs.readFileSync('templates/index.html', 'utf8');
 const scripts = [...html.matchAll(new RegExp('<script[^>]*>([\\s\\S]*?)</script>', 'gi'))];
 scripts.forEach(match => new Function(match[1]));
 
+assert.match(html, /PS Assessments/);
+assert.match(html, /\/api\/jot-down\/assessment/);
+assert.match(html, /psAssessments/);
+assert.match(html, /PS_ASSESSMENT_SYNC_KEY/);
+assert.match(html, /showPsAssessmentSyncNotice\(assessmentUserId\)/);
+assert.match(html, /PS Assessments not confirmed/);
 assert.match(html, /id="memberWelcome"/);
 assert.match(html, />Build my edge</);
 assert.match(html, />Signal Radar</);
@@ -35,6 +41,18 @@ assert.match(html, /function loadMemberDaily\(/);
 assert.match(html, /function answerMemberChallenge\(/);
 assert.match(html, /fetch\("\/api\/member-daily"/);
 assert.match(html, />Tool Kit</);
+assert.equal((html.match(/<summary>Business Tool Kit<\/summary>/g) || []).length, 2);
+for (const tool of ["I’m meeting a client", "I’m responding to an RFP"]) {
+  assert.match(html, new RegExp(`<summary>Business Tool Kit<\\/summary><div>[\\s\\S]*?>${tool}<\\/button>`));
+}
+assert.equal((html.match(/<summary>Productivity Tool Kit<\/summary>/g) || []).length, 2);
+for (const tool of ['Project Charter', 'Gantt Chart', 'Change Analyzer', 'Dashboard Creator']) {
+  assert.match(html, new RegExp(`<summary>Productivity Tool Kit<\\/summary><div>[\\s\\S]*?>${tool}<\\/button>`));
+}
+assert.match(html, /querySelectorAll\("\.toolkit-submenu:not\(\.business-toolkit\)"\)/);
+assert.match(html, /\.home-dropdown\[open\],\.toolkit-submenu\[open\]/);
+assert.match(html, /querySelectorAll\("\.toolkit-submenu>summary"\)/);
+assert.match(html, /querySelectorAll\("\.toolkit-submenu\[open\]"\)/);
 assert.match(html, />New Learning Resources</);
 assert.match(html, /id="memberRecentNotebooks"/);
 assert.match(html, /function renderMemberResourceCards\(/);
@@ -92,6 +110,9 @@ assert.match(html, /Pasted explanation image/);
 assert.match(html, /Some images were unavailable/);
 assert.match(html, /function fetchJotPastedImageSource\(/);
 assert.match(html, /fetch\("\/api\/jot-media\/import"/);
+assert.match(html, /function isJotNearWhiteBackground\(/);
+assert.match(html, /function normalizeJotPastedBackgrounds\(/);
+assert.match(html, /getContext\("2d",\{alpha:true\}\)/);
 assert.match(html, /Promise\.race\(\[downloads,new Promise\(resolve=>setTimeout\(resolve,2500\)\)\]\)/);
 
 console.log('Member welcome: personalized routes, assigned learning progress, access gating and motion fallback passed');

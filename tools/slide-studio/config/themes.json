@@ -1,0 +1,5 @@
+{
+  "ocean": {"name":"Ocean", "background":"FFFFFF", "text":"172B4D", "accent":"00859B", "muted":"7B8794", "panel":"EAF2F3"},
+  "forest": {"name":"Forest", "background":"FBFDFC", "text":"173B43", "accent":"008A8A", "muted":"73848A", "panel":"E8F2F1"},
+  "midnight": {"name":"Midnight", "background":"12171C", "text":"F4F7F8", "accent":"59C5C6", "muted":"AAB6BC", "panel":"203038"}
+}
