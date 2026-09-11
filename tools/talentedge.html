@@ -168,6 +168,17 @@ let accessRole=null,activeRecord=null;
 const resultKey='talentedge-latest-v2';
 function readRecord(key){try{return JSON.parse(localStorage.getItem(key)||'null')}catch{return null}}
 function persistRecord(){if(activeRecord){try{localStorage.setItem(resultKey,JSON.stringify(activeRecord))}catch{notify('Results could not be saved in this browser.')}}}
+function kestrelSession(){try{return JSON.parse(localStorage.getItem('kestreliqAuthSession')||'null')}catch{return null}}
+async function saveRecordToSupabase(){
+  if(!activeRecord)return null;
+  if(!activeRecord.id)activeRecord.id=crypto.randomUUID();
+  const session=kestrelSession();
+  if(!session?.access_token)throw new Error('Your KestrelIQ session has expired. Reopen TalentEdge from KestrelIQ and try again.');
+  const response=await fetch('/api/talentedge/assessment',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify(activeRecord)});
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(payload.detail||payload.error||'TalentEdge results could not be saved to Supabase.');
+  return payload.assessment;
+}
 function route(view){for(const id of ['welcome','candidateProfile','suite','setup','toolApp','assessment','results','admin','loginChoice','adminLogin','latestResults']){const el=$(id);if(el)el.hidden=id!==view}
 $('adminOpen').hidden=accessRole!=='admin';$('sessionLogout').hidden=!accessRole;window.scrollTo(0,0)}
 function addScreen(id,markup){const el=document.createElement('main');el.id=id;el.className='layout';el.hidden=true;el.innerHTML=markup;document.body.append(el)}
@@ -200,7 +211,7 @@ $('adminOpen').onclick=adminView;
 $('adminCancel').onclick=()=>{renderLatest();route('latestResults')};
 closeAdmin=()=>{renderLatest();route('latestResults')};
 $('candidateProfileForm').onsubmit=e=>{e.preventDefault();const profile={name:$('profileName').value.trim(),id:$('profileId').value.trim(),role:$('profileRole').value.trim()};if(!profile.name)return;
-activeRecord={profile,assessments:{},startedAt:new Date().toISOString()};localStorage.setItem('talentedge-candidate-profile',JSON.stringify(profile));persistRecord();showSuite()};
+activeRecord={id:crypto.randomUUID(),profile,assessments:{},startedAt:new Date().toISOString()};localStorage.setItem('talentedge-candidate-profile',JSON.stringify(profile));persistRecord();showSuite()};
 function refreshCompletion(){document.querySelectorAll('.app-card').forEach(c=>{const b=c.querySelector('button'),key=b.dataset.app||'chat',done=activeRecord?.assessments[key]?.status==='Completed';b.textContent=done?'✓ Completed':'Launch assessment →';b.disabled=done;const pill=c.querySelector('.pill');if(pill)pill.textContent=done?'✓ Completed':'Ready'})}
 showSuite=()=>{route('suite');refreshCompletion()};
 const originalLaunch=launchTool;
@@ -210,7 +221,7 @@ finishTool=()=>{if(!toolState||toolState.finished)return;originalFinish();if(act
 const originalResults=renderResults;
 renderResults=()=>{originalResults();if(activeRecord){activeRecord.assessments.chat={status:'Completed',score:state.result.score,completedAt:new Date().toISOString()};persistRecord()}};
 document.querySelectorAll('.launch-app').forEach(b=>b.onclick=()=>{if(!activeRecord){route('candidateProfile');return}activeRecord.assessments.chat={status:'In progress'};persistRecord();$('candidate').value=activeRecord.profile.name;$('candidateId').value=activeRecord.profile.id;$('candidate').closest('.field').hidden=true;route('setup')});
-logoutButton.onclick=()=>{clearInterval(toolInterval);clearInterval(interval);if(window.speechSynthesis)window.speechSynthesis.cancel();if(activeRecord){for(const a of Object.values(activeRecord.assessments))if(a.status==='In progress')a.status='Incomplete';activeRecord.endedAt=new Date().toISOString();persistRecord()}toolState=null;state=null;activeRecord=null;accessRole=null;localStorage.removeItem('talentedge-candidate-profile');route('loginChoice')};
+logoutButton.onclick=async()=>{clearInterval(toolInterval);clearInterval(interval);if(window.speechSynthesis)window.speechSynthesis.cancel();logoutButton.disabled=true;logoutButton.textContent='Saving results…';if(activeRecord){for(const a of Object.values(activeRecord.assessments))if(a.status==='In progress')a.status='Incomplete';activeRecord.endedAt=new Date().toISOString();persistRecord();try{await saveRecordToSupabase();notify('Assessment results saved successfully to Supabase.')}catch(error){notify(error.message||'Results were not saved. Please try again.');logoutButton.disabled=false;logoutButton.textContent='Log out';return}}setTimeout(()=>{toolState=null;state=null;activeRecord=null;accessRole=null;localStorage.removeItem('talentedge-candidate-profile');logoutButton.disabled=false;logoutButton.textContent='Log out';route('loginChoice')},900)};
 localStorage.removeItem('talentedge-admin-gate');
 setTimeout(()=>route('loginChoice'),2900);
 </script></body></html>

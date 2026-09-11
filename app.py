@@ -662,6 +662,59 @@ def _save_ps_assessment(payload, user, access_token):
     return rows[0] if rows else record
 
 
+def _save_talentedge_assessment(payload, user, access_token):
+    if not isinstance(payload, dict):
+        raise ValueError("TalentEdge assessment details are required.")
+    session_id = _jot_uuid(payload.get("id"), "Assessment session id")
+    profile = payload.get("profile") if isinstance(payload.get("profile"), dict) else {}
+    assessments = payload.get("assessments") if isinstance(payload.get("assessments"), dict) else {}
+    candidate_id = str(profile.get("id") or "").strip()[:120]
+    candidate_name = str(profile.get("name") or "").strip()[:160]
+    candidate_role = str(profile.get("role") or "").strip()[:160]
+    if not candidate_id or not candidate_name:
+        raise ValueError("Candidate name and candidate id are required.")
+    allowed = {"typing", "listening", "chat", "communication", "email"}
+    clean_assessments, scores = {}, []
+    for key, value in assessments.items():
+        if key not in allowed or not isinstance(value, dict):
+            continue
+        status = str(value.get("status") or "Not attempted").strip()[:40]
+        item = {"status": status}
+        try:
+            score = int(value.get("score"))
+        except (TypeError, ValueError):
+            score = None
+        if score is not None and 0 <= score <= 100:
+            item["score"] = score
+            if status.lower() == "completed":
+                scores.append(score)
+        if value.get("completedAt"):
+            item["completedAt"] = str(value.get("completedAt"))[:80]
+        clean_assessments[key] = item
+    completed_count = len(scores)
+    record = {
+        "id": session_id,
+        "user_id": str(user.get("id") or ""),
+        "candidate_id": candidate_id,
+        "candidate_name": candidate_name,
+        "candidate_role": candidate_role,
+        "assessments": clean_assessments,
+        "overall_score": round(sum(scores) / completed_count) if completed_count else None,
+        "completed_count": completed_count,
+        "status": "completed" if completed_count == len(allowed) else ("incomplete" if payload.get("endedAt") else "in_progress"),
+        "started_at": str(payload.get("startedAt") or datetime.now(timezone.utc).isoformat()),
+        "ended_at": str(payload.get("endedAt") or "") or None,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    save_token = SUPABASE_SERVICE_ROLE_KEY or access_token
+    save_key = SUPABASE_SERVICE_ROLE_KEY or None
+    rows = _supabase_table_request(
+        "talentedge_assessments", "POST", "?on_conflict=id", [record],
+        access_token=save_token, api_key=save_key,
+    )
+    return rows[0] if rows else record
+
+
 def _list_jot_time(user_id, access_token):
     encoded_user = urllib.parse.quote(str(user_id), safe="")
     events = _supabase_table_request(
@@ -5710,6 +5763,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/jot-down/subtopic/delete",
             "/api/jot-down/time",
             "/api/jot-down/assessment",
+            "/api/talentedge/assessment",
         }:
             payload = _read_json(self)
             access_token = _bearer_token(self)
@@ -5726,6 +5780,9 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 elif post_path == "/api/jot-down/assessment":
                     _json_response(self, 200, {"assessment": _save_ps_assessment(payload, user, access_token)})
+                    return
+                elif post_path == "/api/talentedge/assessment":
+                    _json_response(self, 200, {"assessment": _save_talentedge_assessment(payload, user, access_token)})
                     return
                 elif post_path == "/api/jot-down/topic/delete":
                     if not _is_timeline_admin(user):

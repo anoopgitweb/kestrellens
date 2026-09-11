@@ -63,6 +63,28 @@ class JotRouteTests(unittest.TestCase):
         list_jot_down.assert_called_once_with(user, "token")
         json_response.assert_called_once_with(handler, 200, refreshed)
 
+    def test_talentedge_logout_result_is_upserted(self):
+        user = {"id": "11111111-1111-4111-8111-111111111111"}
+        payload = {
+            "id": "55555555-5555-4555-8555-555555555555",
+            "profile": {"id": "C-100", "name": "Candidate", "role": "Advisor"},
+            "assessments": {
+                "typing": {"status": "Completed", "score": 82},
+                "email": {"status": "Completed", "score": 76},
+            },
+            "startedAt": "2026-09-11T10:00:00Z",
+            "endedAt": "2026-09-11T10:30:00Z",
+        }
+        with patch.object(app, "_supabase_table_request", return_value=[]) as request:
+            result = app._save_talentedge_assessment(payload, user, "token")
+
+        saved = request.call_args.args[3][0]
+        self.assertEqual(saved["candidate_id"], "C-100")
+        self.assertEqual(saved["completed_count"], 2)
+        self.assertEqual(saved["overall_score"], 79)
+        self.assertEqual(saved["status"], "incomplete")
+        self.assertEqual(result, saved)
+
 
 if __name__ == "__main__":
     unittest.main()
