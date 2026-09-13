@@ -35,6 +35,9 @@ class UtilityTests(unittest.TestCase):
         }
         for source, expected in samples.items():
             self.assertIn(expected, v.youtube_failure(Exception(source)))
+        diagnostic = v.youtube_failure(Exception('ERROR: extractor failed for https://youtube.test/watch?v=secret'))
+        self.assertIn('extractor failed', diagnostic)
+        self.assertNotIn('youtube.test', diagnostic)
 
     def test_permission_and_ownership(self):
         with self.assertRaises(ValueError): v.request({'action':'start','url':'https://youtu.be/abcdefghijk'}, 'one')

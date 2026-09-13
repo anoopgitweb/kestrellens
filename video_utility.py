@@ -38,7 +38,12 @@ def youtube_failure(exc):
         return 'This video is unavailable to the hosting server. It may be restricted, removed, or region-blocked.'
     if 'timed out' in lowered or 'temporary failure' in lowered:
         return 'YouTube did not respond in time. Please retry shortly.'
-    return 'YouTube could not provide this video. Try another public video or update the hosted yt-dlp dependencies.'
+    detail = re.sub(r'https?://\S+', '[video URL]', message)
+    detail = re.sub(r'(?i)\b(cookie|token|authorization|password)\s*[:=]\s*\S+', r'\1=[redacted]', detail)
+    detail = re.sub(r'\s+', ' ', detail).strip()
+    if detail.lower().startswith('error:'):
+        detail = detail[6:].strip()
+    return 'YouTube could not provide this video. Technical detail: ' + detail[:350]
 
 def youtube_url(value):
     p = urlsplit(str(value or '').strip())
