@@ -175,13 +175,13 @@ grant select, insert, delete on public.jot_time_events to authenticated;
 grant select, insert, update, delete on public.ps_assessments to authenticated;
 
 -- Private, user-scoped storage for pasted images and optional page attachments.
--- Images are compressed to WebP; documents are limited to 5 MB by the bucket.
+-- Images are compressed to WebP; the editor limits documents to 5 MB and videos to 100 MB.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'jot-down-images',
   'jot-down-images',
   false,
-  5242880,
+  104857600,
   array[
     'image/webp',
     'image/jpeg',
@@ -191,7 +191,11 @@ values (
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'text/csv',
-    'text/plain'
+    'text/plain',
+    'video/mp4',
+    'video/webm',
+    'video/quicktime',
+    'application/json'
   ]
 )
 on conflict (id) do update set

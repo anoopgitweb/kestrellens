@@ -4980,6 +4980,9 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(chunk)
                     remaining -= len(chunk)
             return
+        if urllib.parse.urlparse(self.path).path == "/assets/learning-video.js":
+            _binary_response(self, 200, (ASSET_DIR / "learning-video.js").read_bytes(), "text/javascript; charset=utf-8")
+            return
         if self.path.startswith("/assets/"):
             asset = ASSET_DIR / Path(urllib.parse.urlparse(self.path).path).name
             if asset.exists() and asset.is_file() and asset.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}:
@@ -5518,6 +5521,24 @@ class Handler(BaseHTTPRequestHandler):
                 _json_response(self, 200, result)
             except (RuntimeError, ValueError, urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 _json_response(self, 502, {"error": _plain_explanation_error_message(exc)})
+            return
+        if post_path == "/api/discover-learn/transcript":
+            try:
+                from video_transcription import request_transcript
+                token = _bearer_token(self)
+                user = _supabase_auth_user(token)
+                _assert_notebook_access(user, token)
+                if int(self.headers.get("Content-Length", "0")) > 4096:
+                    raise ValueError("Transcription request is too large.")
+                payload = _read_json(self)
+                result = request_transcript(payload, user["id"], token, SUPABASE_URL, SUPABASE_ANON_KEY, OPENAI_API_KEY)
+                _json_response(self, 200, result)
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except Exception:
+                _json_response(self, 503, {"error": "Transcription is unavailable. Check your connection and private storage setup."})
             return
         if post_path in {"/api/discover-learn/openai", "/api/discover-learn/notebook"}:
             payload = _read_json(self)
