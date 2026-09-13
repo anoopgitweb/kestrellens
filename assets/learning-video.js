@@ -1,22 +1,6 @@
 /* Uploaded notebook videos and private saved transcripts. */
 (() => {
-  const types={mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime'};
   const isVideo=a=>Boolean(a&&/\.(mp4|webm|mov)$/i.test(a.name||a.path||''));
-  const field=document.createElement('div');
-  field.className='jot-page-video-field';
-  field.innerHTML='<label>Upload videos <input type="file" multiple accept=".mp4,.webm,.mov" aria-label="Upload videos"></label><small>MP4, WebM or MOV. Up to 100 MB and 30 minutes each. Save the page, then open a video to transcribe it.</small>';
-  $('jotNewPageVideoUrl').closest('label').after(field);
-  field.querySelector('input').onchange=async event=>{
-    const input=event.target,files=Array.from(input.files||[]);
-    if(state.jotAttachmentUploading||state.jotCreatingPage)return;
-    state.jotAttachmentUploading=true;input.disabled=true;renderJotCreateState();
-    try{for(const file of files){
-      const ext=file.name.split('.').pop().toLowerCase();
-      if(!types[ext]||file.size>100*1024*1024){showToast('Video skipped',file.name+': use MP4, WebM or MOV up to 100 MB.');continue;}
-      try{const path=await uploadJotAsset(file,ext,types[ext]);state.jotPageCreatorAttachment=[...jotCreatorAttachments(),{path,name:file.name,type:types[ext],size:file.size,existing:false}];showToast('Video uploaded',file.name);}
-      catch(error){showToast('Video upload failed',error.message);}
-    }}finally{input.disabled=false;input.value='';state.jotAttachmentUploading=false;renderJotCreateState();updateJotPageCreatorPreview();}
-  };
   const style=document.createElement('style');
   style.textContent=`#jotUploadedVideo{margin:auto;border:1px solid #2ca69b;border-radius:16px;background:#032c35;color:#e5f8f6;width:min(1100px,94vw);max-height:92dvh;padding:20px;box-sizing:border-box;overflow:auto}#jotUploadedVideo::backdrop{background:#00171dde}#jotUploadedVideo header,#jotUploadedVideo .video-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}#jotUploadedVideo h2{font-size:18px;flex:1;margin:0;overflow-wrap:anywhere}#jotUploadedVideo button,#jotUploadedVideo select{background:#08464c;color:#effffd;border:1px solid #268d88;border-radius:8px;padding:8px 12px}#jotUploadedVideo button:disabled{opacity:.45}#jotUploadedVideo video{display:block;width:100%;max-height:48dvh;background:#00191e}#jotUploadedVideo .transcript-copy{white-space:pre-wrap;line-height:1.7;max-height:30vh;overflow:auto;padding:14px;background:#05212b}#jotUploadedVideo .transcript-copy button{display:block;text-align:left;width:100%;margin-bottom:8px}#jotUploadedVideosBtn[hidden]{display:none!important}`;
   document.head.append(style);

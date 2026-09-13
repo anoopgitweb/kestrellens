@@ -17,8 +17,8 @@ const {chromium}=require('playwright');
   assert.equal(download.suggestedFilename(),'Lesson.srt');
   await page.locator('[data-close]').click();
   assert.equal(await page.locator('#jotUploadedVideo').isVisible(),false);
-  await page.locator('input[type=file]').setInputFiles({name:'second.mp4',mimeType:'video/mp4',buffer:Buffer.from('video')});
-  assert.equal(await page.evaluate(()=>state.jotPageCreatorAttachment[0].name),'second.mp4');
-  console.log('Video upload, saved transcript, SRT download, toolbar and dialog checks passed.');
+  assert.equal(await page.locator('input[type=file]').count(),0);
+  assert.equal(await page.getByText('Upload videos',{exact:true}).count(),0);
+  console.log('Saved transcript, SRT download, legacy video toolbar and removed upload control checks passed.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
