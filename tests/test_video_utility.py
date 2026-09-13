@@ -82,4 +82,33 @@ class UtilityTests(unittest.TestCase):
             self.assertEqual(content.count("openToolKitPage('/tools/video-utility')"),2)
         finally: server.shutdown();server.server_close()
 
+    def test_hosted_requests_keep_auth_and_file_ownership(self):
+        import http.client
+        server = app.ThreadingHTTPServer(('127.0.0.1',0),app.Handler)
+        threading.Thread(target=server.serve_forever,daemon=True).start()
+        token = app._tool_launch_token('web-owner','video-utility',int(time.time())+600)
+        other = app._tool_launch_token('other-user','video-utility',int(time.time())+600)
+        def call(path, payload=None):
+            conn = http.client.HTTPConnection('127.0.0.1',server.server_port)
+            conn.request('POST' if payload is not None else 'GET', path,
+                         json.dumps(payload) if payload is not None else None,
+                         {'Host':'kestreliq.example','Content-Type':'application/json'})
+            res=conn.getresponse(); result=(res.status,res.read());conn.close();return result
+        try:
+            self.assertEqual(call('/api/video-utility',{'action':'dependencies','launch':token})[0],200)
+            for invalid in ['', 'forged', app._tool_launch_token('web-owner','video-utility',1), app._tool_launch_token('web-owner','statlens',int(time.time())+600)]:
+                self.assertEqual(call('/api/video-utility',{'action':'dependencies','launch':invalid})[0],403)
+            with patch.object(v,'metadata',return_value={'title':'Hosted sample','duration':60,'heights':[720]}):
+                self.assertEqual(call('/api/video-utility',{'action':'validate','launch':token,'url':'https://youtu.be/abcdefghijk','rights':True})[0],200)
+            with tempfile.TemporaryDirectory() as directory:
+                folder=Path(directory);(folder/'transcript.txt').write_text('Hosted transcript')
+                v.JOBS['hosted']={'owner':'web-owner','folder':folder,'status':'complete','job_id':'hosted'}
+                try:
+                    url='/api/video-utility/file?job_id=hosted&name=transcript.txt&launch='
+                    self.assertEqual(call(url+token),(200,b'Hosted transcript'))
+                    self.assertEqual(call(url+other)[0],404)
+                    self.assertEqual(call('/api/video-utility',{'action':'status','launch':other,'job_id':'hosted'})[0],400)
+                finally: del v.JOBS['hosted']
+        finally: server.shutdown();server.server_close()
+
 if __name__ == '__main__': unittest.main()

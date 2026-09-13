@@ -4878,9 +4878,6 @@ class Handler(BaseHTTPRequestHandler):
         return True
 
     def _video_utility_owner(self, launch):
-        host = urllib.parse.urlsplit('http://' + self.headers.get('Host', '')).hostname
-        if not ipaddress.ip_address(self.client_address[0]).is_loopback or host not in {'localhost', '127.0.0.1', '::1'}:
-            raise PermissionError('Open KestrelIQ locally to process videos on this computer.')
         owner = _tool_launch_user(launch, 'video-utility')
         if not owner:
             raise PermissionError('Session expired. Reopen Video & Transcript Utility from the Tool Kit.')

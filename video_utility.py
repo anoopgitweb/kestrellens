@@ -1,4 +1,4 @@
-"""Local Video & Transcript Utility, isolated from notebook transcription."""
+"""Video processing on the KestrelIQ server, isolated from notebook transcription."""
 import importlib.util
 import re
 import shutil
@@ -117,14 +117,14 @@ def run(job_id, url, quality, transcribe, model):
         update(media=target.name)
         sources[0].unlink()
         if transcribe:
-            update(message='Loading local speech model (first use downloads the model)')
+            update(message='Loading speech model on the server (first use downloads the model)')
             from faster_whisper import WhisperModel
             engine = WhisperModel(model, device='cpu', compute_type='int8')
             stream, details = engine.transcribe(str(target), beam_size=5)
             segments = []
             for s in stream:
                 segments.append({'start': s.start, 'end': s.end, 'text': s.text.strip()})
-                update(message='Transcribing locally', percent=min(99, round(s.end / info['duration'] * 100)))
+                update(message='Transcribing on the server', percent=min(99, round(s.end / info['duration'] * 100)))
             if not any(s['text'] for s in segments):
                 raise ValueError('No speech was detected. Your media download is still available.')
             for kind in ('txt', 'srt', 'vtt'):
