@@ -105,6 +105,7 @@ from statlens_launcher import launch as launch_statlens
 from slide_studio_launcher import launch as launch_slide_studio
 
 TOOL_PAGES = {
+    "/tools/mp4-transcriber": "mp4-transcriber.html",
     "/tools/video-utility": "video-utility.html",
     "/tools/slide-studio": "slide-studio/templates/index.html",
     "/tools/statlens": "statlens/frontend/index.html",
@@ -4883,6 +4884,12 @@ class Handler(BaseHTTPRequestHandler):
             raise PermissionError('Session expired. Reopen Video & Transcript Utility from the Tool Kit.')
         return owner
 
+    def _mp4_transcriber_owner(self, launch):
+        owner = _tool_launch_user(launch, 'mp4-transcriber')
+        if not owner:
+            raise PermissionError('Session expired. Reopen MP4 Transcriber from the Tool Kit.')
+        return owner
+
     def do_OPTIONS(self):
         _json_response(self, 200, {"ok": True})
 
@@ -4890,6 +4897,18 @@ class Handler(BaseHTTPRequestHandler):
         if self._redirect_numeric_localhost():
             return
         request_path = urllib.parse.urlparse(self.path).path
+        if request_path == '/api/mp4-transcriber/file':
+            try:
+                query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                owner = self._mp4_transcriber_owner((query.get('launch') or [''])[0])
+                from mp4_transcriber import artifact
+                path = artifact((query.get('job_id') or [''])[0], owner, (query.get('name') or [''])[0])
+                _binary_response(self, 200, path.read_bytes(), 'application/octet-stream', path.name)
+            except PermissionError as exc:
+                _json_response(self, 403, {'error': str(exc)})
+            except ValueError as exc:
+                _json_response(self, 404, {'error': str(exc)})
+            return
         if request_path == '/api/video-utility/file':
             try:
                 query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -5240,6 +5259,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         post_path = self.path.split("?", 1)[0].rstrip("/")
+        if post_path == '/api/mp4-transcriber/upload':
+            try:
+                query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                owner = self._mp4_transcriber_owner((query.get('launch') or [''])[0])
+                length = int(self.headers.get('Content-Length') or 0)
+                from mp4_transcriber import start_upload
+                _json_response(self, 202, start_upload(self.rfile, length, owner, (query.get('model') or ['base'])[0]))
+            except PermissionError as exc:
+                _json_response(self, 403, {'error': str(exc)})
+            except ValueError as exc:
+                _json_response(self, 400, {'error': str(exc)})
+            except Exception:
+                _json_response(self, 503, {'error': 'The MP4 upload could not start. Check server storage and transcription dependencies.'})
+            return
         if post_path == "/api/presenter-media":
             query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             launch = (query.get("launch") or [""])[0]
@@ -5306,6 +5339,20 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:
                 _json_response(self, 503, {"error": _plain_explanation_error_message(exc), "detail": str(exc)})
             return
+        if post_path == '/api/mp4-transcriber':
+            try:
+                payload = _read_json(self)
+                owner = self._mp4_transcriber_owner(payload.get('launch'))
+                from mp4_transcriber import dependencies, status
+                result = dependencies() if payload.get('action') == 'dependencies' else status(payload.get('job_id'), owner) if payload.get('action') == 'status' else None
+                if result is None:
+                    raise ValueError('Unknown action.')
+                _json_response(self, 200, result)
+            except PermissionError as exc:
+                _json_response(self, 403, {'error': str(exc)})
+            except ValueError as exc:
+                _json_response(self, 400, {'error': str(exc)})
+            return
         if post_path == '/api/video-utility':
             try:
                 if int(self.headers.get('Content-Length', '0')) > 8192:
@@ -5332,7 +5379,7 @@ class Handler(BaseHTTPRequestHandler):
                 profile = _profile_for_user(user, access_token)
                 if not (_is_timeline_admin(user) or tool_key in _normalize_tool_access(profile.get("tool_access"))):
                     raise PermissionError("Ask the administrator to enable this toolkit app for you.")
-                launch_lifetime = 8 * 60 * 60 if tool_key in {"presenter-5-step-flow", "video-utility"} else 30 * 60 if tool_key == "five-minute-consultant" else 90
+                launch_lifetime = 8 * 60 * 60 if tool_key in {"presenter-5-step-flow", "video-utility", "mp4-transcriber"} else 30 * 60 if tool_key == "five-minute-consultant" else 90
                 expires = int(time.time()) + launch_lifetime
                 _json_response(self, 200, {"url": f"/tools/{tool_key}?launch={urllib.parse.quote(_tool_launch_token(user['id'], tool_key, expires))}"})
             except ValueError as exc:
