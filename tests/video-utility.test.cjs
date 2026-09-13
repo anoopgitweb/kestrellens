@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const {chromium}=require('playwright');
+(async()=>{const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
+try{const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.route('http://kestrel.test/**',route=>{const req=route.request();if(req.method()==='GET')return route.fulfill({contentType:'text/html',body:fs.readFileSync('C:/KestrelIQ/tools/video-utility.html','utf8')});const d=req.postDataJSON();let data;if(d.action==='dependencies')data={yt_dlp:true,ffmpeg:true,faster_whisper:true};else if(!d.rights&&d.action==='validate')return route.fulfill({status:400,json:{error:'Confirm rights'}});else if(d.action==='validate')data={title:'Sample speech',uploader:'Test',duration:60,heights:[480,720]};else if(d.action==='start')data={job_id:'test',status:'processing'};else data={job_id:'test',status:'complete',message:'Ready to download',media:'media.mp4',segments:[{start:0,end:1,text:'Hello world'}]};return route.fulfill({json:data});});
+await page.goto('http://kestrel.test/tools/video-utility?launch=test');assert.equal(await page.locator('#start').isEnabled(),false);
+await page.locator('#url').fill('https://youtu.be/abcdefghijk');await page.locator('#validate').click();await page.getByText('Confirm rights',{exact:true}).waitFor();
+await page.locator('#rights').check();await page.locator('#validate').click();await page.waitForFunction(()=>!document.getElementById('start').disabled);
+await page.locator('#start').click();await page.getByText('Hello world',{exact:true}).waitFor();assert.equal(await page.locator('.download').count(),4);
+await page.locator('#url').fill('https://youtu.be/anotherabcd');assert.equal(await page.locator('#start').isEnabled(),false);assert.deepEqual(errors,[]);
+await page.screenshot({path:'video-utility-preview.png',fullPage:true});console.log('Browser rights gate, validation, processing, preview and four export links passed.');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1});

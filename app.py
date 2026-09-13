@@ -105,6 +105,7 @@ from statlens_launcher import launch as launch_statlens
 from slide_studio_launcher import launch as launch_slide_studio
 
 TOOL_PAGES = {
+    "/tools/video-utility": "video-utility.html",
     "/tools/slide-studio": "slide-studio/templates/index.html",
     "/tools/statlens": "statlens/frontend/index.html",
     "/tools/project-charter": "project-charter.html",
@@ -4876,6 +4877,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         return True
 
+    def _video_utility_owner(self, launch):
+        host = urllib.parse.urlsplit('http://' + self.headers.get('Host', '')).hostname
+        if not ipaddress.ip_address(self.client_address[0]).is_loopback or host not in {'localhost', '127.0.0.1', '::1'}:
+            raise PermissionError('Open KestrelIQ locally to process videos on this computer.')
+        owner = _tool_launch_user(launch, 'video-utility')
+        if not owner:
+            raise PermissionError('Session expired. Reopen Video & Transcript Utility from the Tool Kit.')
+        return owner
+
     def do_OPTIONS(self):
         _json_response(self, 200, {"ok": True})
 
@@ -4883,6 +4893,28 @@ class Handler(BaseHTTPRequestHandler):
         if self._redirect_numeric_localhost():
             return
         request_path = urllib.parse.urlparse(self.path).path
+        if request_path == '/api/video-utility/file':
+            try:
+                query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                owner = self._video_utility_owner((query.get('launch') or [''])[0])
+                from video_utility import artifact
+                path = artifact((query.get('job_id') or [''])[0], owner, (query.get('name') or [''])[0])
+                with path.open('rb') as stream:
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/octet-stream')
+                    self.send_header('Content-Disposition', 'attachment; filename="' + path.name + '"')
+                    self.send_header('Content-Length', str(path.stat().st_size))
+                    self.send_header('Cache-Control', 'no-store')
+                    self.end_headers()
+                    while chunk := stream.read(1024 * 1024):
+                        self.wfile.write(chunk)
+            except PermissionError as exc:
+                _json_response(self, 403, {'error': str(exc)})
+            except ValueError as exc:
+                _json_response(self, 404, {'error': str(exc)})
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            return
         if request_path in {"/", "/index.html"}:
             if not INDEX_FILE.exists():
                 _html_response(self, 500, "templates/index.html is missing.")
@@ -5277,6 +5309,21 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:
                 _json_response(self, 503, {"error": _plain_explanation_error_message(exc), "detail": str(exc)})
             return
+        if post_path == '/api/video-utility':
+            try:
+                if int(self.headers.get('Content-Length', '0')) > 8192:
+                    raise ValueError('Request is too large.')
+                payload = _read_json(self)
+                owner = self._video_utility_owner(payload.get('launch'))
+                from video_utility import request
+                _json_response(self, 200, request(payload, owner))
+            except PermissionError as exc:
+                _json_response(self, 403, {'error': str(exc)})
+            except ValueError as exc:
+                _json_response(self, 400, {'error': str(exc)})
+            except Exception:
+                _json_response(self, 503, {'error': 'Could not process this video. Check dependencies, connection and video availability.'})
+            return
         if post_path == "/api/tool-launch":
             try:
                 access_token = _bearer_token(self)
@@ -5288,7 +5335,7 @@ class Handler(BaseHTTPRequestHandler):
                 profile = _profile_for_user(user, access_token)
                 if not (_is_timeline_admin(user) or tool_key in _normalize_tool_access(profile.get("tool_access"))):
                     raise PermissionError("Ask the administrator to enable this toolkit app for you.")
-                launch_lifetime = 8 * 60 * 60 if tool_key == "presenter-5-step-flow" else 30 * 60 if tool_key == "five-minute-consultant" else 90
+                launch_lifetime = 8 * 60 * 60 if tool_key in {"presenter-5-step-flow", "video-utility"} else 30 * 60 if tool_key == "five-minute-consultant" else 90
                 expires = int(time.time()) + launch_lifetime
                 _json_response(self, 200, {"url": f"/tools/{tool_key}?launch={urllib.parse.quote(_tool_launch_token(user['id'], tool_key, expires))}"})
             except ValueError as exc:
