@@ -16,10 +16,22 @@ LOCK = threading.RLock()
 JOBS = {}
 QUALITIES = {'Best', '1080p', '720p', '480p', 'audio-only'}
 
-def youtube_options(**extra):
+def javascript_runtimes():
     runtimes = {name: {} for name in ('deno', 'node', 'bun', 'quickjs') if shutil.which(name)}
+    try:
+        import deno
+        bundled = str(deno.find_deno_bin())
+        if Path(bundled).is_file():
+            runtimes['deno'] = {'path': bundled}
+    except (ImportError, OSError, RuntimeError):
+        pass
+    return runtimes
+
+def youtube_options(**extra):
+    runtimes = javascript_runtimes()
     return {'quiet': True, 'no_warnings': True, 'noplaylist': True, 'socket_timeout': 30,
-            'retries': 2, 'js_runtimes': runtimes, 'remote_components': ['ejs:github'], **extra}
+            'retries': 2, 'js_runtimes': runtimes, 'remote_components': ['ejs:github'],
+            'extractor_args': {'youtube': {'player_client': ['default', 'tv', 'web_embedded']}}, **extra}
 
 def youtube_failure(exc):
     message = re.sub(r'\x1b\[[0-9;]*m', '', str(exc))
@@ -76,7 +88,7 @@ def dependencies():
         ready = True
     except ValueError:
         ready = False
-    return {'yt_dlp': bool(importlib.util.find_spec('yt_dlp')), 'javascript': any(shutil.which(name) for name in ('deno', 'node', 'bun', 'quickjs')), 'ffmpeg': ready,
+    return {'yt_dlp': bool(importlib.util.find_spec('yt_dlp')), 'javascript': bool(javascript_runtimes()), 'ffmpeg': ready,
             'faster_whisper': bool(importlib.util.find_spec('faster_whisper'))}
 
 def metadata(url):

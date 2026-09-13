@@ -45,6 +45,12 @@ class UtilityTests(unittest.TestCase):
         self.assertTrue(status['javascript'])
         self.assertTrue(status['ffmpeg'])
 
+    def test_bundled_deno_path_is_given_to_ytdlp(self):
+        options = v.youtube_options()
+        self.assertIn('deno', options['js_runtimes'])
+        self.assertTrue(options['js_runtimes']['deno'].get('path'))
+        self.assertIn('tv', options['extractor_args']['youtube']['player_client'])
+
     def test_permission_and_ownership(self):
         with self.assertRaises(ValueError): v.request({'action':'start','url':'https://youtu.be/abcdefghijk'}, 'one')
         with self.assertRaises(ValueError): v.artifact('missing','one','../secret')
