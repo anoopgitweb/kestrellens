@@ -16,6 +16,30 @@ LOCK = threading.RLock()
 JOBS = {}
 QUALITIES = {'Best', '1080p', '720p', '480p', 'audio-only'}
 
+def youtube_options(**extra):
+    runtimes = {name: {} for name in ('deno', 'node', 'bun', 'quickjs') if shutil.which(name)}
+    return {'quiet': True, 'no_warnings': True, 'noplaylist': True, 'socket_timeout': 30,
+            'retries': 2, 'js_runtimes': runtimes, 'remote_components': ['ejs:github'], **extra}
+
+def youtube_failure(exc):
+    message = re.sub(r'\x1b\[[0-9;]*m', '', str(exc))
+    lowered = message.lower()
+    if 'sign in to confirm' in lowered or 'not a bot' in lowered:
+        return 'YouTube blocked this hosting server from accessing the video. Try another public video or process it locally.'
+    if 'private video' in lowered or 'members-only' in lowered:
+        return 'This video is private or members-only and cannot be processed.'
+    if 'age' in lowered and ('restrict' in lowered or 'confirm' in lowered):
+        return 'This video is age-restricted and cannot be processed without a YouTube sign-in.'
+    if 'javascript runtime' in lowered or 'challenge' in lowered or 'signature' in lowered:
+        return 'The server needs a supported JavaScript runtime for this YouTube video. Check the hosting build and redeploy.'
+    if 'requested format' in lowered:
+        return 'The selected quality is unavailable. Try Best or a lower resolution.'
+    if 'video unavailable' in lowered or 'not available' in lowered:
+        return 'This video is unavailable to the hosting server. It may be restricted, removed, or region-blocked.'
+    if 'timed out' in lowered or 'temporary failure' in lowered:
+        return 'YouTube did not respond in time. Please retry shortly.'
+    return 'YouTube could not provide this video. Try another public video or update the hosted yt-dlp dependencies.'
+
 def youtube_url(value):
     p = urlsplit(str(value or '').strip())
     if p.scheme not in {'https', 'http'} or p.username or p.password or p.port:
@@ -55,8 +79,11 @@ def metadata(url):
         import yt_dlp
     except ImportError:
         raise ValueError('yt-dlp is missing. Install requirements-video.txt and restart KestrelIQ.')
-    with yt_dlp.YoutubeDL({'quiet': True, 'noplaylist': True, 'socket_timeout': 20, 'retries': 1}) as downloader:
-        info = downloader.extract_info(youtube_url(url), download=False)
+    try:
+        with yt_dlp.YoutubeDL(youtube_options()) as downloader:
+            info = downloader.extract_info(youtube_url(url), download=False)
+    except yt_dlp.utils.DownloadError as exc:
+        raise ValueError(youtube_failure(exc)) from exc
     if not info or info.get('_type') == 'playlist' or info.get('is_live') or info.get('live_status') == 'is_upcoming':
         raise ValueError('Choose a published video; playlists and ongoing live streams are unsupported.')
     if not info.get('duration') or info['duration'] > 7200:
@@ -100,11 +127,14 @@ def run(job_id, url, quality, transcribe, model):
                 if data.get('downloaded_bytes', 0) > 2 * 1024**3:
                     raise ValueError('This download exceeds the 2 GB limit.')
                 update(message='Downloading media', percent=round(100 * data.get('downloaded_bytes', 0) / total) if total else None)
-        options = {'format': fmt, 'outtmpl': str(folder / 'source.%(ext)s'), 'noplaylist': True,
-                   'quiet': True, 'ffmpeg_location': executable, 'merge_output_format': 'mkv',
-                   'socket_timeout': 30, 'retries': 2, 'max_filesize': 2 * 1024**3, 'progress_hooks': [progress]}
-        with yt_dlp.YoutubeDL(options) as downloader:
-            downloader.download([url])
+        options = youtube_options(format=fmt, outtmpl=str(folder / 'source.%(ext)s'),
+                                  ffmpeg_location=executable, merge_output_format='mkv',
+                                  max_filesize=2 * 1024**3, progress_hooks=[progress])
+        try:
+            with yt_dlp.YoutubeDL(options) as downloader:
+                downloader.download([url])
+        except yt_dlp.utils.DownloadError as exc:
+            raise ValueError(youtube_failure(exc)) from exc
         sources = [p for p in folder.glob('source.*') if p.suffix not in {'.part', '.ytdl'}]
         if len(sources) != 1:
             raise ValueError('The download was incomplete or too large. Try a lower quality.')

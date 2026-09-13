@@ -26,6 +26,16 @@ class UtilityTests(unittest.TestCase):
         self.assertTrue(v.export(segments, 'vtt').startswith('WEBVTT\n'))
         self.assertEqual(v.export(segments, 'txt'), 'Hello world\n')
 
+    def test_youtube_errors_are_actionable(self):
+        samples = {
+            'Sign in to confirm you are not a bot': 'blocked this hosting server',
+            'Private video': 'private or members-only',
+            'No supported JavaScript runtime': 'JavaScript runtime',
+            'Requested format is not available': 'selected quality',
+        }
+        for source, expected in samples.items():
+            self.assertIn(expected, v.youtube_failure(Exception(source)))
+
     def test_permission_and_ownership(self):
         with self.assertRaises(ValueError): v.request({'action':'start','url':'https://youtu.be/abcdefghijk'}, 'one')
         with self.assertRaises(ValueError): v.artifact('missing','one','../secret')
