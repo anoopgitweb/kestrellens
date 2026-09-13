@@ -76,7 +76,7 @@ def dependencies():
         ready = True
     except ValueError:
         ready = False
-    return {'yt_dlp': bool(importlib.util.find_spec('yt_dlp')), 'ffmpeg': ready,
+    return {'yt_dlp': bool(importlib.util.find_spec('yt_dlp')), 'javascript': any(shutil.which(name) for name in ('deno', 'node', 'bun', 'quickjs')), 'ffmpeg': ready,
             'faster_whisper': bool(importlib.util.find_spec('faster_whisper'))}
 
 def metadata(url):
@@ -191,8 +191,8 @@ def request(payload, owner):
     if quality not in QUALITIES or model not in {'tiny', 'base', 'small'}:
         raise ValueError('Choose a supported quality and speech model.')
     deps = dependencies()
-    if not deps['yt_dlp'] or not deps['ffmpeg'] or (payload.get('transcribe') and not deps['faster_whisper']):
-        raise ValueError('Install requirements-video.txt, then restart KestrelIQ. Transcription requires faster-whisper.')
+    if not deps['yt_dlp'] or not deps['javascript'] or not deps['ffmpeg'] or (payload.get('transcribe') and not deps['faster_whisper']):
+        raise ValueError('Install requirements-video.txt, including Deno, then restart KestrelIQ. Transcription requires faster-whisper.')
     with LOCK:
         for key, job in list(JOBS.items()):
             if job['status'] != 'processing' and time.time() - job['created'] > 86400:

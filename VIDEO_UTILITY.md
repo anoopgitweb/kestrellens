@@ -1,7 +1,7 @@
 # Video & Transcript Utility
 
 Install with `python -m pip install -r requirements.txt`, then restart `python app.py`. The main requirements now include the download and transcription dependencies for hosted deployments. `requirements-video.txt` remains available for adding only the video dependencies to a local installation.
-Use Python 3.11 or newer. FFmpeg is found on PATH or supplied by imageio-ffmpeg.
+Use Python 3.11 or newer. FFmpeg is found on PATH or supplied by imageio-ffmpeg. The Python dependencies install a Deno executable so yt-dlp can solve current YouTube player challenges on Python-only hosting.
 faster-whisper runs on CPU using int8. The first use of each model downloads its weights; subsequent runs use the local cache. No transcription API key is required.
 
 Open Tool Kit > Productivity Tool Kit > Video & Transcript Utility on the hosted site or locally. Administrators can enable `video-utility` in the existing account tool-access controls. Both versions require the existing signed toolkit launch session (eight hours). Status and file downloads are restricted to the user who started the job.

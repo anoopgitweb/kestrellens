@@ -39,6 +39,12 @@ class UtilityTests(unittest.TestCase):
         self.assertIn('extractor failed', diagnostic)
         self.assertNotIn('youtube.test', diagnostic)
 
+    def test_dependencies_report_javascript_runtime(self):
+        with patch.object(v.shutil, 'which', side_effect=lambda name: '/bin/deno' if name == 'deno' else '/bin/ffmpeg' if name == 'ffmpeg' else None):
+            status = v.dependencies()
+        self.assertTrue(status['javascript'])
+        self.assertTrue(status['ffmpeg'])
+
     def test_permission_and_ownership(self):
         with self.assertRaises(ValueError): v.request({'action':'start','url':'https://youtu.be/abcdefghijk'}, 'one')
         with self.assertRaises(ValueError): v.artifact('missing','one','../secret')

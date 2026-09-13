@@ -2,4 +2,5 @@ google-api-python-client>=2.0,<3
 google-auth>=2.0,<3
 imageio-ffmpeg>=0.6,<0.7
 yt-dlp[default,curl-cffi]>=2025.1,<2027
+deno>=2.6,<3
 faster-whisper>=1.1,<2
