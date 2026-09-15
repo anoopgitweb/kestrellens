@@ -11,25 +11,27 @@
   let videos=[],current=null,transcript=null,objectUrl='',version=0,pollTimer;
   const close=()=>{version++;clearTimeout(pollTimer);media.pause();media.removeAttribute('src');media.load();if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl='';dialog.close();};
   dialog.querySelector('[data-close]').onclick=close;dialog.oncancel=e=>{e.preventDefault();close();};
-  function collect(item){return Array.from(item?.querySelectorAll('a[data-storage-path][data-attachment-name]')||[]).map(a=>({path:a.dataset.storagePath,name:a.dataset.attachmentName,type:a.dataset.attachmentType})).filter(isVideo);}
-  async function api(action,jobId,path){await ensureFreshSession();const response=await fetch('/api/discover-learn/transcript',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({action,job_id:jobId,path})});const result=await response.json();if(!response.ok)throw Error(result.error||'Transcription unavailable');return result;}
+  function collect(item){const list=Array.from(item?.querySelectorAll('a[data-storage-path][data-attachment-name]')||[]).map(a=>({path:a.dataset.storagePath,name:a.dataset.attachmentName,type:a.dataset.attachmentType})).filter(isVideo);const link=item?.querySelector('[data-video-url]');if(link?.dataset.videoUrl)list.push({youtube_url:link.dataset.videoUrl,name:'YouTube video'});return list;}
+  async function api(action,jobId,video){await ensureFreshSession();const body={action,job_id:jobId};if(video.youtube_url)body.youtube_url=video.youtube_url;else body.path=video.path;const response=await fetch('/api/discover-learn/transcript',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify(body)});const result=await response.json();if(!response.ok)throw Error(result.error||'Transcription unavailable');return result;}
   function renderTranscript(value){transcript=value;copy.replaceChildren();for(const key of ['txt','srt','pdf'])dialog.querySelector('[data-'+key+']').disabled=!value;transcribe.disabled=Boolean(value);transcribe.textContent=value?'Transcript saved':'Transcribe video';if(!value)return;status.textContent='Transcript saved in your private storage.';if(value.segments?.length){for(const segment of value.segments){const button=document.createElement('button');button.type='button';button.textContent=stamp(segment.start)+'  '+segment.text;button.onclick=()=>{media.currentTime=segment.start;media.play().catch(()=>{});};copy.append(button);}}else copy.textContent=value.text;}
-  async function track(action='read',jobId,request=version,path=current.path){
-    try{const result=await api(action,jobId,path);if(request!==version)return;
+  async function track(action='read',jobId,request=version,video=current){
+    try{const result=await api(action,jobId,video);if(request!==version)return;
       status.textContent=result.message||'Ready to transcribe.';
       if(result.status==='complete'){renderTranscript(result.transcript);return;}
       transcribe.disabled=result.status==='processing';
-      if(result.status==='processing')pollTimer=setTimeout(()=>track('status',result.job_id,request,path),2500);
+      if(result.status==='processing')pollTimer=setTimeout(()=>track('status',result.job_id,request,video),2500);
       else if(result.status==='failed'){status.textContent=result.message;transcribe.disabled=false;}
     }catch(error){if(request===version){status.textContent=error.message;transcribe.disabled=false;}}
   }
-  async function load(index){const request=++version;clearTimeout(pollTimer);current=videos[index];renderTranscript(null);media.pause();media.removeAttribute('src');media.load();if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl='';status.textContent='Loading video...';dialog.querySelector('h2').textContent=current.name;const path=current.path;
-    track('read',null,request,path);
+  async function load(index){const request=++version;clearTimeout(pollTimer);current=videos[index];renderTranscript(null);media.pause();media.removeAttribute('src');media.load();if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl='';status.textContent='Loading video...';dialog.querySelector('h2').textContent=current.name;
+    track('read',null,request,current);
+    if(current.youtube_url){status.textContent='YouTube link selected. The transcript can be generated here.';return;}
+    const path=current.path;
     try{await ensureFreshSession();const cfg=await loadAuthConfig(),response=await fetch(`${cfg.supabaseUrl}/storage/v1/object/${JOT_IMAGE_BUCKET}/${jotStoragePathUrl(path)}`,{headers:{apikey:cfg.supabaseAnonKey,Authorization:`Bearer ${state.session.access_token}`}});if(!response.ok)throw Error('Video could not be loaded.');const blob=await response.blob();if(request!==version)return;objectUrl=URL.createObjectURL(blob);media.src=objectUrl;}
     catch(error){if(request===version)status.textContent=error.message;}
   }
   function open(list,index=0){videos=list;if(!videos.length)return;select.replaceChildren();videos.forEach((v,i)=>{const o=document.createElement('option');o.value=i;o.textContent=v.name;select.append(o);});select.value=index;select.hidden=videos.length<2;(document.fullscreenElement||document.body).append(dialog);if(!dialog.open)dialog.showModal();load(index);}
-  select.onchange=()=>load(Number(select.value));transcribe.onclick=()=>{transcribe.disabled=true;status.textContent='Starting transcription...';track('start');};
+  select.onchange=()=>load(Number(select.value));transcribe.onclick=()=>{transcribe.disabled=true;status.textContent='Starting transcription...';track('start',null,version,current);};
   function stamp(seconds,srt=false){const ms=Math.max(0,Math.round(Number(seconds||0)*1000));return [Math.floor(ms/3600000),Math.floor(ms/60000)%60,Math.floor(ms/1000)%60].map(n=>String(n).padStart(2,'0')).join(':')+(srt?','+String(ms%1000).padStart(3,'0'):'');}
   function download(format){if(!transcript)return;const text=format==='srt'?(transcript.segments||[]).map((s,i)=>`${i+1}\n${stamp(s.start,true)} --> ${stamp(s.end,true)}\n${s.text}\n`).join('\n'):transcript.text;const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=current.name.replace(/\.[^.]+$/,'')+'.'+format;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   dialog.querySelector('[data-txt]').onclick=()=>download('txt');dialog.querySelector('[data-srt]').onclick=()=>download('srt');

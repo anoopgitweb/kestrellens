@@ -8,7 +8,7 @@
 
 ## Use
 
-Create or edit a Discover & Learn page, select **Upload videos**, and save. Open its **Video** button or video attachment, then select **Transcribe video**. The original video stays in private storage; only extracted audio is sent to OpenAI. YouTube links are not transcribed.
+Create or edit a Discover & Learn page, enter a YouTube video link, and save. Open the video and select **Transcribe video**. The YouTube audio is processed on the server; only extracted audio is sent to OpenAI.
 
 Supports MP4, WebM and MOV up to 100 MB / 30 minutes each. Playback depends on browser codec support. The backend extracts mono audio and transcribes it in ten-minute chunks using `whisper-1`, retaining segment timestamps.
 

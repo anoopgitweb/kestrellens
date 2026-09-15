@@ -9,6 +9,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+import hashlib
 import wave
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -30,6 +31,19 @@ def validate_path(path, user_id):
         raise ValueError('Choose an uploaded MP4, WebM or MOV video.')
     uuid.UUID(parts[2].rsplit('.', 1)[0])
     return str(path)
+
+def validate_youtube_url(value):
+    parsed=urllib.parse.urlparse(str(value or '').strip())
+    if parsed.scheme not in {'http','https'} or parsed.hostname not in {'youtube.com','www.youtube.com','m.youtube.com','youtu.be','www.youtu.be'}:
+        raise ValueError('Enter a valid YouTube watch or youtu.be link.')
+    if parsed.hostname.endswith('youtu.be') and parsed.path.strip('/'):
+        return str(value).strip()
+    if parsed.path in {'/watch','/shorts','/live','/embed'} and (urllib.parse.parse_qs(parsed.query).get('v') or parsed.path!='/watch'):
+        return str(value).strip()
+    raise ValueError('Enter a valid YouTube watch or youtu.be link.')
+
+def youtube_cache_path(url,user_id):
+    return f"{user_id}/youtube-{hashlib.sha256(url.encode()).hexdigest()[:40]}.transcript.json"
 
 
 def storage(url, key, token, path, data=None):
@@ -57,18 +71,26 @@ def transcribe_audio(audio, api_key):
         return json.load(response)
 
 
-def run_job(job_id, url, key, token, path, api_key):
+def run_job(job_id, url, key, token, path, api_key, cache_path=None):
     def update(**values):
         with LOCK:
             JOBS[job_id].update(values)
     try:
         import imageio_ffmpeg
-        update(message='Downloading video')
-        video = storage(url, key, token, path)
         with tempfile.TemporaryDirectory(prefix='kestrel-transcript-') as folder:
-            source, audio = Path(folder)/('video.'+path.rsplit('.', 1)[1]), Path(folder)/'audio.wav'
-            source.write_bytes(video)
-            del video
+            audio = Path(folder)/'audio.wav'
+            if path.startswith('youtube:'):
+                import yt_dlp
+                update(message='Preparing YouTube audio')
+                video_url=path[8:]
+                options={'format':'bestaudio/best','outtmpl':str(Path(folder)/'source.%(ext)s'),'quiet':True,'noplaylist':True,'max_filesize':MAX_VIDEO_BYTES}
+                with yt_dlp.YoutubeDL(options) as downloader: downloader.download([video_url])
+                source=next(Path(folder).glob('source.*'))
+            else:
+                update(message='Downloading video')
+                video = storage(url, key, token, path)
+                source, audio = Path(folder)/('video.'+path.rsplit('.', 1)[1]), Path(folder)/'audio.wav'
+                source.write_bytes(video); del video
             update(message='Extracting audio')
             process = subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), '-nostdin', '-v', 'error',
                 '-protocol_whitelist', 'file,pipe', '-i', str(source), '-vn', '-t', str(MAX_SECONDS+1),
@@ -98,7 +120,7 @@ def run_job(job_id, url, key, token, path, api_key):
             if not transcript['text']:
                 raise ValueError('No speech was detected in this video.')
             update(message='Saving transcript')
-            storage(url, key, token, path+'.transcript.json', json.dumps(transcript).encode())
+            storage(url, key, token, cache_path or path+'.transcript.json', json.dumps(transcript).encode())
             update(status='complete', message='Transcript saved', transcript=transcript)
     except Exception as exc:
         message = str(exc) if isinstance(exc, ValueError) else 'Transcription could not complete. Check the server transcription and storage configuration, then retry.'
@@ -106,7 +128,13 @@ def run_job(job_id, url, key, token, path, api_key):
 
 
 def request_transcript(payload, user_id, token, url, key, api_key):
-    path = validate_path(payload.get('path'), user_id)
+    youtube_url=payload.get('youtube_url')
+    if youtube_url:
+        youtube_url=validate_youtube_url(youtube_url)
+        path='youtube:'+youtube_url
+        cache_path=youtube_cache_path(youtube_url,user_id)
+    else:
+        path = validate_path(payload.get('path'), user_id); cache_path=path+'.transcript.json'
     if payload.get('job_id'):
         with LOCK:
             job = JOBS.get(str(payload['job_id']))
@@ -114,7 +142,7 @@ def request_transcript(payload, user_id, token, url, key, api_key):
                 raise ValueError('Transcription job expired. Reopen the video to load a saved transcript or retry.')
             return {k:v for k,v in job.items() if k not in {'user_id', 'path', 'created'}}
     try:
-        transcript = json.loads(storage(url, key, token, path+'.transcript.json'))
+        transcript = json.loads(storage(url, key, token, cache_path))
         return {'status': 'complete', 'transcript': transcript, 'message': 'Saved transcript'}
     except urllib.error.HTTPError as exc:
         if exc.code not in (400, 404):
@@ -136,5 +164,5 @@ def request_transcript(payload, user_id, token, url, key, api_key):
             raise ValueError('Hourly transcription limit reached. Please try again later.')
         job_id = uuid.uuid4().hex
         JOBS[job_id] = {'job_id':job_id,'user_id':user_id,'path':path,'created':time.time(),'status':'processing','message':'Preparing video'}
-        POOL.submit(run_job, job_id, url, key, token, path, api_key)
+        POOL.submit(run_job, job_id, url, key, token, path, api_key, cache_path)
     return {'status':'processing','job_id':job_id,'message':'Preparing video'}
