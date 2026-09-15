@@ -97,6 +97,14 @@ class JotRouteTests(unittest.TestCase):
         self.assertEqual(request.call_args.args[0], "talentedge_assessments")
         self.assertIn("order=updated_at.desc", request.call_args.args[2])
 
+    def test_candidate_history_is_scoped_to_signed_in_user(self):
+        user = {"id": "11111111-1111-4111-8111-111111111111"}
+        with patch.object(app, "_supabase_table_request", return_value=[]) as request:
+            app._list_talentedge_assessments(user, "token")
+
+        self.assertIn("user_id=eq.11111111-1111-4111-8111-111111111111", request.call_args.args[2])
+        self.assertIn("order=updated_at.desc", request.call_args.args[2])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,7 +12,7 @@ assert.match(html, /id="editVideo2File"[^>]+type="file"/);
 assert.match(html, /id="editDocument3File"[^>]+type="file"/);
 assert.match(html, /id="editPpt3File"[^>]+type="file"/);
 assert.match(html, /id="editLive3Url"[^>]+type="url"/);
-assert.match(html, /Up to 2 videos/);
+assert.match(html, /Up to 3 videos/);
 assert.match(html, /Reference Docs \(PDF\)/);
 assert.match(html, /Reference Docs \(PPT\)/);
 assert.match(html, /Up to 3 PDFs/);

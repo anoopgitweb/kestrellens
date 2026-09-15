@@ -1,0 +1,50 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const html = fs.readFileSync(path.join(__dirname, "..", "tools", "presenter-5-step-flow.html"), "utf8");
+const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(match => match[1]);
+
+scripts.forEach(source => new Function(source));
+
+assert.match(html, /id="presenterTour"[^>]+aria-modal="true"[^>]+hidden/);
+assert.match(html, /id="presenterTourSkip"[^>]*>Skip tour<\/button>/);
+assert.match(html, /id="presenterTourBack"/);
+assert.match(html, /id="presenterTourNext"/);
+assert.match(html, /id="presenterTourHelper"/);
+assert.match(html, /id="presenterTourCompletion"/);
+assert.match(html, /The stage is all yours/);
+assert.match(html, /Happy exploring!/);
+assert.match(html, /#voiceLauncher\{display:none!important\}/);
+assert.match(html, /#fullscreenBtn\{display:inline-grid!important/);
+assert.match(html, /aria-label="Open guided tour"[^>]*>🤖<\/button>/);
+assert.match(html, /Welcome to your CX journey/);
+assert.match(html, /welcome-step/);
+assert.match(html, /function endPresenterTour\(skipped=false\)/);
+assert.match(html, /helper\.classList\.add\("visible"\)/);
+assert.match(html, /function revealPresenterTourHelper\(\)/);
+assert.match(html, /setTimeout\(\(\)=>\{completion\.hidden=true;revealPresenterTourHelper\(\)\},1900\)/);
+assert.match(html, /const presenterTourSteps=\[/);
+assert.match(html, /function startPresenterTour\(\)/);
+assert.match(html, /function endPresenterTour\(skipped=false\)/);
+assert.match(html, /#journey \.cap-card/);
+assert.match(html, /#showcaseScreen \.ecosystem-icons/);
+assert.match(html, /id="presenterTourResourcePreview"/);
+assert.match(html, /resourceLabels/);
+assert.match(html, /PDFs & presentations/);
+assert.match(html, /#modalImpact/);
+assert.match(html, /docs-summary-btn/);
+assert.match(html, /videos-summary-btn/);
+assert.match(html, /links-summary-btn/);
+assert.match(html, /function openPresenterTourExample\(\)/);
+assert.match(html, /function closePresenterTourExample\(\)/);
+assert.match(html, /function selectPresenterTourMenu\(className\)/);
+assert.match(html, /scrollIntoView\(\{behavior:"smooth",block:"center",inline:"center"\}\)/);
+assert.match(html, /setTimeout\(positionPresenterTour,720\)/);
+assert.match(html, /setMode\("presenter"\);startPresenterTour\(\)/);
+assert.doesNotMatch(html, /setMode\("presenter"\);openVision\(\)/);
+assert.match(html, /e\.key==="Escape"/);
+assert.match(html, /e\.key==="ArrowRight"/);
+assert.match(html, /prefers-reduced-motion:reduce/);
+
+console.log("Presenter guided tour checks passed.");

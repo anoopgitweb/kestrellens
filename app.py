@@ -1313,6 +1313,17 @@ def _admin_talentedge_assessments(requesting_user):
     )
 
 
+def _list_talentedge_assessments(user, access_token):
+    user_id = urllib.parse.quote(str(user.get("id") or ""), safe="")
+    request_token = SUPABASE_SERVICE_ROLE_KEY or access_token
+    request_key = SUPABASE_SERVICE_ROLE_KEY or None
+    return _supabase_table_request(
+        "talentedge_assessments", "GET",
+        f"?user_id=eq.{user_id}&select=*&order=updated_at.desc&limit=100",
+        access_token=request_token, api_key=request_key,
+    )
+
+
 def _normalize_tool_access(value):
     valid = set(TOOL_KEYS.values())
     return sorted({str(item or "").strip() for item in (value if isinstance(value, list) else []) if str(item or "").strip() in valid})
@@ -5148,6 +5159,16 @@ class Handler(BaseHTTPRequestHandler):
                 _json_response(self, 403, {"error": str(exc)})
             except Exception as exc:
                 _json_response(self, 503, {"error": "Could not load TalentEdge assessments.", "detail": str(exc)})
+            return
+        if self.path == "/api/talentedge/assessments":
+            access_token = _bearer_token(self)
+            try:
+                user = _supabase_auth_user(access_token)
+                _json_response(self, 200, {"assessments": _list_talentedge_assessments(user, access_token)})
+            except PermissionError as exc:
+                _json_response(self, 401, {"error": str(exc)})
+            except Exception as exc:
+                _json_response(self, 503, {"error": "Could not load your TalentEdge assessments.", "detail": str(exc)})
             return
         if self.path == "/api/favorites":
             access_token = _bearer_token(self)

@@ -45,6 +45,16 @@ if not exist "%KESTRELIQ_PYTHON%" if "%KESTRELIQ_PYTHON%"=="C:\Users\manju\.cach
 echo Closing stale KestrelIQ servers on port 8787...
 for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":8787 .*LISTENING"') do taskkill /PID %%P /F >nul 2>nul
 
+set "MAYA_JOURNEY_HOME=C:\Users\manju\.codex\.chatgpt-projects\g-p-6aa51f27b96881919371b9e9d04cbb0b\maya-journey"
+set "MAYA_JOURNEY_PYTHON=%MAYA_JOURNEY_HOME%\.venv\Scripts\python.exe"
+if not exist "%MAYA_JOURNEY_PYTHON%" goto :missing_maya
+
+echo Closing stale Maya Journey servers on port 8000...
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":8000 .*LISTENING"') do taskkill /PID %%P /F >nul 2>nul
+
+echo Starting Maya Journey...
+start "Maya Journey Server" /min /D "%MAYA_JOURNEY_HOME%" "%MAYA_JOURNEY_PYTHON%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+
 echo Starting KestrelIQ...
 start "KestrelIQ Local Server" /D "%~dp0" "%KESTRELIQ_PYTHON%" app.py
 timeout /t 2 /nobreak >nul
@@ -60,5 +70,13 @@ exit /b 1
 :missing_python
 echo.
 echo Python was not found. Open KestrelIQ in Codex once so its bundled runtime is available.
+pause
+exit /b 1
+
+:missing_maya
+echo.
+echo Maya Journey is not installed at:
+echo %MAYA_JOURNEY_HOME%
+echo Open its README.md and complete the one-time installation.
 pause
 exit /b 1
