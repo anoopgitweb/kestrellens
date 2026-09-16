@@ -1,0 +1,2 @@
+.audio-control{border-color:#2b5662!important;color:#a9c5cc!important}.audio-control.active{border-color:#28bdb2!important;background:#0d4a4b!important;color:#74e9df!important}.audio-control.active:before{content:'';display:inline-block;width:5px;height:5px;margin-right:6px;border-radius:50%;background:#62e6da;box-shadow:0 0 9px #62e6da}@media(max-width:900px){.audio-control{font-size:8px;padding:8px}}
+ .audio-control:disabled{opacity:.65;cursor:wait}.audio-control.active#openai-voice{border-color:#49e6d5;color:#9ffaf0;box-shadow:0 0 18px #21cfc455}
