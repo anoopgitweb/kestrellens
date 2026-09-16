@@ -26,6 +26,7 @@ const chapters=[
     text:"Before I left, I had one more question. I preferred to speak in Japanese.\n\nThere was no transfer, no interruption, and no waiting. I simply started speaking in Japanese. It felt completely seamless—I understood everything clearly, and the conversation continued naturally.\n\nI spoke in the language I was most comfortable with and got exactly the information I wanted.",
     line:"I didn't adapt to the technology. The technology adapted to me—and the conversation simply continued.",
     action:"Choose a language",
+    sync:["preferred to speak in Japanese","started speaking in Japanese","completely seamless","understood everything clearly","got exactly the information I wanted"],
     dialog:{title:"Choose Maya's language",copy:"Maya speaks naturally while the agent continues in English. Meaning moves between them in real time.",options:["日本語 · Japanese","हिन्दी · Hindi","Español · Spanish","Français · French","Deutsch · German"],results:["こんにちは。プリンターについてもう一つ質問があります。 ↔ Hello. I have one more question about my printer.","नमस्ते। मेरे प्रिंटर के बारे में एक और सवाल है। ↔ Hello. I have one more question about my printer.","Hola. Tengo otra pregunta sobre mi impresora. ↔ Hello. I have one more question about my printer.","Bonjour. J'ai une autre question sur mon imprimante. ↔ Hello. I have one more question about my printer.","Hallo. Ich habe noch eine Frage zu meinem Drucker. ↔ Hello. I have one more question about my printer."]}
   },
   {
@@ -46,10 +47,11 @@ const chapters=[
     line:"My journey felt simple, personal, and connected from beginning to end.",
     action:"Explore the experiences",
     replicas:[["01","iXHello"],["02","iXHero"],["03","Language Translation Tools"],["04","Agentic AI"]],
+    sync:["moment I asked for help","everything was resolved","another customer","beginning to end"],
     dialog:{title:"A repeatable path to scale",copy:"Take a proven customer outcome and make it reusable across accounts, processes and markets.",options:["Discover","Prove","Replicate","Scale"],results:["Find the moments where customer effort and operational friction meet.","Validate the experience with real users, controls and measurable outcomes.","Package the workflow, integrations, guardrails and learning.","Deploy the proven pattern across teams, accounts and markets."]}
   }
 ];
-let active=0,voiceEnabled=true,musicEnabled=true,musicVolume=.85,autoAdvance=false,autoAdvanceTimer=null,speechRun=0,introActive=true,introSpeechStarted=false;
+let active=0,voiceEnabled=true,musicEnabled=true,musicVolume=.85,autoAdvance=false,autoAdvanceTimer=null,speechRun=0,introActive=true,introSpeechStarted=false,revealTimers=[];
 let musicContext=null,musicMaster=null,musicTimer=null,musicStep=0;
 
 function esc(value){return String(value).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]))}
@@ -123,18 +125,27 @@ function revealFeatures(syncToSpeech=false){
   items.forEach((item,index)=>{item.classList.add("reveal-item");item.classList.remove("revealed");item.style.setProperty("--reveal-delay",syncToSpeech?"0s":`${.35+index*1.35}s`)});
   if(!syncToSpeech)requestAnimationFrame(()=>requestAnimationFrame(()=>canvas.classList.add("revealing")));
 }
+function clearRevealTimers(){revealTimers.forEach(clearTimeout);revealTimers=[]}
+function revealAtSpeechCues(spokenText,cues,utterance){
+  const items=[...document.querySelectorAll("#visualCanvas .reveal-item")],offsets=cues.map(phrase=>spokenText.indexOf(phrase));
+  const revealThrough=charIndex=>items.forEach((item,index)=>{if(offsets[index]>=0&&charIndex>=offsets[index])item.classList.add("revealed")});
+  utterance.onboundary=event=>revealThrough(event.charIndex);
+  const estimatedDuration=Math.max(3500,spokenText.length/15.5*1000);
+  offsets.forEach((offset,index)=>{if(offset<0)return;const delay=Math.max(180,offset/spokenText.length*estimatedDuration);revealTimers.push(setTimeout(()=>items[index]?.classList.add("revealed"),delay))});
+}
 function speak(){
-  if(introActive||!voiceEnabled||!("speechSynthesis" in window))return;
+  if(introActive)return;
+  if(!voiceEnabled||!("speechSynthesis" in window)){revealFeatures(false);return}
   const run=++speechRun,chapterIndex=active;
   speechSynthesis.cancel();
   const chapter=chapters[active],spokenText=`${chapter.text} ${chapter.line}`;revealFeatures(!!chapter.sync);
   const utterance=new SpeechSynthesisUtterance(spokenText);
   utterance.voice=mayaVoice();
-  if(chapter.sync){const offsets=chapter.sync.map(phrase=>spokenText.indexOf(phrase));utterance.onboundary=event=>{document.querySelectorAll("#visualCanvas .reveal-item").forEach((item,index)=>{if(offsets[index]>=0&&event.charIndex>=offsets[index])item.classList.add("revealed")})}}
-  utterance.rate=1.12;utterance.pitch=1.02;utterance.onend=()=>{if(run===speechRun)stopMusic();document.querySelectorAll(".reveal-item").forEach(item=>{item.style.opacity="1";item.style.transform="none"});if(run===speechRun&&chapterIndex===active&&autoAdvance){clearTimeout(autoAdvanceTimer);autoAdvanceTimer=setTimeout(()=>transitionToNextScene(),1100)}};utterance.onerror=()=>{if(run===speechRun)stopMusic()};startMusic();speechSynthesis.speak(utterance);
+  clearRevealTimers();if(chapter.sync)revealAtSpeechCues(spokenText,chapter.sync,utterance);
+  utterance.rate=1.12;utterance.pitch=1.02;utterance.onend=()=>{clearRevealTimers();if(run===speechRun)stopMusic();document.querySelectorAll(".reveal-item").forEach(item=>{item.style.opacity="1";item.style.transform="none"});if(run===speechRun&&chapterIndex===active&&autoAdvance){clearTimeout(autoAdvanceTimer);autoAdvanceTimer=setTimeout(()=>transitionToNextScene(),1100)}};utterance.onerror=()=>{clearRevealTimers();if(run===speechRun)stopMusic()};startMusic();speechSynthesis.speak(utterance);
 }
 function showChapter(index,{speakNow=true}={}){
-  clearTimeout(autoAdvanceTimer);speechRun++;
+  clearTimeout(autoAdvanceTimer);clearRevealTimers();speechRun++;
   active=Math.max(0,Math.min(chapters.length-1,index));const chapter=chapters[active];
   document.body.dataset.chapter=String(active+1);
   document.documentElement.style.setProperty("--accent",chapter.accent);
@@ -152,7 +163,7 @@ function transitionToNextScene(){
   setTimeout(()=>{stage.classList.remove("scene-leaving");if(active===chapters.length-1){renderFinale();return}showChapter(active+1);stage.classList.add("scene-entering");setTimeout(()=>stage.classList.remove("scene-entering"),620)},460);
 }
 function openExperience(index=active){
-  speechRun++;speechSynthesis?.cancel();stopMusic();
+  speechRun++;clearRevealTimers();speechSynthesis?.cancel();stopMusic();
   const chapter=chapters[index],dialog=chapter.dialog;
   document.documentElement.style.setProperty("--accent",chapter.accent);
   $("dialogContent").innerHTML=`<div class="dialog-body"><span>${String(index+1).padStart(2,"0")} · ${chapter.name}</span><h2>${dialog.title}</h2><p>${dialog.copy}</p><div class="try-panel"><h3>Choose an action</h3><div class="try-options">${dialog.options.map((option,i)=>`<button data-result="${i}">${option}</button>`).join("")}</div><div class="try-result">Select an option to begin.</div></div></div>`;
@@ -167,11 +178,13 @@ function speakFinale(){
   const finaleText="Now you know my journey, and you have seen how each experience helped make it simple, personal, and connected. But you do not have to experience it only through my story. Here at the Tech Experience Center, you can try these capabilities for yourself, in real time. Start at Kiosk One and speak with the I X Hello Voice Bot. At Kiosk Two, experience a clearer, more helpful conversation. At Kiosk Three, communicate naturally in the language you prefer. At Kiosk Four, give AI a goal and watch it coordinate the work. And at Kiosk Five, see how a successful experience can reach another customer. Please explore the kiosks, try the technology, and imagine what an effortless experience could feel like for your customers. I hope you enjoy it as much as I did.";
   const kioskOffsets=["Kiosk One","Kiosk Two","Kiosk Three","Kiosk Four","Kiosk Five"].map(phrase=>finaleText.indexOf(phrase));
   const highlightKiosk=index=>document.querySelectorAll(".experience-tile").forEach((card,cardIndex)=>card.classList.toggle("speaking",cardIndex===index));
-  const utterance=new SpeechSynthesisUtterance(finaleText);
-  utterance.voice=mayaVoice();utterance.rate=1.08;utterance.pitch=1.02;utterance.onboundary=event=>{let current=-1;kioskOffsets.forEach((offset,index)=>{if(event.charIndex>=offset)current=index});if(current>=0)highlightKiosk(current)};utterance.onend=()=>{stopMusic();highlightKiosk(-1)};utterance.onerror=()=>{stopMusic();highlightKiosk(-1)};startMusic();speechSynthesis.speak(utterance);
+  const utterance=new SpeechSynthesisUtterance(finaleText),highlightAt=charIndex=>{let current=-1;kioskOffsets.forEach((offset,index)=>{if(charIndex>=offset)current=index});if(current>=0)highlightKiosk(current)};
+  utterance.voice=mayaVoice();utterance.rate=1.08;utterance.pitch=1.02;utterance.onboundary=event=>highlightAt(event.charIndex);
+  clearRevealTimers();const estimatedDuration=Math.max(3500,finaleText.length/15*1000);kioskOffsets.forEach((offset,index)=>{revealTimers.push(setTimeout(()=>highlightKiosk(index),Math.max(180,offset/finaleText.length*estimatedDuration)))});
+  utterance.onend=()=>{clearRevealTimers();stopMusic();highlightKiosk(-1)};utterance.onerror=()=>{clearRevealTimers();stopMusic();highlightKiosk(-1)};startMusic();speechSynthesis.speak(utterance);
 }
 function renderFinale(){
-  clearTimeout(autoAdvanceTimer);speechRun++;speechSynthesis?.cancel();stopMusic();$("finale").hidden=false;
+  clearTimeout(autoAdvanceTimer);clearRevealTimers();speechRun++;speechSynthesis?.cancel();stopMusic();$("finale").hidden=false;
   const kioskActivities=[
     "Talk to the I X Hello Voice Bot and try the printer-support self-service journey.",
     "Experience noise removal, accent clarity and real-time knowledge during a live conversation.",
