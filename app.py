@@ -4948,6 +4948,36 @@ class Handler(BaseHTTPRequestHandler):
                 return
             _html_response(self, 200, INDEX_FILE.read_text(encoding="utf-8"))
             return
+        if request_path.rstrip("/") == "/tools/maya-journey":
+            launch = (urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("launch") or [""])[0]
+            if not _valid_tool_launch(launch, "presenter-5-step-flow"):
+                _html_response(self, 401, "<h1>Authentication required</h1><p>Open Maya’s Journey from the Presenter.</p>")
+                return
+            journey_file = TOOL_DIR / "maya-journey" / "embedded.html"
+            if not journey_file.exists():
+                _html_response(self, 404, "Maya’s Journey is missing.")
+                return
+            _html_response(self, 200, journey_file.read_text(encoding="utf-8"))
+            return
+        if request_path.startswith("/tools/maya-journey/static/"):
+            static_root = (TOOL_DIR / "maya-journey" / "static").resolve()
+            relative_name = urllib.parse.unquote(request_path.removeprefix("/tools/maya-journey/static/"))
+            asset_file = (static_root / relative_name).resolve()
+            if static_root not in asset_file.parents or not asset_file.is_file():
+                _json_response(self, 404, {"error": "Maya Journey asset not found"})
+                return
+            content_types = {
+                ".css": "text/css; charset=utf-8",
+                ".js": "text/javascript; charset=utf-8",
+                ".png": "image/png",
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".svg": "image/svg+xml",
+                ".webp": "image/webp",
+            }
+            content_type = content_types.get(asset_file.suffix.lower(), "application/octet-stream")
+            _binary_response(self, 200, asset_file.read_bytes(), content_type)
+            return
         tool_path = request_path.rstrip("/")
         if tool_path in TOOL_PAGES:
             launch = (urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("launch") or [""])[0]
