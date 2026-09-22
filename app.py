@@ -110,6 +110,7 @@ TOOL_PAGES = {
     "/tools/slide-studio": "slide-studio/templates/index.html",
     "/tools/statlens": "statlens/frontend/index.html",
     "/tools/bleu-calculator": "bleu-calculator.html",
+    "/tools/textforge": "textforge.html",
     "/tools/project-charter": "project-charter.html",
     "/tools/gantt-chart": "gantt-chart.html",
     "/tools/notebook-presenter": "notebook-presenter.html",

@@ -121,6 +121,13 @@ can enable `bleu-calculator` in the existing user tool-access list. The BLEU-4
 calculation and its n-gram explanation run in the browser. Translation and
 AI-estimated semantic metrics use the server-side `OPENAI_API_KEY`.
 
+### TextForge text and data studio
+
+Open **Tool Kit > Productivity Tool Kit > TextForge — Text & Data Studio**.
+Administrators can enable `textforge` in the existing user tool-access list.
+TextForge provides browser-based formatting, conversion, preview, parsing, and
+analysis tools for HTML, CSV, Excel, JSON, Markdown, XML, YAML, SQL, URLs, and text.
+
 The app is bundled in `tools/statlens`. The launcher uses its `.venv` when
 available, otherwise the Codex bundled Python runtime, then the current Python.
 On another machine, install `tools/statlens/requirements.txt` into its virtual

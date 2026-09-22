@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TextForge — Text &amp; Data Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<style>
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+
+    --paper: #FAF9F6;
+    --ink: #1D1B18;
+    --ink-soft: #55524C;
+    --line: #DEDAD1;
+    --panel: #FFFFFF;
+    --moss: #3E6259;
+    --moss-dim: #E7EEEB;
+    --clay: #B5502E;
+    --clay-dim: #F5E4DD;
+    --mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+    --serif: 'Fraunces', Georgia, serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14161A;
+      --ink: #EDEAE2;
+      --ink-soft: #A5A199;
+      --line: #2C2F35;
+      --panel: #1B1E23;
+      --moss: #7FA89B;
+      --moss-dim: #22322D;
+      --clay: #D98863;
+      --clay-dim: #362320;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14161A;
+    --ink: #EDEAE2;
+    --ink-soft: #A5A199;
+    --line: #2C2F35;
+    --panel: #1B1E23;
+    --moss: #7FA89B;
+    --moss-dim: #22322D;
+    --clay: #D98863;
+    --clay-dim: #362320;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .frame {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+  }
+
+  header.top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+  }
+  header.top h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 28px;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  header.top p {
+    margin: 4px 0 0;
+    color: var(--ink-soft);
+    font-size: 13px;
+  }
+
+  nav.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 20px;
+  }
+  nav.tabs button {
+    appearance: none;
+    background: none;
+    border: none;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ink-soft);
+    padding: 10px 16px 12px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color .15s ease, border-color .15s ease;
+  }
+  nav.tabs button:hover { color: var(--ink); }
+  nav.tabs button.active {
+    color: var(--moss);
+    border-bottom-color: var(--moss);
+    font-weight: 600;
+  }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  button.action {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    padding: 7px 13px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  button.action:hover { border-color: var(--moss); }
+  button.action.primary {
+    background: var(--moss);
+    border-color: var(--moss);
+    color: var(--paper);
+  }
+  button.action.primary:hover { opacity: .9; }
+
+  label.action.file-btn {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  select.action {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    padding: 7px 13px;
+    border-radius: 6px;
+  }
+
+  .status {
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    display: none;
+  }
+  .status.show { display: inline-block; }
+  .status.ok { background: var(--moss-dim); color: var(--moss); }
+  .status.err { background: var(--clay-dim); color: var(--clay); }
+
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 680px) {
+    .split { grid-template-columns: 1fr; }
+  }
+
+  .field-label {
+    font-size: 11px;
+    text-transform: none;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  textarea, .rendered {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 12px;
+    resize: vertical;
+    min-height: 320px;
+    line-height: 1.5;
+  }
+  textarea:focus { outline: 2px solid var(--moss); outline-offset: 1px; }
+
+  .rendered {
+    overflow-y: auto;
+    font-family: var(--serif);
+    font-size: 15px;
+  }
+  .rendered h1, .rendered h2, .rendered h3 { font-family: var(--serif); line-height: 1.25; }
+  .rendered code { font-family: var(--mono); background: var(--moss-dim); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  .rendered pre { background: var(--moss-dim); padding: 10px; border-radius: 6px; overflow-x: auto; }
+  .rendered pre code { background: none; padding: 0; }
+  .rendered blockquote { border-left: 3px solid var(--moss); margin: 0; padding-left: 12px; color: var(--ink-soft); }
+  .rendered table { border-collapse: collapse; width: 100%; }
+  .rendered th, .rendered td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; }
+
+  .case-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .case-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: border-color .15s ease;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .case-card:hover { border-color: var(--moss); }
+  .case-card .k { font-size: 11px; color: var(--ink-soft); flex: 0 0 130px; }
+  .case-card .v {
+    font-size: 13px;
+    word-break: break-all;
+    white-space: pre-wrap;
+    flex: 1;
+  }
+  .case-card .copied { color: var(--moss); }
+
+  .hint { color: var(--ink-soft); font-size: 12px; margin-top: 8px; }
+
+  /* Tree view */
+  #json-output-wrap { position: relative; }
+  .tree-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    min-height: 320px;
+    max-height: 500px;
+    overflow-y: auto;
+  }
+  .tree-controls {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+  }
+  button.tree-mini {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: none;
+    color: var(--ink-soft);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 9px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  button.tree-mini:hover { border-color: var(--moss); color: var(--moss); }
+  .tree-body { padding: 10px 8px; font-size: 13px; }
+
+  .tnode { }
+  .trow {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    cursor: default;
+    white-space: pre;
+  }
+  .trow.has-children { cursor: pointer; }
+  .trow.has-children:hover { background: var(--moss-dim); }
+  .tcaret {
+    display: inline-block;
+    width: 12px;
+    color: var(--moss);
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+  .tkey { color: var(--ink-soft); }
+  .tsep { color: var(--ink-soft); }
+  .tval { color: var(--ink); }
+  .tval.tnum { color: var(--moss); }
+  .tval.tbool { color: var(--clay); }
+  .tval.tnull { color: var(--ink-soft); font-style: italic; }
+  .tcount { color: var(--ink-soft); }
+  .tchildren { margin-left: 16px; }
+  .tchildren.collapsed { display: none; }
+
+  .html-frame {
+    width: 100%;
+    min-height: 320px;
+    height: 400px;
+    background: #FFFFFF;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    resize: vertical;
+    overflow: auto;
+    display: block;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .stat-card .lbl { font-size: 11px; color: var(--ink-soft); margin-bottom: 4px; }
+  .stat-card .val { font-size: 18px; font-weight: 600; color: var(--moss); word-break: break-word; }
+
+  .analyze-section {
+    margin-top: 22px;
+  }
+  .analyze-section h3 {
+    font-family: var(--serif);
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+  .word-freq-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .word-freq-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .word-freq-row .w { color: var(--ink); flex: 0 0 120px; }
+  .word-freq-row .bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--moss-dim);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .word-freq-row .bar-fill { height: 100%; background: var(--moss); }
+  .word-freq-row .n { color: var(--ink-soft); flex: 0 0 34px; text-align: right; }
+
+  .readability-box {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .readability-box .score { font-size: 28px; font-weight: 600; color: var(--moss); font-family: var(--serif); }
+  .readability-box .label { color: var(--ink-soft); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header class="top">
+    <div>
+      <h1>TextForge</h1>
+      <p>Text &amp; Data Studio — format, convert, preview, parse, and analyze in one focused workspace.</p>
+      <p style="margin-top:2px; font-size:11px; color:var(--ink-soft);">An India Innovation lightweight app.</p>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="active" data-tab="html">HTML viewer</button>
+    <button data-tab="csv">CSV ↔ JSON</button>
+    <button data-tab="json">JSON formatter</button>
+    <button data-tab="case">Case converter</button>
+    <button data-tab="md">Markdown preview</button>
+    <button data-tab="xml">XML formatter</button>
+    <button data-tab="yaml">YAML ↔ JSON</button>
+    <button data-tab="sql">SQL formatter</button>
+    <button data-tab="url">URL parser</button>
+    <button data-tab="analyze">Text analyzer</button>
+  </nav>
+
+  <!-- JSON -->
+  <section class="panel" id="panel-json">
+    <div class="toolbar">
+      <button class="action primary" id="json-run">Run ▸</button>
+      <button class="action" id="json-format">Format</button>
+      <button class="action" id="json-minify">Minify</button>
+      <button class="action" id="json-tree-btn">Tree view</button>
+      <button class="action" id="json-values-btn">Values only</button>
+      <button class="action" id="json-validate">Validate</button>
+      <button class="action" id="json-clear">Clear</button>
+      <span class="status" id="json-status"></span>
+    </div>
+    <div class="split">
+      <div>
+        <span class="field-label">Input</span>
+        <textarea id="json-input" placeholder='{"paste":"your JSON here"}'></textarea>
+      </div>
+      <div>
+        <span class="field-label">Output</span>
+        <div id="json-output-wrap">
+          <textarea id="json-output" placeholder="Result appears here" readonly></textarea>
+          <div class="tree-panel" id="json-tree" style="display:none;">
+            <div class="tree-controls">
+              <button class="tree-mini" id="tree-expand-all">Expand all</button>
+              <button class="tree-mini" id="tree-collapse-all">Collapse all</button>
+            </div>
+            <div class="tree-body" id="tree-body"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="hint">Run (or just keep typing) re-applies whichever action you used last — Format, Minify, Tree view, or Values only — so Output stays live as you edit. Format pretty-prints with unquoted keys/values; Minify does the same, compact. Tree view gives a collapsible structure; Values only lists just the leaf values. Validate checks syntax without changing anything.</p>
+  </section>
+
+  <!-- CSV/JSON -->
+  <section class="panel" id="panel-csv">
+    <div class="toolbar">
+      <button class="action primary" id="csv-to-json">CSV → JSON</button>
+      <button class="action" id="json-to-csv">JSON → CSV</button>
+      <label class="action file-btn" for="csv-file">Upload file</label>
+      <input type="file" id="csv-file" accept=".csv,.xlsx,.xls" style="display:none;">
+      <select class="action" id="csv-sheet-select" style="display:none;"></select>
+      <button class="action" id="csv-clear">Clear</button>
+      <span class="status" id="csv-status"></span>
+    </div>
+    <div class="split">
+      <div>
+        <span class="field-label">Input</span>
+        <textarea id="csv-input" placeholder="name,age&#10;Ada,32&#10;Grace,36"></textarea>
+      </div>
+      <div>
+        <span class="field-label">Output</span>
+        <textarea id="csv-output" placeholder="Result appears here" readonly></textarea>
+      </div>
+    </div>
+    <p class="hint">Assumes the first CSV row is a header, comma-separated with optional quoted fields. JSON → CSV expects an array of flat objects. Upload a .csv, .xlsx or .xls file — if it has more than one sheet, a picker appears so you choose which one to load.</p>
+  </section>
+
+  <!-- Markdown -->
+  <section class="panel" id="panel-md">
+    <div class="toolbar">
+      <button class="action" id="md-clear">Clear</button>
+    </div>
+    <div class="split">
+      <div>
+        <span class="field-label">Markdown</span>
+        <textarea id="md-input" placeholder="# Heading&#10;&#10;Write some **markdown** here.">## Try it
+
+Write **bold**, _italic_, and `inline code`.
+
+- one
+- two
+
+> a quoted line</textarea>
+      </div>
+      <div>
+        <span class="field-label">Preview</span>
+        <div class="rendered" id="md-output"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Case converter -->
+  <section class="panel" id="panel-case">
+    <textarea id="case-input" placeholder="Type or paste text to convert" style="min-height:120px;">Hello world example</textarea>
+    <div class="case-list" id="case-grid"></div>
+    <p class="hint">Click any card to copy its value.</p>
+  </section>
+
+  <!-- HTML viewer -->
+  <section class="panel active" id="panel-html">
+    <div class="toolbar">
+      <button class="action primary" id="html-run">Run ▸</button>
+      <button class="action" id="html-clear">Clear</button>
+      <span class="status" id="html-status"></span>
+    </div>
+    <div class="split">
+      <div>
+        <span class="field-label">Input (HTML)</span>
+        <textarea id="html-input" placeholder="&lt;h1&gt;Hello&lt;/h1&gt;">&lt;h2&gt;Hello there&lt;/h2&gt;
+&lt;p&gt;Edit this HTML and the preview updates as you type.&lt;/p&gt;
+&lt;button onclick="alert('Hi!')"&gt;Click me&lt;/button&gt;</textarea>
+      </div>
+      <div>
+        <span class="field-label">Preview</span>
+        <iframe id="html-preview" class="html-frame" sandbox="allow-scripts" title="HTML preview"></iframe>
+      </div>
+    </div>
+    <p class="hint">Renders your HTML/CSS/JS in a sandboxed frame — nothing here can affect the rest of the page. Preview updates live as you type, or click Run.</p>
+  </section>
+
+  <!-- XML formatter -->
+  <section class="panel" id="panel-xml">
+    <div class="toolbar">
+      <button class="action primary" id="xml-format">Format</button>
+      <button class="action" id="xml-validate">Validate</button>
+      <button class="action" id="xml-clear">Clear</button>
+      <span class="status" id="xml-status"></span>
+    </div>
+    <div class="split">
+      <div>
+        <span class="field-label">Input</span>
+        <textarea id="xml-input" placeholder="&lt;root&gt;&lt;item&gt;value&lt;/item&gt;&lt;/root&gt;"></textarea>
+      </div>
+      <div>
+        <span class="field-label">Output</span>
+        <textarea id="xml-output" placeholder="Result appears here" readonly></textarea>
+      </div>
+    </div>
+    <p class="hint">Format re-indents the document. Validate checks well-formedness and reports the parser error if any.</p>
+  </section>
+
+  <!-- YAML <-> JSON -->
+  <section class="panel" id="panel-yaml">
+    <div class="toolbar">
+      <button class="action primary" id="yaml-to-json">YAML → JSON</button>
+      <button class="action" id="json-to-yaml">JSON → YAML</button>
+      <button class="action" id="yaml-clear">Clear</button>
+      <span class="status" id="yaml-status"></span>
+    </div>
+    <div class="split">
+      <div>
+        <span class="field-label">Input</span>
+        <textarea id="yaml-input" placeholder="key: value&#10;list:&#10;  - one&#10;  - two"></textarea>
+      </div>
+      <div>
+        <span class="field-label">Output</span>
+        <textarea id="yaml-output" placeholder="Result appears here" readonly></textarea>
+      </div>
+    </div>
+    <p class="hint">Converts between YAML and JSON. Paste either format on the left and pick the direction.</p>
+  </section>
+
+  <!-- SQL formatter -->
+  <section class="panel" id="panel-sql">
+    <div class="toolbar">
+      <button class="action primary" id="sql-format">Format</button>
+      <button class="action" id="sql-clear">Clear</button>
+      <span class="status" id="sql-status"></span>
+    </div>
+    <div class="split">
+      <div>
+        <span class="field-label">Input</span>
+        <textarea id="sql-input" placeholder="select * from users where id = 1"></textarea>
+      </div>
+      <div>
+        <span class="field-label">Output</span>
+        <textarea id="sql-output" placeholder="Result appears here" readonly></textarea>
+      </div>
+    </div>
+    <p class="hint">Basic keyword-based formatter: capitalizes SQL keywords and breaks major clauses onto new lines. Good for quick readability, not a full SQL parser.</p>
+  </section>
+
+  <!-- URL parser -->
+  <section class="panel" id="panel-url">
+    <div class="toolbar">
+      <button class="action primary" id="url-parse">Parse</button>
+      <button class="action" id="url-clear">Clear</button>
+      <span class="status" id="url-status"></span>
+    </div>
+    <div class="split">
+      <div>
+        <span class="field-label">Input</span>
+        <textarea id="url-input" placeholder="https://example.com:8080/path/to/page?query=1&sort=asc#section" style="min-height:120px;"></textarea>
+      </div>
+      <div>
+        <span class="field-label">Output</span>
+        <textarea id="url-output" placeholder="Result appears here" readonly style="min-height:120px;"></textarea>
+      </div>
+    </div>
+    <p class="hint">Breaks a URL into protocol, host, port, path, and query parameters.</p>
+  </section>
+
+  <!-- Text analyzer -->
+  <section class="panel" id="panel-analyze">
+    <div class="toolbar">
+      <button class="action" id="analyze-clear">Clear</button>
+      <span class="status" id="analyze-status"></span>
+    </div>
+    <textarea id="analyze-input" placeholder="Paste or type text here — stats update as you type." style="min-height: 220px;"></textarea>
+
+    <div class="analyze-section">
+      <h3>Counts</h3>
+      <div class="stat-grid" id="analyze-counts"></div>
+    </div>
+
+    <div class="analyze-section">
+      <h3>Averages &amp; extremes</h3>
+      <div class="stat-grid" id="analyze-averages"></div>
+    </div>
+
+    <div class="analyze-section">
+      <h3>Character breakdown</h3>
+      <div class="stat-grid" id="analyze-chars"></div>
+    </div>
+
+    <div class="analyze-section">
+      <h3>Reading &amp; speaking time</h3>
+      <div class="stat-grid" id="analyze-time"></div>
+    </div>
+
+    <div class="analyze-section">
+      <h3>Readability</h3>
+      <div class="readability-box">
+        <span class="score" id="analyze-flesch-score">–</span>
+        <span class="label" id="analyze-flesch-label">Paste some text to see a score.</span>
+      </div>
+    </div>
+
+    <div class="analyze-section">
+      <h3>Most frequent words</h3>
+      <div class="word-freq-list" id="analyze-freq"></div>
+    </div>
+  </section>
+
+<script>
+  // ---------- Tabs ----------
+  const tabs = document.querySelectorAll('nav.tabs button');
+  tabs.forEach(btn => btn.addEventListener('click', () => {
+    tabs.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  }));
+
+  function flash(el, msg, ok) {
+    el.textContent = msg;
+    el.className = 'status show ' + (ok ? 'ok' : 'err');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 3500);
+  }
+
+  // ---------- JSON ----------
+  const jsonInput = document.getElementById('json-input');
+  const jsonOutput = document.getElementById('json-output');
+  const jsonStatus = document.getElementById('json-status');
+
+  // Formats like JSON, but keys and string values are unquoted (not valid JSON, display only).
+  function unquotedPretty(value, depth) {
+    const pad = '  '.repeat(depth);
+    const padIn = '  '.repeat(depth + 1);
+    if (value === null) return 'null';
+    if (Array.isArray(value)) {
+      if (value.length === 0) return '[]';
+      const items = value.map(v => padIn + unquotedPretty(v, depth + 1));
+      return '[\n' + items.join(',\n') + '\n' + pad + ']';
+    }
+    if (typeof value === 'object') {
+      const keys = Object.keys(value);
+      if (keys.length === 0) return '{}';
+      const items = keys.map(k => padIn + k + ': ' + unquotedPretty(value[k], depth + 1));
+      return '{\n' + items.join(',\n') + '\n' + pad + '}';
+    }
+    if (typeof value === 'string') return value;
+    return String(value);
+  }
+
+  function unquotedMin(value) {
+    if (value === null) return 'null';
+    if (Array.isArray(value)) return '[' + value.map(unquotedMin).join(',') + ']';
+    if (typeof value === 'object') return '{' + Object.keys(value).map(k => k + ':' + unquotedMin(value[k])).join(',') + '}';
+    if (typeof value === 'string') return value;
+    return String(value);
+  }
+
+  let jsonMode = 'format'; // tracks last-used action, for Run + live auto-update
+
+  function doFormat() {
+    try {
+      const parsed = JSON.parse(jsonInput.value);
+      jsonOutput.value = unquotedPretty(parsed, 0);
+      showOutput('text');
+      flash(jsonStatus, 'Formatted', true);
+    } catch (e) {
+      flash(jsonStatus, 'Invalid JSON: ' + e.message, false);
+    }
+  }
+
+  function doMinify() {
+    try {
+      const parsed = JSON.parse(jsonInput.value);
+      jsonOutput.value = unquotedMin(parsed);
+      showOutput('text');
+      flash(jsonStatus, 'Minified', true);
+    } catch (e) {
+      flash(jsonStatus, 'Invalid JSON: ' + e.message, false);
+    }
+  }
+
+  function doValidate() {
+    try {
+      JSON.parse(jsonInput.value);
+      flash(jsonStatus, 'Valid JSON', true);
+    } catch (e) {
+      flash(jsonStatus, 'Invalid: ' + e.message, false);
+    }
+  }
+
+  function doTree() {
+    try {
+      const parsed = JSON.parse(jsonInput.value);
+      renderTree(parsed);
+      showOutput('tree');
+      flash(jsonStatus, 'Tree view', true);
+    } catch (e) {
+      flash(jsonStatus, 'Invalid JSON: ' + e.message, false);
+    }
+  }
+
+  function doValues() {
+    try {
+      const parsed = JSON.parse(jsonInput.value);
+      const out = [];
+      extractValues(parsed, out);
+      jsonOutput.value = out.join('\n');
+      showOutput('text');
+      flash(jsonStatus, 'Values only', true);
+    } catch (e) {
+      flash(jsonStatus, 'Invalid JSON: ' + e.message, false);
+    }
+  }
+
+  function runJsonMode() {
+    if (jsonMode === 'minify') doMinify();
+    else if (jsonMode === 'tree') doTree();
+    else if (jsonMode === 'values') doValues();
+    else if (jsonMode === 'validate') doValidate();
+    else doFormat();
+  }
+
+  document.getElementById('json-run').addEventListener('click', runJsonMode);
+
+  document.getElementById('json-format').addEventListener('click', () => { jsonMode = 'format'; doFormat(); });
+  document.getElementById('json-minify').addEventListener('click', () => { jsonMode = 'minify'; doMinify(); });
+  document.getElementById('json-validate').addEventListener('click', () => { jsonMode = 'validate'; doValidate(); });
+  document.getElementById('json-tree-btn').addEventListener('click', () => { jsonMode = 'tree'; doTree(); });
+  document.getElementById('json-values-btn').addEventListener('click', () => { jsonMode = 'values'; doValues(); });
+
+  // Live auto-update: re-run the last action ~350ms after typing stops.
+  let jsonLiveTimer = null;
+  jsonInput.addEventListener('input', () => {
+    clearTimeout(jsonLiveTimer);
+    jsonLiveTimer = setTimeout(runJsonMode, 350);
+  });
+
+  document.getElementById('json-clear').addEventListener('click', () => {
+    jsonInput.value = '';
+    jsonOutput.value = '';
+    treeBody.innerHTML = '';
+    jsonStatus.classList.remove('show');
+    showOutput('text');
+  });
+
+  // ---------- JSON tree view ----------
+  const jsonTreePanel = document.getElementById('json-tree');
+  const treeBody = document.getElementById('tree-body');
+
+  function showOutput(mode) {
+    if (mode === 'tree') {
+      jsonOutput.style.display = 'none';
+      jsonTreePanel.style.display = 'block';
+    } else {
+      jsonOutput.style.display = 'block';
+      jsonTreePanel.style.display = 'none';
+    }
+  }
+
+  function typeOf(v) {
+    if (v === null) return 'null';
+    if (Array.isArray(v)) return 'array';
+    return typeof v; // object, string, number, boolean
+  }
+
+  function leafSpan(v) {
+    const t = typeOf(v);
+    const span = document.createElement('span');
+    span.className = 'tval ' + (t === 'number' ? 'tnum' : t === 'boolean' ? 'tbool' : t === 'null' ? 'tnull' : '');
+    span.textContent = t === 'null' ? 'null' : t === 'string' ? v : String(v);
+    return span;
+  }
+
+  function buildNode(key, value, depth) {
+    const wrap = document.createElement('div');
+    wrap.className = 'tnode';
+    const t = typeOf(value);
+    const isBranch = t === 'object' || t === 'array';
+
+    const row = document.createElement('div');
+    row.className = 'trow' + (isBranch ? ' has-children' : '');
+
+    const caret = document.createElement('span');
+    caret.className = 'tcaret';
+    caret.textContent = isBranch ? '▾' : '';
+    row.appendChild(caret);
+
+    if (key !== null) {
+      const k = document.createElement('span');
+      k.className = 'tkey';
+      k.textContent = key;
+      row.appendChild(k);
+      const sep = document.createElement('span');
+      sep.className = 'tsep';
+      sep.textContent = ':';
+      row.appendChild(sep);
+    }
+
+    let childrenWrap = null;
+    if (isBranch) {
+      const entries = t === 'array' ? value.map((v, i) => [i, v]) : Object.entries(value);
+      const count = document.createElement('span');
+      count.className = 'tcount';
+      count.textContent = t === 'array' ? `[${entries.length}]` : `{${entries.length}}`;
+      row.appendChild(count);
+
+      childrenWrap = document.createElement('div');
+      childrenWrap.className = 'tchildren';
+      entries.forEach(([k, v]) => childrenWrap.appendChild(buildNode(t === 'array' ? String(k) : k, v, depth + 1)));
+
+      row.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const collapsed = childrenWrap.classList.toggle('collapsed');
+        caret.textContent = collapsed ? '▸' : '▾';
+      });
+    } else {
+      row.appendChild(leafSpan(value));
+    }
+
+    wrap.appendChild(row);
+    if (childrenWrap) wrap.appendChild(childrenWrap);
+    return wrap;
+  }
+
+  function renderTree(parsed) {
+    treeBody.innerHTML = '';
+    const rootLabel = Array.isArray(parsed) ? 'array' : (typeof parsed === 'object' && parsed !== null) ? 'object' : typeOf(parsed);
+    treeBody.appendChild(buildNode(rootLabel, parsed, 0));
+  }
+
+  document.getElementById('tree-expand-all').addEventListener('click', () => {
+    treeBody.querySelectorAll('.tchildren.collapsed').forEach(c => c.classList.remove('collapsed'));
+    treeBody.querySelectorAll('.trow.has-children .tcaret').forEach(c => c.textContent = '▾');
+  });
+  document.getElementById('tree-collapse-all').addEventListener('click', () => {
+    treeBody.querySelectorAll('.tchildren').forEach(c => c.classList.add('collapsed'));
+    treeBody.querySelectorAll('.trow.has-children .tcaret').forEach(c => c.textContent = '▸');
+  });
+
+  // ---------- Values only ----------
+  function extractValues(value, out) {
+    if (value === null) { out.push('null'); return; }
+    if (Array.isArray(value)) { value.forEach(v => extractValues(v, out)); return; }
+    if (typeof value === 'object') { Object.values(value).forEach(v => extractValues(v, out)); return; }
+    out.push(String(value));
+  }
+
+  // ---------- CSV <-> JSON ----------
+  const csvInput = document.getElementById('csv-input');
+  const csvOutput = document.getElementById('csv-output');
+  const csvStatus = document.getElementById('csv-status');
+
+  function parseCSVLine(line) {
+    const out = [];
+    let cur = '', inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (inQuotes) {
+        if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        else if (c === '"') { inQuotes = false; }
+        else { cur += c; }
+      } else {
+        if (c === '"') inQuotes = true;
+        else if (c === ',') { out.push(cur); cur = ''; }
+        else cur += c;
+      }
+    }
+    out.push(cur);
+    return out;
+  }
+
+  function csvToJSON(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.length > 0);
+    if (lines.length === 0) return '[]';
+    const headers = parseCSVLine(lines[0]);
+    const rows = lines.slice(1).map(line => {
+      const vals = parseCSVLine(line);
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = vals[i] !== undefined ? vals[i] : '');
+      return obj;
+    });
+    return JSON.stringify(rows, null, 2);
+  }
+
+  function csvEscape(val) {
+    const s = String(val ?? '');
+    if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
+  function jsonToCSV(text) {
+    const data = JSON.parse(text);
+    if (!Array.isArray(data) || data.length === 0) throw new Error('expected a non-empty JSON array of objects');
+    const headers = Object.keys(data[0]);
+    const lines = [headers.join(',')];
+    data.forEach(row => {
+      lines.push(headers.map(h => csvEscape(row[h])).join(','));
+    });
+    return lines.join('\n');
+  }
+
+  document.getElementById('csv-to-json').addEventListener('click', () => {
+    try {
+      csvOutput.value = csvToJSON(csvInput.value);
+      flash(csvStatus, 'Converted', true);
+    } catch (e) {
+      flash(csvStatus, 'Error: ' + e.message, false);
+    }
+  });
+
+  document.getElementById('json-to-csv').addEventListener('click', () => {
+    try {
+      csvOutput.value = jsonToCSV(csvInput.value);
+      flash(csvStatus, 'Converted', true);
+    } catch (e) {
+      flash(csvStatus, 'Error: ' + e.message, false);
+    }
+  });
+
+  document.getElementById('csv-clear').addEventListener('click', () => {
+    csvInput.value = '';
+    csvOutput.value = '';
+    csvStatus.classList.remove('show');
+    sheetSelect.style.display = 'none';
+    sheetSelect.innerHTML = '';
+    csvFileInput.value = '';
+    currentWorkbook = null;
+  });
+
+  // ---------- CSV/XLSX file upload ----------
+  const csvFileInput = document.getElementById('csv-file');
+  const sheetSelect = document.getElementById('csv-sheet-select');
+  let currentWorkbook = null;
+
+  function loadSheetIntoInput(wb, sheetName) {
+    const ws = wb.Sheets[sheetName];
+    csvInput.value = XLSX.utils.sheet_to_csv(ws);
+    flash(csvStatus, 'Loaded "' + sheetName + '"', true);
+  }
+
+  csvFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    sheetSelect.style.display = 'none';
+    sheetSelect.innerHTML = '';
+    currentWorkbook = null;
+
+    try {
+      if (ext === 'csv') {
+        csvInput.value = await file.text();
+        flash(csvStatus, 'Loaded ' + file.name, true);
+      } else {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        currentWorkbook = wb;
+        if (wb.SheetNames.length > 1) {
+          wb.SheetNames.forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            sheetSelect.appendChild(opt);
+          });
+          sheetSelect.style.display = 'inline-block';
+          loadSheetIntoInput(wb, wb.SheetNames[0]);
+          flash(csvStatus, wb.SheetNames.length + ' sheets found — pick one', true);
+        } else {
+          loadSheetIntoInput(wb, wb.SheetNames[0]);
+        }
+      }
+    } catch (err) {
+      flash(csvStatus, 'Could not read file: ' + err.message, false);
+    }
+  });
+
+  sheetSelect.addEventListener('change', () => {
+    if (currentWorkbook) loadSheetIntoInput(currentWorkbook, sheetSelect.value);
+  });
+
+  // ---------- Markdown ----------
+  const mdInput = document.getElementById('md-input');
+  const mdOutput = document.getElementById('md-output');
+
+  function renderMD() {
+    try {
+      mdOutput.innerHTML = marked.parse(mdInput.value || '');
+    } catch (e) {
+      mdOutput.textContent = 'Could not render: ' + e.message;
+    }
+  }
+  mdInput.addEventListener('input', renderMD);
+  document.getElementById('md-clear').addEventListener('click', () => { mdInput.value = ''; renderMD(); });
+  renderMD();
+
+  // ---------- Case converter ----------
+  const caseInput = document.getElementById('case-input');
+  const caseGrid = document.getElementById('case-grid');
+
+  function words(str) {
+    return str
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/[_\-]+/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+
+  const converters = [
+    { k: 'UPPERCASE', f: s => s.toUpperCase() },
+    { k: 'lowercase', f: s => s.toLowerCase() },
+    { k: 'Title Case', f: s => words(s).map(w => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ') },
+    { k: 'Sentence case', f: s => { const l = s.toLowerCase(); return l ? l[0].toUpperCase() + l.slice(1) : l; } },
+    { k: 'camelCase', f: s => { const w = words(s).map(x => x.toLowerCase()); return w.map((x, i) => i === 0 ? x : x[0].toUpperCase() + x.slice(1)).join(''); } },
+    { k: 'PascalCase', f: s => words(s).map(x => x[0].toUpperCase() + x.slice(1).toLowerCase()).join('') },
+    { k: 'snake_case', f: s => words(s).map(x => x.toLowerCase()).join('_') },
+    { k: 'kebab-case', f: s => words(s).map(x => x.toLowerCase()).join('-') },
+    { k: 'CONSTANT_CASE', f: s => words(s).map(x => x.toUpperCase()).join('_') },
+  ];
+
+  function renderCases() {
+    const val = caseInput.value;
+    caseGrid.innerHTML = '';
+    converters.forEach(c => {
+      const card = document.createElement('div');
+      card.className = 'case-card';
+      const out = val ? c.f(val) : '';
+      card.innerHTML = `<div class="k">${c.k}</div><div class="v">${out || '&nbsp;'}</div>`;
+      card.addEventListener('click', async () => {
+        if (!out) return;
+        try {
+          await navigator.clipboard.writeText(out);
+          const v = card.querySelector('.v');
+          const prev = v.textContent;
+          v.textContent = 'Copied';
+          v.classList.add('copied');
+          setTimeout(() => { v.textContent = prev; v.classList.remove('copied'); }, 900);
+        } catch (e) { /* clipboard unavailable, ignore */ }
+      });
+      caseGrid.appendChild(card);
+    });
+  }
+  caseInput.addEventListener('input', renderCases);
+  renderCases();
+
+  // ---------- HTML viewer ----------
+  const htmlInput = document.getElementById('html-input');
+  const htmlPreview = document.getElementById('html-preview');
+  const htmlStatus = document.getElementById('html-status');
+
+  function runHTML() {
+    htmlPreview.srcdoc = htmlInput.value;
+    flash(htmlStatus, 'Rendered', true);
+  }
+
+  document.getElementById('html-run').addEventListener('click', runHTML);
+  document.getElementById('html-clear').addEventListener('click', () => {
+    htmlInput.value = '';
+    htmlPreview.srcdoc = '';
+    htmlStatus.classList.remove('show');
+  });
+
+  let htmlLiveTimer = null;
+  htmlInput.addEventListener('input', () => {
+    clearTimeout(htmlLiveTimer);
+    htmlLiveTimer = setTimeout(runHTML, 350);
+  });
+
+  // Initial render on load
+  runHTML();
+
+  // ---------- XML formatter/validator ----------
+  const xmlInput = document.getElementById('xml-input');
+  const xmlOutput = document.getElementById('xml-output');
+  const xmlStatus = document.getElementById('xml-status');
+
+  function xmlParseError(text) {
+    const doc = new DOMParser().parseFromString(text, 'text/xml');
+    const err = doc.querySelector('parsererror');
+    return err ? err.textContent.trim() : null;
+  }
+
+  function formatXML(xml) {
+    const PAD = '  ';
+    let value = xml.trim().replace(/>\s*</g, '>\n<');
+    let pad = 0;
+    const lines = value.split('\n').map(node => {
+      node = node.trim();
+      if (!node) return null;
+      let indentChange = 0;
+      if (/^<\?/.test(node) || /^<!--[\s\S]*-->$/.test(node) || /\/>\s*$/.test(node)) {
+        // self-closing, declaration, or full comment on one line: no change
+      } else if (/^<\/\w/.test(node)) {
+        pad = Math.max(pad - 1, 0);
+      } else if (/^<\w[^>]*>.*<\/\w[^>]*>$/.test(node)) {
+        // opening and closing tag with content on same line: no change
+      } else if (/^<\w[^>]*[^/]>$/.test(node)) {
+        indentChange = 1;
+      }
+      const line = PAD.repeat(pad) + node;
+      pad += indentChange;
+      return line;
+    }).filter(l => l !== null);
+    return lines.join('\n');
+  }
+
+  document.getElementById('xml-format').addEventListener('click', () => {
+    const err = xmlParseError(xmlInput.value);
+    if (err) { flash(xmlStatus, 'Invalid XML: ' + err.split('\n')[0], false); return; }
+    xmlOutput.value = formatXML(xmlInput.value);
+    flash(xmlStatus, 'Formatted', true);
+  });
+
+  document.getElementById('xml-validate').addEventListener('click', () => {
+    const err = xmlParseError(xmlInput.value);
+    if (err) flash(xmlStatus, 'Invalid: ' + err.split('\n')[0], false);
+    else flash(xmlStatus, 'Well-formed XML', true);
+  });
+
+  document.getElementById('xml-clear').addEventListener('click', () => {
+    xmlInput.value = ''; xmlOutput.value = ''; xmlStatus.classList.remove('show');
+  });
+
+  // ---------- YAML <-> JSON ----------
+  const yamlInput = document.getElementById('yaml-input');
+  const yamlOutput = document.getElementById('yaml-output');
+  const yamlStatus = document.getElementById('yaml-status');
+
+  document.getElementById('yaml-to-json').addEventListener('click', () => {
+    try {
+      const obj = jsyaml.load(yamlInput.value);
+      yamlOutput.value = JSON.stringify(obj, null, 2);
+      flash(yamlStatus, 'Converted', true);
+    } catch (e) {
+      flash(yamlStatus, 'Invalid YAML: ' + e.message, false);
+    }
+  });
+
+  document.getElementById('json-to-yaml').addEventListener('click', () => {
+    try {
+      const obj = JSON.parse(yamlInput.value);
+      yamlOutput.value = jsyaml.dump(obj);
+      flash(yamlStatus, 'Converted', true);
+    } catch (e) {
+      flash(yamlStatus, 'Invalid JSON: ' + e.message, false);
+    }
+  });
+
+  document.getElementById('yaml-clear').addEventListener('click', () => {
+    yamlInput.value = ''; yamlOutput.value = ''; yamlStatus.classList.remove('show');
+  });
+
+  // ---------- SQL formatter ----------
+  const sqlInput = document.getElementById('sql-input');
+  const sqlOutput = document.getElementById('sql-output');
+  const sqlStatus = document.getElementById('sql-status');
+
+  const SQL_KEYWORDS = [
+    'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING',
+    'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'OUTER JOIN', 'JOIN', 'ON',
+    'AND', 'OR', 'NOT', 'IN', 'IS', 'NULL', 'LIKE', 'BETWEEN',
+    'INSERT INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE FROM',
+    'LIMIT', 'OFFSET', 'UNION ALL', 'UNION', 'DISTINCT', 'AS',
+    'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END'
+  ];
+  const SQL_BREAK_BEFORE = [
+    'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING',
+    'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'OUTER JOIN',
+    'AND', 'OR', 'INSERT INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE FROM',
+    'LIMIT', 'OFFSET', 'UNION ALL', 'UNION'
+  ];
+
+  function formatSQL(sql) {
+    let out = sql.replace(/\s+/g, ' ').trim();
+    const sortedKw = SQL_KEYWORDS.slice().sort((a, b) => b.length - a.length);
+    sortedKw.forEach(kw => {
+      const pattern = '\\b' + kw.replace(/ /g, '\\s+') + '\\b';
+      out = out.replace(new RegExp(pattern, 'gi'), kw);
+    });
+    const sortedBreak = SQL_BREAK_BEFORE.slice().sort((a, b) => b.length - a.length);
+    sortedBreak.forEach(kw => {
+      const pattern = '\\s+(' + kw.replace(/ /g, '\\s+') + ')\\b';
+      out = out.replace(new RegExp(pattern, 'g'), '\n$1');
+    });
+    return out.split('\n').map(line => {
+      const trimmed = line.trim();
+      return /^(AND|OR)\b/.test(trimmed) ? '  ' + trimmed : trimmed;
+    }).join('\n');
+  }
+
+  document.getElementById('sql-format').addEventListener('click', () => {
+    if (!sqlInput.value.trim()) { flash(sqlStatus, 'Nothing to format', false); return; }
+    sqlOutput.value = formatSQL(sqlInput.value);
+    flash(sqlStatus, 'Formatted', true);
+  });
+  document.getElementById('sql-clear').addEventListener('click', () => {
+    sqlInput.value = ''; sqlOutput.value = ''; sqlStatus.classList.remove('show');
+  });
+
+  // ---------- URL parser ----------
+  const urlInputEl = document.getElementById('url-input');
+  const urlOutput = document.getElementById('url-output');
+  const urlStatus = document.getElementById('url-status');
+
+  document.getElementById('url-parse').addEventListener('click', () => {
+    try {
+      const u = new URL(urlInputEl.value.trim());
+      const lines = [
+        'Protocol: ' + u.protocol,
+        'Host: ' + u.hostname,
+        'Port: ' + (u.port || '(default)'),
+        'Path: ' + (u.pathname || '/'),
+        'Hash: ' + (u.hash || '(none)'),
+        '',
+        'Query params:'
+      ];
+      const params = [...u.searchParams.entries()];
+      if (params.length === 0) lines.push('  (none)');
+      else params.forEach(([k, v]) => lines.push('  ' + k + ': ' + v));
+      urlOutput.value = lines.join('\n');
+      flash(urlStatus, 'Parsed', true);
+    } catch (e) {
+      flash(urlStatus, 'Invalid URL: ' + e.message, false);
+    }
+  });
+  document.getElementById('url-clear').addEventListener('click', () => {
+    urlInputEl.value = ''; urlOutput.value = ''; urlStatus.classList.remove('show');
+  });
+
+  // ---------- Text analyzer ----------
+  const analyzeInput = document.getElementById('analyze-input');
+  const elCounts = document.getElementById('analyze-counts');
+  const elAverages = document.getElementById('analyze-averages');
+  const elChars = document.getElementById('analyze-chars');
+  const elTime = document.getElementById('analyze-time');
+  const elFleschScore = document.getElementById('analyze-flesch-score');
+  const elFleschLabel = document.getElementById('analyze-flesch-label');
+  const elFreq = document.getElementById('analyze-freq');
+
+  const STOPWORDS = new Set(['the','a','an','and','or','but','of','to','in','on','at','for','is','are','was','were','be','been','it','this','that','these','those','with','as','by','from','into','than','then','so','such','not','no','if','their','its','his','her','they','you','we','i','he','she','them','your','my','our']);
+
+  function statCard(container, label, value) {
+    const card = document.createElement('div');
+    card.className = 'stat-card';
+    card.innerHTML = '<div class="lbl">' + label + '</div><div class="val">' + value + '</div>';
+    container.appendChild(card);
+  }
+
+  function countSyllables(word) {
+    word = word.toLowerCase().replace(/[^a-z]/g, '');
+    if (!word) return 0;
+    word = word.replace(/e$/, '');
+    const m = word.match(/[aeiouy]+/g);
+    return m ? Math.max(m.length, 1) : 1;
+  }
+
+  function fleschLabel(score) {
+    if (score >= 90) return 'Very easy — 5th grade level';
+    if (score >= 80) return 'Easy — 6th grade level';
+    if (score >= 70) return 'Fairly easy — 7th grade level';
+    if (score >= 60) return 'Standard — 8th–9th grade level';
+    if (score >= 50) return 'Fairly difficult — high school';
+    if (score >= 30) return 'Difficult — college level';
+    return 'Very difficult — graduate level';
+  }
+
+  function analyzeText() {
+    const text = analyzeInput.value;
+    elCounts.innerHTML = '';
+    elAverages.innerHTML = '';
+    elChars.innerHTML = '';
+    elTime.innerHTML = '';
+    elFreq.innerHTML = '';
+
+    if (!text.trim()) {
+      statCard(elCounts, 'Words', '0');
+      elFleschScore.textContent = '–';
+      elFleschLabel.textContent = 'Paste some text to see a score.';
+      return;
+    }
+
+    const words = (text.match(/[\p{L}\p{N}'-]+/gu) || []);
+    const wordCount = words.length;
+    const sentences = (text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || []).map(s => s.trim()).filter(Boolean);
+    const sentenceCount = sentences.length || (wordCount ? 1 : 0);
+    const paragraphs = text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    const paragraphCount = paragraphs.length || (wordCount ? 1 : 0);
+    const lines = text.split('\n');
+    const lineCount = lines.length;
+    const lowerWords = words.map(w => w.toLowerCase());
+    const uniqueWords = new Set(lowerWords);
+
+    const charsWithSpaces = text.length;
+    const charsWithoutSpaces = text.replace(/\s/g, '').length;
+    const letters = (text.match(/[a-zA-Z]/g) || []).length;
+    const digits = (text.match(/[0-9]/g) || []).length;
+    const punctuation = (text.match(/[.,/#!$%^&*;:{}=\-_`~()"'?]/g) || []).length;
+    const whitespace = (text.match(/\s/g) || []).length;
+
+    const totalWordLength = words.reduce((sum, w) => sum + w.length, 0);
+    const avgWordLength = wordCount ? (totalWordLength / wordCount).toFixed(1) : '0';
+    const avgWordsPerSentence = sentenceCount ? (wordCount / sentenceCount).toFixed(1) : '0';
+    const longestWord = words.reduce((a, b) => (b.length > a.length ? b : a), '');
+
+    const totalSyllables = words.reduce((sum, w) => sum + countSyllables(w), 0);
+
+    const readingTime = wordCount / 200;
+    const speakingTime = wordCount / 130;
+    const fmtTime = (mins) => mins < 1 ? Math.ceil(mins * 60) + ' sec' : mins.toFixed(1) + ' min';
+
+    // Counts
+    statCard(elCounts, 'Words', wordCount.toLocaleString());
+    statCard(elCounts, 'Unique words', uniqueWords.size.toLocaleString());
+    statCard(elCounts, 'Sentences', sentenceCount.toLocaleString());
+    statCard(elCounts, 'Paragraphs', paragraphCount.toLocaleString());
+    statCard(elCounts, 'Lines', lineCount.toLocaleString());
+    statCard(elCounts, 'Syllables', totalSyllables.toLocaleString());
+
+    // Averages & extremes
+    statCard(elAverages, 'Avg word length', avgWordLength + ' chars');
+    statCard(elAverages, 'Avg words / sentence', avgWordsPerSentence);
+    statCard(elAverages, 'Longest word', longestWord || '–');
+
+    // Character breakdown
+    statCard(elChars, 'Characters (with spaces)', charsWithSpaces.toLocaleString());
+    statCard(elChars, 'Characters (no spaces)', charsWithoutSpaces.toLocaleString());
+    statCard(elChars, 'Letters', letters.toLocaleString());
+    statCard(elChars, 'Digits', digits.toLocaleString());
+    statCard(elChars, 'Punctuation', punctuation.toLocaleString());
+    statCard(elChars, 'Whitespace', whitespace.toLocaleString());
+
+    // Reading/speaking time
+    statCard(elTime, 'Reading time', fmtTime(readingTime));
+    statCard(elTime, 'Speaking time', fmtTime(speakingTime));
+
+    // Flesch reading ease
+    let score = 0;
+    if (wordCount > 0 && sentenceCount > 0) {
+      score = 206.835 - 1.015 * (wordCount / sentenceCount) - 84.6 * (totalSyllables / wordCount);
+      score = Math.max(0, Math.min(100, score));
+    }
+    elFleschScore.textContent = wordCount ? score.toFixed(1) : '–';
+    elFleschLabel.textContent = wordCount ? fleschLabel(score) : 'Paste some text to see a score.';
+
+    // Top words (excluding stopwords and single letters)
+    const freq = {};
+    lowerWords.forEach(w => {
+      if (STOPWORDS.has(w) || w.length < 2 || /^\d+$/.test(w)) return;
+      freq[w] = (freq[w] || 0) + 1;
+    });
+    const top = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    if (top.length === 0) {
+      elFreq.innerHTML = '<span class="hint">No repeated meaningful words found.</span>';
+    } else {
+      const maxCount = top[0][1];
+      top.forEach(([w, n]) => {
+        const row = document.createElement('div');
+        row.className = 'word-freq-row';
+        row.innerHTML = '<span class="w">' + w + '</span>' +
+          '<span class="bar-track"><span class="bar-fill" style="width:' + (n / maxCount * 100) + '%"></span></span>' +
+          '<span class="n">' + n + '</span>';
+        elFreq.appendChild(row);
+      });
+    }
+  }
+
+  let analyzeTimer = null;
+  analyzeInput.addEventListener('input', () => {
+    clearTimeout(analyzeTimer);
+    analyzeTimer = setTimeout(analyzeText, 200);
+  });
+  document.getElementById('analyze-clear').addEventListener('click', () => {
+    analyzeInput.value = '';
+    analyzeText();
+    flash(document.getElementById('analyze-status'), 'Cleared', true);
+  });
+
+  analyzeText();
+
+</script>
+</body>
+</html>
+
