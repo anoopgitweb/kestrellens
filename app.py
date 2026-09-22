@@ -109,6 +109,7 @@ TOOL_PAGES = {
     "/tools/video-utility": "video-utility.html",
     "/tools/slide-studio": "slide-studio/templates/index.html",
     "/tools/statlens": "statlens/frontend/index.html",
+    "/tools/bleu-calculator": "bleu-calculator.html",
     "/tools/project-charter": "project-charter.html",
     "/tools/gantt-chart": "gantt-chart.html",
     "/tools/notebook-presenter": "notebook-presenter.html",
@@ -5418,6 +5419,47 @@ class Handler(BaseHTTPRequestHandler):
                 _json_response(self, 400, {'error': str(exc)})
             except Exception:
                 _json_response(self, 503, {'error': 'Could not process this video. Check dependencies, connection and video availability.'})
+            return
+        if post_path == "/api/bleu-assist":
+            try:
+                if int(self.headers.get("Content-Length", "0")) > 16384:
+                    raise ValueError("Request is too large.")
+                payload = _read_json(self)
+                if not _tool_launch_user(payload.get("launch"), "bleu-calculator"):
+                    raise PermissionError("This BLEU Calculator session has expired. Reopen it from the KestrelIQ Tool Kit.")
+                prompt = str(payload.get("prompt") or "").strip()
+                if not prompt or len(prompt) > 12000:
+                    raise ValueError("Provide a prompt of no more than 12,000 characters.")
+                wants_json = bool(payload.get("json"))
+                instruction = (
+                    "Return only valid JSON with no markdown fences. Follow the requested schema exactly."
+                    if wants_json else
+                    "Return only the requested translation with no explanation or quotation marks."
+                )
+                result = _openai_response_request({
+                    "model": OPENAI_ASK_MODEL,
+                    "input": [
+                        {"role": "system", "content": [{"type": "input_text", "text": instruction}]},
+                        {"role": "user", "content": [{"type": "input_text", "text": prompt}]},
+                    ],
+                    "max_output_tokens": 1400,
+                })
+                output_text, _ = _openai_output_text_and_sources(result)
+                if not output_text:
+                    raise RuntimeError("AI assistance returned an empty response.")
+                if wants_json:
+                    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", output_text.strip(), flags=re.I)
+                    _json_response(self, 200, {"result": json.loads(cleaned)})
+                else:
+                    _json_response(self, 200, {"text": output_text.strip()})
+            except (json.JSONDecodeError, TypeError):
+                _json_response(self, 502, {"error": "AI assistance returned an invalid result. Please try again."})
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except PermissionError as exc:
+                _json_response(self, 403, {"error": str(exc)})
+            except Exception as exc:
+                _json_response(self, 503, {"error": _openai_content_error_message(exc)})
             return
         if post_path == "/api/tool-launch":
             try:

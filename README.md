@@ -114,6 +114,13 @@ This integration is for KestrelIQ running on the same computer as the browser;
 remote launches show a local-use explanation rather than redirecting to the
 remote visitor's computer. StatLens itself remains a local, single-user tool.
 
+### BLEU Score Calculator
+
+Open **Tool Kit > Data & Analytics > BLEU Score Calculator**. Administrators
+can enable `bleu-calculator` in the existing user tool-access list. The BLEU-4
+calculation and its n-gram explanation run in the browser. Translation and
+AI-estimated semantic metrics use the server-side `OPENAI_API_KEY`.
+
 The app is bundled in `tools/statlens`. The launcher uses its `.venv` when
 available, otherwise the Codex bundled Python runtime, then the current Python.
 On another machine, install `tools/statlens/requirements.txt` into its virtual

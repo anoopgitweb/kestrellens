@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BLEU Score Calculator</title>
+<style>
+:root{
+  --bg:#f7f7f5; --card:#ffffff; --text:#1f1f1f; --muted:#6b6b6b;
+  --accent:#c15f3c; --border:#e4e2dd;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#1a1a18; --card:#242422; --text:#eee; --muted:#9a9a95; --border:#3a3a36;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1a1a18; --card:#242422; --text:#eee; --muted:#9a9a95; --border:#3a3a36;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding:24px 16px 48px;
+}
+.wrap{max-width:640px;margin:0 auto;}
+h1{font-size:1.4rem;margin-bottom:4px;}
+p.sub{color:var(--muted);margin-top:0;font-size:.9rem;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px;}
+label{display:block;font-weight:600;font-size:.85rem;margin-bottom:6px;}
+textarea{
+  width:100%;min-height:80px;padding:10px;border-radius:8px;border:1px solid var(--border);
+  background:var(--bg);color:var(--text);font-size:.95rem;resize:vertical;font-family:inherit;
+}
+button{
+  background:var(--accent);color:#fff;border:none;padding:10px 20px;border-radius:8px;
+  font-size:.95rem;font-weight:600;cursor:pointer;margin-top:8px;
+}
+button:hover{opacity:.9;}
+.result{text-align:center;padding:10px 0;}
+.score{font-size:2.4rem;font-weight:700;color:var(--accent);}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;}
+.grid div{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center;font-size:.8rem;}
+.grid div b{display:block;font-size:1rem;color:var(--text);}
+.small{color:var(--muted);font-size:.8rem;margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="font-size:.7rem;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:2px;">India Innovation Light Weight Apps</div>
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+    <div>
+      <h1>BLEU Score Calculator</h1>
+      <p class="sub">Compare a machine translation candidate against one or more reference translations.</p>
+    </div>
+    <button id="helpBtn" style="background:transparent;color:var(--accent);border:1px solid var(--accent);padding:6px 14px;margin-top:2px;">Help</button>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;gap:10px;">
+      <div style="flex:1;">
+        <label for="baseLang">Base language</label>
+        <select id="baseLang"></select>
+      </div>
+      <div style="flex:1;">
+        <label for="targetLang">Translate to</label>
+        <select id="targetLang"></select>
+      </div>
+    </div>
+    <label for="sourceText" style="margin-top:12px;">Source text</label>
+    <textarea id="sourceText" placeholder="Enter text in the base language"></textarea>
+    <button id="translateBtn">Translate</button>
+    <div class="small" id="translateStatus"></div>
+  </div>
+
+  <div class="card">
+    <label for="candidate">Candidate translation (auto-filled, editable)</label>
+    <textarea id="candidate" placeholder="Translation will appear here, or type your own"></textarea>
+  </div>
+
+  <div class="card">
+    <label for="references">Reference translation(s) — one per line</label>
+    <textarea id="references" placeholder="the cat is on the mat
+there is a cat on the mat"></textarea>
+  </div>
+
+  <button id="computeBtn">Calculate BLEU</button>
+
+  <div class="card" id="semanticCard">
+    <label>Semantic evaluation (AI-estimated)</label>
+    <p class="small" style="margin-top:-4px;">These are AI estimates of each metric, not the literal output of the original BERTScore/COMET/BLEURT models.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <button class="semBtn" data-metric="embedding" style="margin-top:0;">Embedding Similarity</button>
+      <button class="semBtn" data-metric="bertscore" style="margin-top:0;">BERTScore</button>
+      <button class="semBtn" data-metric="comet" style="margin-top:0;">COMET/BLEURT</button>
+      <button class="semBtn" data-metric="judge" style="margin-top:0;">LLM as Judge</button>
+    </div>
+    <div id="semanticStatus" class="small" style="margin-top:10px;"></div>
+    <div id="semanticResults"></div>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none;">
+    <div class="result">
+      <div class="score" id="bleuScore">-</div>
+      <div class="small">BLEU-4 score</div>
+    </div>
+    <div class="grid" id="precisionGrid"></div>
+    <div class="small" id="bpInfo"></div>
+  </div>
+
+  <div class="card" id="explainCard" style="display:none;">
+    <label style="margin-bottom:10px;">How this score was reached</label>
+
+    <div class="small" style="margin-bottom:4px;">Word overlap (candidate vs. references)</div>
+    <div id="overlapView" style="line-height:1.9;margin-bottom:14px;"></div>
+
+    <div class="small" style="margin-bottom:4px;">What is an n-gram? (sliding window over your candidate)</div>
+    <div id="ngramView" style="margin-bottom:14px;"></div>
+
+    <div class="small" style="margin-bottom:4px;">Step 1 — n-gram precision</div>
+    <table id="precisionTable" style="width:100%;border-collapse:collapse;font-size:.85rem;margin-bottom:14px;"></table>
+
+    <div class="small" style="margin-bottom:4px;">Step 2 — geometric mean of precisions</div>
+    <div id="geoMeanStep" class="small" style="margin-bottom:14px;font-family:monospace;"></div>
+
+    <div class="small" style="margin-bottom:4px;">Step 3 — brevity penalty</div>
+    <div id="bpStep" class="small" style="margin-bottom:14px;font-family:monospace;"></div>
+
+    <div class="small" style="margin-bottom:4px;">Final score</div>
+    <div id="finalStep" class="small" style="font-family:monospace;font-weight:600;"></div>
+  </div>
+</div>
+
+<div id="helpOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;padding:16px;overflow-y:auto;">
+  <div style="max-width:640px;margin:20px auto;background:var(--card);border-radius:14px;padding:22px;position:relative;">
+    <button id="closeHelpBtn" style="position:absolute;top:14px;right:14px;background:transparent;color:var(--muted);border:1px solid var(--border);padding:4px 10px;margin:0;">✕</button>
+    <h2 style="margin-top:0;">Understanding the metrics</h2>
+
+    <div id="helpTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;">
+      <button class="helpTabBtn" data-tab="bleu" style="margin-top:0;padding:6px 12px;font-size:.8rem;">BLEU</button>
+      <button class="helpTabBtn" data-tab="embedding" style="margin-top:0;padding:6px 12px;font-size:.8rem;">Embedding Similarity</button>
+      <button class="helpTabBtn" data-tab="bertscore" style="margin-top:0;padding:6px 12px;font-size:.8rem;">BERTScore</button>
+      <button class="helpTabBtn" data-tab="comet" style="margin-top:0;padding:6px 12px;font-size:.8rem;">COMET/BLEURT</button>
+      <button class="helpTabBtn" data-tab="judge" style="margin-top:0;padding:6px 12px;font-size:.8rem;">LLM as Judge</button>
+      <button class="helpTabBtn" data-tab="techtranslate" style="margin-top:0;padding:6px 12px;font-size:.8rem;">How Translation Works</button>
+    </div>
+
+    <div class="helpPanel" data-panel="bleu">
+    <h3>What BLEU stands for</h3>
+    <p><b>BLEU = BiLingual Evaluation Understudy.</b> It's an automatic metric for judging how close a machine-translated ("candidate") sentence is to one or more human ("reference") translations.</p>
+
+    <h3>Origin</h3>
+    <p>Introduced in 2002 by Papineni, Roukos, Ward and Zhu at IBM, in the paper "BLEU: a Method for Automatic Evaluation of Machine Translation." It became the standard MT benchmark for two decades because it's fast, cheap, and correlates reasonably with human judgment at the corpus level.</p>
+
+    <h3>Core idea</h3>
+    <p>BLEU counts how many word sequences (n-grams) in the candidate also appear in the reference(s). More overlap → higher score. It checks both word choice (1-grams) and word order/fluency (2-, 3-, 4-grams).</p>
+
+    <h3>The formula</h3>
+    <p style="font-family:monospace;background:var(--bg);padding:10px;border-radius:8px;">BLEU = BP × exp( Σ (1/N) × log(pₙ) )</p>
+    <p>With N=4, this is equivalent to: <span style="font-family:monospace;">BP × (p₁ × p₂ × p₃ × p₄)^(1/4)</span> — the brevity penalty times the geometric mean of the four n-gram precisions.</p>
+
+    <h3>n-gram precision (pₙ)</h3>
+    <p>For each n (1 to 4), precision = (matched n-grams) / (total n-grams in candidate).</p>
+    <p><b>Clipping:</b> a matched n-gram can't be counted more times than it appears in the reference. This stops a candidate from gaming the score by repeating a correct word many times.</p>
+
+    <h3>Brevity penalty (BP)</h3>
+    <p>Precision alone rewards short candidates (fewer n-grams = easier to get them all right). BP corrects this by penalizing translations shorter than the reference:</p>
+    <ul>
+      <li>If candidate length &gt; reference length → BP = 1 (no penalty)</li>
+      <li>If candidate length ≤ reference length → BP = e^(1 − r/c), where r = reference length, c = candidate length</li>
+    </ul>
+
+    <h3>Multiple references</h3>
+    <p>When several correct references are given, BLEU takes the best (least penalized) match at each step — the candidate only needs to be close to <i>one</i> valid reference, not all of them.</p>
+
+    <h3>Score range and rough interpretation</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem;margin:8px 0;">
+      <tr style="background:var(--bg);"><th style="border:1px solid var(--border);padding:6px;">Score</th><th style="border:1px solid var(--border);padding:6px;">Quality</th></tr>
+      <tr><td style="border:1px solid var(--border);padding:6px;">&lt;10%</td><td style="border:1px solid var(--border);padding:6px;">Almost useless</td></tr>
+      <tr><td style="border:1px solid var(--border);padding:6px;">10–19%</td><td style="border:1px solid var(--border);padding:6px;">Hard to get the gist</td></tr>
+      <tr><td style="border:1px solid var(--border);padding:6px;">20–29%</td><td style="border:1px solid var(--border);padding:6px;">Gist is clear, but has significant errors</td></tr>
+      <tr><td style="border:1px solid var(--border);padding:6px;">30–40%</td><td style="border:1px solid var(--border);padding:6px;">Understandable to good translation</td></tr>
+      <tr><td style="border:1px solid var(--border);padding:6px;">40–50%</td><td style="border:1px solid var(--border);padding:6px;">High quality</td></tr>
+      <tr><td style="border:1px solid var(--border);padding:6px;">50–60%</td><td style="border:1px solid var(--border);padding:6px;">Very high quality</td></tr>
+      <tr><td style="border:1px solid var(--border);padding:6px;">&gt;60%</td><td style="border:1px solid var(--border);padding:6px;">Often better/quality than a single human reference</td></tr>
+    </table>
+    <p class="small">These bands are commonly cited rules of thumb (Google's MT documentation), not a strict standard — always sentence/domain dependent.</p>
+
+    <h3>Limitations</h3>
+    <ul>
+      <li>Only checks surface word overlap — no understanding of meaning, so correct synonyms or paraphrases get penalized.</li>
+      <li>Ignores grammar/semantics beyond n-gram order.</li>
+      <li>Sensitive to exactly how the reference is worded; more references reduce this issue.</li>
+      <li>Designed for corpus-level evaluation; single-sentence scores can be noisy or misleading.</li>
+      <li>Doesn't handle morphologically rich languages or non-whitespace-tokenized languages (e.g. Chinese, Japanese) well without special tokenization.</li>
+    </ul>
+
+    <h3>Common alternatives</h3>
+    <ul>
+      <li><b>METEOR</b> — accounts for synonyms/stemming, better sentence-level correlation with humans.</li>
+      <li><b>chrF</b> — character n-gram based, more robust across languages.</li>
+      <li><b>TER</b> (Translation Edit Rate) — edit distance to reach the reference.</li>
+      <li><b>COMET / BLEURT</b> — neural, embedding-based metrics with stronger human correlation.</li>
+    </ul>
+
+    <h3>In simple terms</h3>
+    <p>Think of it like checking your answer against an answer key by counting how many words and short phrases line up, word-for-word.</p>
+    <h3>Example</h3>
+    <p><b>Reference:</b> "The cat is sleeping on the sofa."<br><b>Candidate:</b> "The cat is sleeping on the couch."</p>
+    <p>Every word matches except "sofa" vs "couch" — same meaning, different word. BLEU doesn't know they mean the same thing, so it counts that as a miss. 1-gram precision would be 5 out of 6 words matched (~83%), but any n-gram containing "couch" (2-gram, 3-gram) also fails to match, pulling the final score down further — even though a human would call this translation basically perfect.</p>
+    </div>
+
+    <div class="helpPanel" data-panel="embedding" style="display:none;">
+      <h3>What it is</h3>
+      <p>A measure of how close two sentences are <b>in meaning</b>, using vector representations ("embeddings") produced by a neural encoder (e.g. Sentence-BERT, OpenAI/Google embedding models).</p>
+      <h3>How it's calculated</h3>
+      <p>Each sentence is converted to a vector. Similarity is the <b>cosine of the angle</b> between the two vectors:</p>
+      <p style="font-family:monospace;background:var(--bg);padding:10px;border-radius:8px;">cosθ = (A · B) / (‖A‖ ‖B‖)</p>
+      <p>Result ranges roughly 0 (unrelated meaning) to 1 (identical meaning). The diagram in this app draws that angle directly from the estimated score.</p>
+      <h3>Interpretation</h3>
+      <ul>
+        <li>&gt;0.8 — very similar meaning</li>
+        <li>0.5–0.8 — moderately related</li>
+        <li>&lt;0.5 — different meaning</li>
+      </ul>
+      <h3>Limitations</h3>
+      <p>No grammar/fluency check — a scrambled sentence with the same words can still score high. Result depends heavily on which embedding model produced the vectors.</p>
+
+      <h3>In simple terms</h3>
+      <p>Imagine every sentence is plotted as a point on a giant "map of meaning." Sentences that mean similar things land close together, no matter what words they use. This metric just measures the distance between those two points.</p>
+      <h3>Example</h3>
+      <p><b>Sentence A:</b> "The movie was fantastic."<br><b>Sentence B:</b> "The film was great."</p>
+      <p>Not a single word matches exactly (fantastic ≠ great, movie ≠ film), so BLEU would score this near 0%. But the meaning is nearly identical, so their points on the "meaning map" sit very close together — Embedding Similarity would score this high, around 90%+.</p>
+    </div>
+
+    <div class="helpPanel" data-panel="bertscore" style="display:none;">
+      <h3>What it is</h3>
+      <p>Named after <b>BERT</b> (Bidirectional Encoder Representations from Transformers). Introduced by Zhang et al., 2019 ("BERTScore: Evaluating Text Generation with BERT").</p>
+      <h3>How it's calculated</h3>
+      <p>Every candidate token and every reference token gets a contextual embedding. Each candidate token is matched to its most similar reference token (cosine similarity), and vice versa:</p>
+      <ul>
+        <li><b>Precision</b> — average best-match similarity, candidate → reference</li>
+        <li><b>Recall</b> — average best-match similarity, reference → candidate</li>
+        <li><b>F1</b> — harmonic mean of precision and recall (the number usually reported)</li>
+      </ul>
+      <h3>Why it beats BLEU</h3>
+      <p>Because it compares meaning-aware embeddings rather than exact strings, it correctly rewards synonyms and paraphrases that BLEU would penalize.</p>
+      <h3>Limitations</h3>
+      <p>Heavier to compute (needs a transformer model), still model-dependent, and less transparent than a simple n-gram count.</p>
+
+      <h3>In simple terms</h3>
+      <p>Like BLEU, but instead of demanding an exact word match, it's okay with a close synonym — it pairs up each word in your sentence with its nearest match in the correct sentence, and gives partial credit based on how close that pairing is.</p>
+      <h3>Example</h3>
+      <p><b>Reference:</b> "The child is joyful."<br><b>Candidate:</b> "The kid is happy."</p>
+      <p>BLEU sees zero exact word matches beyond "The" and "is" — a low score. BERTScore instead pairs "kid"↔"child" and "happy"↔"joyful," recognizes they're near-synonyms, and scores the sentence highly for meaning, even with completely different vocabulary.</p>
+    </div>
+
+    <div class="helpPanel" data-panel="comet" style="display:none;">
+      <h3>What they are</h3>
+      <p><b>COMET</b> — Crosslingual Optimized Metric for Evaluation of Translation (Unbabel, 2020). <b>BLEURT</b> — BiLingual Evaluation Understudy with Representations from Transformers (Google, 2020).</p>
+      <h3>How they're calculated</h3>
+      <p>Both are neural networks <b>trained directly on human quality ratings</b> (not a fixed formula like BLEU). COMET typically uses source + candidate + reference through a multilingual transformer (XLM-R); BLEURT fine-tunes BERT on synthetic data plus real human WMT ratings. The output is a learned regression score approximating what a human rater would give.</p>
+      <h3>Why they're preferred over BLEU today</h3>
+      <p>Much higher correlation with actual human judgment, and they can weigh fluency and adequacy together rather than just word overlap.</p>
+      <h3>Limitations</h3>
+      <p>Black-box — no interpretable sub-scores like BLEU's n-gram table. Needs a trained model to run (can't be computed by hand). Different model versions can give different score scales.</p>
+
+      <h3>In simple terms</h3>
+      <p>Like asking a very experienced translation reviewer who has personally read and rated thousands of translations before — they've developed a "gut feel" for quality that goes beyond just matching words, and they'll notice things like awkward phrasing even if every word is technically correct.</p>
+      <h3>Example</h3>
+      <p><b>Reference:</b> "She quickly finished her homework."<br><b>Candidate:</b> "Homework her she finished quickly."</p>
+      <p>Every individual word is correct, so BLEU's 1-gram score would look fine. But the word order is broken English. COMET/BLEURT, having learned from real human ratings of fluency, would catch this and score it low — the same way a human reviewer instantly would.</p>
+    </div>
+
+    <div class="helpPanel" data-panel="judge" style="display:none;">
+      <h3>What it is</h3>
+      <p>Using a large language model itself, prompted with a rubric, to rate translation quality — rather than a fixed mathematical formula.</p>
+      <h3>How it's calculated</h3>
+      <p>The LLM is given the candidate, the reference, and a rubric (e.g. accuracy, fluency, terminology, completeness) and asked to score each dimension plus give reasoning. There's no formula — the score comes from the model's own learned judgment.</p>
+      <h3>Advantages</h3>
+      <p>Flexible and explainable — it can flag exactly why a translation is wrong (wrong tone, mistranslated term, awkward phrasing) in plain language, and rubrics can be customized per domain.</p>
+      <h3>Limitations</h3>
+      <p>Not deterministic — asking again can give a slightly different score. Can be swayed by how the prompt/rubric is worded. No independent ground-truth validation the way COMET/BLEURT have against human ratings.</p>
+
+      <h3>In simple terms</h3>
+      <p>Like handing both sentences to a bilingual friend and asking, "Does this translation actually say the same thing, and does it sound natural?" They can explain exactly what's wrong in plain language, not just give you a number.</p>
+      <h3>Example</h3>
+      <p><b>Reference:</b> "Please submit the report by Friday."<br><b>Candidate:</b> "Kindly send report on Friday, please submit."</p>
+      <p>An LLM judge would flag this as awkward and slightly repetitive ("submit"/"send" duplicated), note the meaning is mostly preserved but "by Friday" (deadline) became "on Friday" (a specific day) — a subtle but real meaning shift — and explain that in a sentence, something a plain overlap-counting metric like BLEU can't do.</p>
+    </div>
+
+    <div class="helpPanel" data-panel="techtranslate" style="display:none;">
+      <h3>What "machine translation" means</h3>
+      <p>Software that automatically converts text from one language to another, without a human translator. This app's Translate button is one example of it in action.</p>
+
+      <h3>How the technology evolved</h3>
+      <p>Translation technology has gone through four major eras, each replacing the previous one's biggest weakness:</p>
+      <svg viewBox="0 0 620 150" style="width:100%;max-width:620px;margin:10px 0;">
+        <line x1="40" y1="75" x2="580" y2="75" stroke="var(--border)" stroke-width="2"/>
+        <g font-size="11" text-anchor="middle">
+          <circle cx="80" cy="75" r="8" fill="#4f8ef7"/>
+          <text x="80" y="45" fill="var(--text)" font-weight="600">Rule-Based</text>
+          <text x="80" y="60" fill="var(--muted)" font-size="9">1950s–90s</text>
+          <text x="80" y="100" fill="var(--muted)" font-size="9">Hand-written</text>
+          <text x="80" y="112" fill="var(--muted)" font-size="9">grammar rules</text>
+
+          <circle cx="240" cy="75" r="8" fill="#3fb37f"/>
+          <text x="240" y="45" fill="var(--text)" font-weight="600">Statistical (SMT)</text>
+          <text x="240" y="60" fill="var(--muted)" font-size="9">1990s–2014</text>
+          <text x="240" y="100" fill="var(--muted)" font-size="9">Learns phrase</text>
+          <text x="240" y="112" fill="var(--muted)" font-size="9">patterns from data</text>
+
+          <circle cx="400" cy="75" r="8" fill="#a26fe0"/>
+          <text x="400" y="45" fill="var(--text)" font-weight="600">Neural (NMT)</text>
+          <text x="400" y="60" fill="var(--muted)" font-size="9">2014–2017</text>
+          <text x="400" y="100" fill="var(--muted)" font-size="9">Encoder-decoder</text>
+          <text x="400" y="112" fill="var(--muted)" font-size="9">+ attention</text>
+
+          <circle cx="560" cy="75" r="8" fill="#e0964f"/>
+          <text x="560" y="45" fill="var(--text)" font-weight="600">Transformer / LLM</text>
+          <text x="560" y="60" fill="var(--muted)" font-size="9">2017–now</text>
+          <text x="560" y="100" fill="var(--muted)" font-size="9">Whole-sentence</text>
+          <text x="560" y="112" fill="var(--muted)" font-size="9">context, no fixed rules</text>
+        </g>
+      </svg>
+
+      <h3>Rule-based (earliest)</h3>
+      <p>Linguists manually wrote grammar rules and dictionaries: "if you see this pattern in French, output this pattern in English." Rigid and couldn't handle exceptions, slang, or ambiguity well.</p>
+
+      <h3>Statistical MT (SMT)</h3>
+      <p>Instead of hand-written rules, the system learned patterns automatically from millions of previously translated sentence pairs (e.g. parliament records, UN documents), picking the statistically most likely translation for each phrase.</p>
+
+      <h3>Neural MT (NMT)</h3>
+      <p>Replaced phrase-matching with a neural network: an <b>encoder</b> reads the whole source sentence into a numeric representation, and a <b>decoder</b> generates the target sentence from it, word by word — allowing far more natural, context-aware output.</p>
+
+      <h3>How a modern encoder–decoder translator works</h3>
+      <svg viewBox="0 0 620 220" style="width:100%;max-width:620px;margin:10px 0;">
+        <text x="140" y="20" font-size="11" fill="var(--muted)" text-anchor="middle">Source sentence</text>
+        <g font-size="10" fill="#1a3d7c">
+          <rect x="20" y="30" width="50" height="24" rx="5" fill="#e8f0fe"/><text x="45" y="46" text-anchor="middle">The</text>
+          <rect x="80" y="30" width="50" height="24" rx="5" fill="#e8f0fe"/><text x="105" y="46" text-anchor="middle">cat</text>
+          <rect x="140" y="30" width="60" height="24" rx="5" fill="#e8f0fe"/><text x="170" y="46" text-anchor="middle">sleeps</text>
+        </g>
+        <text x="380" y="20" font-size="11" fill="var(--muted)" text-anchor="middle">Target sentence</text>
+        <g font-size="10" fill="#7a4310">
+          <rect x="310" y="30" width="50" height="24" rx="5" fill="#fcefe0"/><text x="335" y="46" text-anchor="middle">Le</text>
+          <rect x="370" y="30" width="50" height="24" rx="5" fill="#fcefe0"/><text x="395" y="46" text-anchor="middle">chat</text>
+          <rect x="430" y="30" width="60" height="24" rx="5" fill="#fcefe0"/><text x="460" y="46" text-anchor="middle">dort</text>
+        </g>
+
+        <rect x="60" y="90" width="140" height="40" rx="8" fill="#e3f7ec" stroke="#3fb37f"/>
+        <text x="130" y="114" text-anchor="middle" font-size="11" fill="#175c3d" font-weight="600">Encoder</text>
+        <rect x="380" y="90" width="140" height="40" rx="8" fill="#f2e9fb" stroke="#a26fe0"/>
+        <text x="450" y="114" text-anchor="middle" font-size="11" fill="#4b2380" font-weight="600">Decoder</text>
+
+        <line x1="105" y1="54" x2="130" y2="90" stroke="var(--muted)" stroke-width="1.5"/>
+        <line x1="200" y1="110" x2="380" y2="110" stroke="#e0964f" stroke-width="2" marker-end="url(#arr)"/>
+        <text x="290" y="102" font-size="9" fill="var(--muted)" text-anchor="middle">attention weights</text>
+        <line x1="450" y1="90" x2="395" y2="54" stroke="var(--muted)" stroke-width="1.5"/>
+
+        <rect x="60" y="160" width="480" height="40" rx="8" fill="var(--bg)" stroke="var(--border)"/>
+        <text x="300" y="184" text-anchor="middle" font-size="10" fill="var(--muted)">Attention lets the decoder "look back" at every source word — not just a fixed summary — when generating each output word</text>
+        <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#e0964f"/></marker></defs>
+      </svg>
+
+      <h3>Transformers &amp; today's LLM-based translation</h3>
+      <p>The Transformer architecture (2017) replaced step-by-step reading with <b>self-attention</b>: every word looks at every other word in the sentence simultaneously, capturing long-range context much better and enabling parallel, faster training. This is the backbone of both dedicated translation engines (Google Translate, DeepL) and general-purpose LLMs like Claude and GPT.</p>
+      <p>The key difference: a dedicated NMT model is trained <i>only</i> to translate. An LLM like the one powering this app's Translate button was trained on huge amounts of general multilingual text and instructions — so it translates by understanding the request itself ("translate X to Y"), which also lets it handle tone, idioms, and informal text more flexibly, at the cost of being less specialized and occasionally less literal.</p>
+
+      <h3>Pipeline in practice</h3>
+      <ol style="font-size:.88rem;line-height:1.6;">
+        <li><b>Tokenization</b> — the sentence is split into sub-word pieces the model understands</li>
+        <li><b>Embedding</b> — each token becomes a numeric vector capturing its meaning/context</li>
+        <li><b>Self-attention / encoding</b> — the model builds a context-aware representation of the whole sentence</li>
+        <li><b>Generation</b> — the target-language tokens are produced one at a time, each informed by the full source context</li>
+        <li><b>Detokenization</b> — the output tokens are stitched back into readable text</li>
+      </ol>
+
+      <h3>Limitations to know</h3>
+      <ul>
+        <li>Can still mistranslate idioms, humor, or culturally specific references</li>
+        <li>LLM-based translators can occasionally "hallucinate" content not in the source</li>
+        <li>Low-resource languages (less training data available) translate less reliably</li>
+        <li>Formality, gender, and tone can be lost or guessed incorrectly without context</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<style>
+.tok{padding:2px 5px;border-radius:5px;margin:0 2px;display:inline-block;font-size:.9rem;}
+.tok-match{background:#d7f0d0;color:#1f4d1a;}
+.tok-nomatch{background:#f5d7d3;color:#5a1f16;}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .tok-match{background:#274d20;color:#c9f0be;}
+  :root:not([data-theme="light"]) .tok-nomatch{background:#4d2620;color:#f0c4bb;}
+}
+:root[data-theme="dark"] .tok-match{background:#274d20;color:#c9f0be;}
+:root[data-theme="dark"] .tok-nomatch{background:#4d2620;color:#f0c4bb;}
+.ngram-block{margin-bottom:18px;}
+.ngram-heading{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.ngram-heading .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.ngram-heading .label{font-weight:600;font-size:.85rem;}
+.ngram-heading .count{font-size:.75rem;color:var(--muted);}
+.ngram-strip{display:flex;align-items:center;gap:6px;overflow-x:auto;padding:6px 2px 10px;scroll-snap-type:x proximity;}
+.ngram-card{
+  scroll-snap-align:start;flex-shrink:0;display:flex;gap:4px;align-items:center;
+  padding:8px 10px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.12);
+  transition:transform .15s ease; font-size:.82rem; font-weight:500;
+}
+.ngram-card:hover{transform:translateY(-2px);}
+.ngram-card .idx{font-size:.65rem;opacity:.65;margin-right:2px;}
+.ngram-arrow{color:var(--muted);font-size:.9rem;flex-shrink:0;}
+.n1 .dot{background:#4f8ef7;} .n1 .ngram-card{background:#e8f0fe;color:#1a3d7c;}
+.n2 .dot{background:#3fb37f;} .n2 .ngram-card{background:#e3f7ec;color:#175c3d;}
+.n3 .dot{background:#a26fe0;} .n3 .ngram-card{background:#f2e9fb;color:#4b2380;}
+.n4 .dot{background:#e0964f;} .n4 .ngram-card{background:#fcefe0;color:#7a4310;}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .n1 .ngram-card{background:#1c2c4d;color:#c7dbff;}
+  :root:not([data-theme="light"]) .n2 .ngram-card{background:#153a29;color:#bdf0d5;}
+  :root:not([data-theme="light"]) .n3 .ngram-card{background:#2f2148;color:#dcc7f7;}
+  :root:not([data-theme="light"]) .n4 .ngram-card{background:#432c14;color:#f5d3ac;}
+}
+:root[data-theme="dark"] .n1 .ngram-card{background:#1c2c4d;color:#c7dbff;}
+:root[data-theme="dark"] .n2 .ngram-card{background:#153a29;color:#bdf0d5;}
+:root[data-theme="dark"] .n3 .ngram-card{background:#2f2148;color:#dcc7f7;}
+:root[data-theme="dark"] .n4 .ngram-card{background:#432c14;color:#f5d3ac;}
+table#precisionTable td, table#precisionTable th{border:1px solid var(--border);padding:6px 8px;text-align:center;}
+#helpOverlay h3{font-size:.95rem;margin:16px 0 4px;}
+#helpOverlay p, #helpOverlay li{font-size:.88rem;line-height:1.5;color:var(--text);}
+#helpOverlay ul{padding-left:20px;margin:6px 0;}
+.semResult{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-top:10px;}
+.semResult .semTitle{display:flex;justify-content:space-between;font-weight:600;font-size:.9rem;margin-bottom:4px;}
+.semResult .semScore{color:var(--accent);}
+.semResult .semReason{font-size:.85rem;color:var(--muted);}
+.helpTabBtn{background:var(--bg);color:var(--text);border:1px solid var(--border);}
+.helpTabBtn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+</style>
+
+<script>
+const LANGUAGES = ["English","Spanish","French","German","Italian","Portuguese","Dutch","Russian",
+"Chinese (Simplified)","Japanese","Korean","Arabic","Hindi","Bengali","Turkish","Polish","Vietnamese",
+"Thai","Swedish","Greek","Hebrew","Indonesian","Ukrainian","Czech","Romanian","Hungarian","Finnish",
+"Danish","Norwegian","Tamil","Telugu","Kannada","Malayalam","Marathi","Gujarati","Urdu","Persian","Swahili"];
+
+function populateLangs(){
+  const base = document.getElementById('baseLang');
+  const target = document.getElementById('targetLang');
+  LANGUAGES.forEach(l=>{
+    base.appendChild(new Option(l,l));
+    target.appendChild(new Option(l,l));
+  });
+  base.value = "English";
+  target.value = "French";
+}
+populateLangs();
+document.getElementById('translateBtn').addEventListener('click', translate);
+document.getElementById('computeBtn').addEventListener('click', compute);
+document.getElementById('helpBtn').addEventListener('click', ()=>{
+  document.getElementById('helpOverlay').style.display = 'block';
+});
+document.getElementById('closeHelpBtn').addEventListener('click', ()=>{
+  document.getElementById('helpOverlay').style.display = 'none';
+});
+document.getElementById('helpOverlay').addEventListener('click', (e)=>{
+  if(e.target.id === 'helpOverlay') e.target.style.display = 'none';
+});
+
+const METRIC_INFO = {
+  embedding: {
+    title: 'Embedding Similarity',
+    buildPrompt: (cand, ref) => `Estimate the semantic embedding cosine similarity (0.0 to 1.0) between these two sentences, as if computed by a sentence embedding model (e.g. all-MiniLM). Focus purely on meaning closeness, ignoring exact wording.
+
+Candidate: ${cand}
+Reference: ${ref}
+
+Respond ONLY as JSON: {"score": <number 0-1>, "reason": "<one short sentence>"}`,
+    render: (container, data) => {
+      const angleDeg = Math.acos(Math.max(-1,Math.min(1,Number(data.score)))) * 180/Math.PI;
+      const rad = angleDeg * Math.PI/180;
+      const x2 = 100 + 70*Math.cos(rad), y2 = 120 - 70*Math.sin(rad);
+      container.innerHTML = `
+        <div class="small" style="margin-bottom:4px;">Vector angle between meaning representations — smaller angle = closer meaning</div>
+        <svg viewBox="0 0 220 140" style="width:100%;max-width:260px;">
+          <line x1="100" y1="120" x2="190" y2="120" stroke="#4f8ef7" stroke-width="3" marker-end="url(#arrow1)"/>
+          <line x1="100" y1="120" x2="${x2}" y2="${y2}" stroke="#e0964f" stroke-width="3" marker-end="url(#arrow2)"/>
+          <path d="M ${100+22*Math.cos(0)} ${120-22*Math.sin(0)} A 22 22 0 0 0 ${100+22*Math.cos(rad)} ${120-22*Math.sin(rad)}" fill="none" stroke="var(--muted)" stroke-width="1.5"/>
+          <defs>
+            <marker id="arrow1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4f8ef7"/></marker>
+            <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#e0964f"/></marker>
+          </defs>
+          <text x="100" y="132" font-size="10" fill="var(--muted)" text-anchor="middle">candidate ↔ reference</text>
+        </svg>
+        <div class="small">Angle ≈ ${angleDeg.toFixed(1)}° (cosθ = score)</div>`;
+    }
+  },
+  bertscore: {
+    title: 'BERTScore (F1)',
+    buildPrompt: (cand, ref) => `Candidate tokens in order: ${JSON.stringify(tokenize(cand))}
+Reference sentence: "${ref}"
+
+For EACH candidate token, find the most semantically similar word in the reference and estimate a similarity from 0 to 1 (synonyms count as high similarity). Then estimate overall BERTScore F1 (0-1).
+
+Respond ONLY as JSON: {"score": <number 0-1>, "reason": "<one short sentence>", "tokenPairs": [{"candidate":"word","reference":"matchedWord","similarity":0.0}, ...]}`,
+    render: (container, data) => {
+      const pairs = Array.isArray(data.tokenPairs) ? data.tokenPairs : [];
+      const rows = pairs.map(p=>{
+        const sim = Math.max(0,Math.min(1,Number(p.similarity)||0));
+        const hue = sim*120; // 0=red,120=green
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <span style="min-width:70px;font-size:.8rem;font-weight:600;">${p.candidate||''}</span>
+          <span style="font-size:.75rem;color:var(--muted);">↔</span>
+          <span style="min-width:70px;font-size:.8rem;">${p.reference||''}</span>
+          <div style="flex:1;background:var(--bg);border-radius:6px;overflow:hidden;height:8px;">
+            <div style="width:${(sim*100).toFixed(0)}%;height:100%;background:hsl(${hue},65%,50%);"></div>
+          </div>
+          <span style="font-size:.75rem;width:34px;text-align:right;">${(sim*100).toFixed(0)}%</span>
+        </div>`;
+      }).join('');
+      container.innerHTML = `<div class="small" style="margin-bottom:6px;">Per-token semantic match to closest reference word</div>${rows || '<div class="small">No token-level detail returned.</div>'}`;
+    }
+  },
+  comet: {
+    title: 'COMET/BLEURT-style score',
+    buildPrompt: (cand, ref) => `Estimate a COMET/BLEURT-style translation quality assessment for the candidate against the reference. Give an overall score plus two sub-scores: adequacy (does it preserve meaning) and fluency (does it read naturally), all 0.0 to 1.0.
+
+Candidate: ${cand}
+Reference: ${ref}
+
+Respond ONLY as JSON: {"score": <number 0-1>, "adequacy": <number 0-1>, "fluency": <number 0-1>, "reason": "<one short sentence>"}`,
+    render: (container, data) => {
+      const bar = (label, val) => `
+        <div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:2px;"><span>${label}</span><span>${(Number(val)*100).toFixed(0)}%</span></div>
+          <div style="background:var(--bg);border-radius:6px;overflow:hidden;height:8px;">
+            <div style="width:${(Number(val)*100).toFixed(0)}%;height:100%;background:var(--accent);"></div>
+          </div>
+        </div>`;
+      container.innerHTML = bar('Adequacy (meaning preserved)', data.adequacy ?? data.score) + bar('Fluency (reads naturally)', data.fluency ?? data.score);
+    }
+  },
+  judge: {
+    title: 'LLM as Judge',
+    buildPrompt: (cand, ref) => `Act as a translation quality judge. Score the candidate against the reference (0.0 to 1.0) on each of these four criteria: accuracy, fluency, terminology, completeness. Then give an overall score.
+
+Candidate: ${cand}
+Reference: ${ref}
+
+Respond ONLY as JSON: {"score": <number 0-1>, "reason": "<one short sentence>", "criteria": [{"name":"Accuracy","score":0.0},{"name":"Fluency","score":0.0},{"name":"Terminology","score":0.0},{"name":"Completeness","score":0.0}]}`,
+    render: (container, data) => {
+      const criteria = Array.isArray(data.criteria) ? data.criteria : [];
+      container.innerHTML = `<div class="grid">${criteria.map(c=>
+        `<div><b>${(Number(c.score)*100).toFixed(0)}%</b>${c.name}</div>`
+      ).join('')}</div>`;
+    }
+  }
+};
+
+async function runSemanticMetric(metric){
+  const candidate = document.getElementById('candidate').value.trim();
+  const refText = document.getElementById('references').value.trim();
+  const status = document.getElementById('semanticStatus');
+
+  if(!candidate || !refText){
+    alert('Please fill in the candidate and at least one reference first.');
+    return;
+  }
+
+  status.textContent = `Running ${METRIC_INFO[metric].title}...`;
+
+  try{
+    const info = METRIC_INFO[metric];
+    const prompt = info.buildPrompt(candidate, refText);
+    const result = await aiCompleteJSON(prompt);
+    renderSemanticResult(metric, info.title, result);
+    status.textContent = '';
+  }catch(err){
+    console.error('semantic metric error', err);
+    status.textContent = `${METRIC_INFO[metric].title} failed: ` + (err && err.message ? err.message : 'unknown error');
+  }
+}
+
+function renderSemanticResult(metric, title, data){
+  const container = document.getElementById('semanticResults');
+  const div = document.createElement('div');
+  div.className = 'semResult';
+  const pct = (Number(data.score)*100).toFixed(1);
+  div.innerHTML = `<div class="semTitle"><span>${title}</span><span class="semScore">${pct}%</span></div><div class="semReason">${data.reason || ''}</div><div class="semViz" style="margin-top:8px;"></div>`;
+  container.prepend(div);
+  try{
+    METRIC_INFO[metric].render(div.querySelector('.semViz'), data);
+  }catch(e){
+    console.error('render error', e);
+  }
+}
+
+document.querySelectorAll('.semBtn').forEach(btn=>{
+  btn.addEventListener('click', ()=> runSemanticMetric(btn.dataset.metric));
+});
+
+document.querySelectorAll('.helpTabBtn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.helpTabBtn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const target = btn.dataset.tab;
+    document.querySelectorAll('.helpPanel').forEach(p=>{
+      p.style.display = (p.dataset.panel === target) ? 'block' : 'none';
+    });
+  });
+});
+document.querySelector('.helpTabBtn[data-tab="bleu"]').classList.add('active');
+
+let sampleFn = null;
+async function getSample(){
+  if(sampleFn) return sampleFn;
+  const launch = new URLSearchParams(location.search).get('launch') || '';
+  const request = async (prompt, jsonMode=false) => {
+    const response = await fetch('/api/bleu-assist', {
+      method: 'POST',
+      cache: 'no-store',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({launch, prompt, json: jsonMode})
+    });
+    const payload = await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(payload.error || 'AI assistance is unavailable.');
+    return payload;
+  };
+  sampleFn = async prompt => ({text:(await request(prompt, false)).text || ''});
+  sampleFn.json = async prompt => (await request(prompt, true)).result;
+  return sampleFn;
+}
+
+async function aiComplete(promptText){
+  const sample = await getSample();
+  const result = await sample(promptText, { modelTier: "quick" });
+  return result.text;
+}
+
+async function aiCompleteJSON(promptText){
+  const sample = await getSample();
+  return await sample.json(promptText, { modelTier: "quick" });
+}
+
+async function translate(){
+  const src = document.getElementById('sourceText').value.trim();
+  const base = document.getElementById('baseLang').value;
+  const target = document.getElementById('targetLang').value;
+  const status = document.getElementById('translateStatus');
+  const btn = document.getElementById('translateBtn');
+
+  if(!src){
+    alert('Please enter source text.');
+    return;
+  }
+
+  btn.disabled = true;
+  status.textContent = 'Translating...';
+
+  try{
+    const prompt = `Translate the following text from ${base} to ${target}. Respond with ONLY the translation, no explanation, no quotes.\n\nText: ${src}`;
+    const text = await aiComplete(prompt);
+    document.getElementById('candidate').value = (text || '').trim();
+    status.textContent = `Translated ${base} → ${target}.`;
+  }catch(err){
+    console.error('translate error', err);
+    status.textContent = 'Translation failed: ' + (err && err.message ? err.message : 'unknown error');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function tokenize(s){
+  return s.toLowerCase().trim().replace(/[^\w\s]/g,'').split(/\s+/).filter(Boolean);
+}
+
+function getNgrams(tokens, n){
+  const counts = {};
+  for(let i=0;i<=tokens.length-n;i++){
+    const gram = tokens.slice(i,i+n).join(' ');
+    counts[gram] = (counts[gram]||0)+1;
+  }
+  return counts;
+}
+
+function compute(){
+ try{
+  const candText = document.getElementById('candidate').value;
+  const refText = document.getElementById('references').value;
+  const refLines = refText.split('\n').map(r=>r.trim()).filter(Boolean);
+
+  if(!candText.trim() || refLines.length===0){
+    alert('Please provide a candidate and at least one reference.');
+    return;
+  }
+
+  const candTokens = tokenize(candText);
+  const refTokensList = refLines.map(tokenize);
+
+  const maxN = 4;
+  const precisions = [];
+  const precisionDetails = [];
+  let unigramMatchFlags = null;
+
+  for(let n=1;n<=maxN;n++){
+    const candGrams = getNgrams(candTokens, n);
+    let clippedTotal = 0;
+    let totalCand = 0;
+    for(const gram in candGrams){
+      totalCand += candGrams[gram];
+      let maxRefCount = 0;
+      for(const refTokens of refTokensList){
+        const refGrams = getNgrams(refTokens, n);
+        if(refGrams[gram]) maxRefCount = Math.max(maxRefCount, refGrams[gram]);
+      }
+      clippedTotal += Math.min(candGrams[gram], maxRefCount);
+    }
+    precisions.push(totalCand===0 ? 0 : clippedTotal/totalCand);
+    precisionDetails.push({n, clipped: clippedTotal, total: totalCand});
+
+    if(n===1){
+      // Per-token match flags for the overlap visualization
+      const refUnigramSets = refTokensList.map(rt => new Set(rt));
+      unigramMatchFlags = candTokens.map(tok => refUnigramSets.some(s => s.has(tok)));
+    }
+  }
+
+  // Brevity penalty
+  const candLen = candTokens.length;
+  let closestRefLen = refTokensList[0].length;
+  let minDiff = Math.abs(refTokensList[0].length - candLen);
+  for(const refTokens of refTokensList){
+    const diff = Math.abs(refTokens.length - candLen);
+    if(diff < minDiff){
+      minDiff = diff;
+      closestRefLen = refTokens.length;
+    }
+  }
+  const bp = candLen > closestRefLen ? 1 : Math.exp(1 - closestRefLen/candLen);
+
+  // Geometric mean of precisions
+  let logSum = 0;
+  let zeroFound = false;
+  for(const p of precisions){
+    if(p===0){ zeroFound = true; break; }
+    logSum += Math.log(p);
+  }
+  const geoMean = zeroFound ? 0 : Math.exp(logSum/maxN);
+  const bleu = bp * geoMean;
+
+  document.getElementById('resultCard').style.display = 'block';
+  document.getElementById('bleuScore').textContent = (bleu*100).toFixed(2) + '%';
+
+  const grid = document.getElementById('precisionGrid');
+  grid.innerHTML = precisions.map((p,i)=>`<div><b>${(p*100).toFixed(1)}%</b>${i+1}-gram</div>`).join('');
+
+  document.getElementById('bpInfo').textContent =
+    `Brevity penalty: ${bp.toFixed(3)} (candidate length ${candLen}, closest reference length ${closestRefLen})`;
+
+  // --- Visual explanation ---
+  const overlapView = document.getElementById('overlapView');
+  overlapView.innerHTML = candTokens.map((tok,i)=>
+    `<span class="tok ${unigramMatchFlags[i] ? 'tok-match':'tok-nomatch'}">${tok}</span>`
+  ).join('');
+
+  const ngramView = document.getElementById('ngramView');
+  const ngramNames = {1:'1-gram (single words)',2:'2-gram (word pairs)',3:'3-gram (word triples)',4:'4-gram (word quadruples)'};
+  ngramView.innerHTML = [1,2,3,4].map(n=>{
+    if(candTokens.length < n) return '';
+    const sets = [];
+    for(let i=0;i<=candTokens.length-n;i++){
+      sets.push(candTokens.slice(i,i+n));
+    }
+    const cardsHtml = sets.map((s,i)=>
+      `<div class="ngram-card"><span class="idx">#${i+1}</span>${s.join(' ')}</div>`
+    ).join('<span class="ngram-arrow">›</span>');
+    return `<div class="ngram-block n${n}">
+      <div class="ngram-heading"><span class="dot"></span><span class="label">${ngramNames[n]}</span><span class="count">${sets.length} window${sets.length===1?'':'s'}</span></div>
+      <div class="ngram-strip">${cardsHtml}</div>
+    </div>`;
+  }).join('');
+
+  const table = document.getElementById('precisionTable');
+  table.innerHTML =
+    '<tr><th>n-gram</th><th>Matched</th><th>Total in candidate</th><th>Precision</th></tr>' +
+    precisionDetails.map(d =>
+      `<tr><td>${d.n}-gram</td><td>${d.clipped}</td><td>${d.total}</td><td>${(d.total? (d.clipped/d.total*100):0).toFixed(1)}%</td></tr>`
+    ).join('');
+
+  document.getElementById('geoMeanStep').textContent =
+    `(${precisions.map(p=>p.toFixed(3)).join(' × ')}) ^ (1/${maxN}) = ${geoMean.toFixed(4)}`;
+
+  document.getElementById('bpStep').textContent =
+    candLen > closestRefLen
+      ? `candidate (${candLen}) > reference (${closestRefLen}) → BP = 1`
+      : `BP = e^(1 - ${closestRefLen}/${candLen}) = ${bp.toFixed(4)}`;
+
+  document.getElementById('finalStep').textContent =
+    `BLEU = BP × geometric mean = ${bp.toFixed(4)} × ${geoMean.toFixed(4)} = ${bleu.toFixed(4)} (${(bleu*100).toFixed(2)}%)`;
+
+  document.getElementById('explainCard').style.display = 'block';
+ }catch(err){
+   console.error('compute() error', err);
+   alert('Error calculating BLEU: ' + (err && err.message ? err.message : err));
+ }
+}
+</script>
+</body>
+</html>
