@@ -151,3 +151,13 @@ its existing authentication. Save project files before closing KestrelIQ:
 browser autosave belongs to the app's port, which may change after a restart.
 Use Open project to transfer a project from the standalone app on port 5050.
 Restart KestrelIQ after installing this integration.
+
+### Project Organizer
+
+Open **Tool Kit > Productivity Tool Kit > Project Organizer**. Administrators
+can enable `project-organizer` in the existing user tool-access list. The bundled
+page in `tools/project-organizer.html` includes projects, links, notes, tasks,
+contacts, and utilities. Data is saved locally in the browser, with JSON
+import/export and optional linked-file saving. Use JSON export/import to move
+data from the standalone HTML file into KestrelIQ. Restart KestrelIQ after
+installing this integration.

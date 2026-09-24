@@ -111,6 +111,7 @@ TOOL_PAGES = {
     "/tools/statlens": "statlens/frontend/index.html",
     "/tools/bleu-calculator": "bleu-calculator.html",
     "/tools/textforge": "textforge.html",
+    "/tools/project-organizer": "project-organizer.html",
     "/tools/project-charter": "project-charter.html",
     "/tools/gantt-chart": "gantt-chart.html",
     "/tools/notebook-presenter": "notebook-presenter.html",
