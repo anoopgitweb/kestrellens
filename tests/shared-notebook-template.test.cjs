@@ -1,0 +1,23 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const root=path.join(__dirname,'..');
+const shared=fs.readFileSync(path.join(root,'assets/notebook-template.js'),'utf8');
+const main=fs.readFileSync(path.join(root,'templates/index.html'),'utf8');
+const presenter=fs.readFileSync(path.join(root,'tools/notebook-presenter.html'),'utf8');
+const downloads=[];
+const XLSX={utils:{aoa_to_sheet:rows=>({rows,'!ref':'A1:H1'}),book_new:()=>({}),book_append_sheet:(book,sheet)=>{book.sheet=sheet;}},writeFile:(book,name)=>downloads.push({rows:book.sheet.rows,name})};
+const context=vm.createContext({window:{XLSX},showToast(){},alert:message=>{throw Error(message);}});
+vm.runInContext(shared,context);
+vm.runInContext(main.match(/async function downloadJotTemplate\(\)[^\n]+/)[0],context);
+vm.runInContext(presenter.slice(presenter.indexOf('async function downloadTemplate('),presenter.indexOf('async function adminExportXLSX(')),context);
+(async()=>{
+ await context.downloadJotTemplate();await context.downloadTemplate();
+ assert.deepEqual(downloads[0],downloads[1]);
+ assert.equal(downloads[0].name,'KestrelIQ_Notebook_Template.xlsx');
+ assert.deepEqual(Array.from(downloads[0].rows[0]),['Notebook','Chapter','Page Heading','Page Details','Video URL','Local Video URL','Diagram','Page Order']);
+ context.parseCsvRows=()=>[downloads[0].rows[0],['Notebook','Chapter','Page','Text','','C:\\Videos\\lesson.mp4','https://example.com/diagram.png','2']];
+ context.JOT_TEMPLATE_HEADERS=context.window.NotebookTemplate.columns;
+ vm.runInContext(main.match(/function jotTemplateColumnKey[^\n]+/)[0]+'\n'+main.match(/function parseJotTemplate[^\n]+/)[0],context);
+ const row=context.parseJotTemplate('fixture')[0];
+ assert.equal(row.localVideoUrl,'C:\\Videos\\lesson.mp4');assert.equal(row.diagramUrl,'https://example.com/diagram.png');assert.equal(row.order,2);
+ console.log('Both download buttons produce the same template; Discover & Learn imports all shared reference fields.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request, render_template, send_file
 from io import BytesIO
 from engine import CATALOG, THEMES, validate, scene, svg, powerpoint
+from notebook_import import import_notebook
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 40 * 1024 * 1024
@@ -16,12 +17,24 @@ def config():
 @app.post('/api/preview')
 def preview():
     deck = validate(request.get_json())
-    return jsonify(slides=[svg(scene(s, THEMES[deck['theme']], i + 1)) for i, s in enumerate(deck['slides'])])
+    start=deck.get('previewSlideNumber',1)
+    return jsonify(slides=[svg(scene(s, THEMES[deck['theme']], start+i, deck)) for i, s in enumerate(deck['slides'])])
 
 @app.post('/api/generate')
 def generate():
     deck = validate(request.get_json())
     return send_file(BytesIO(powerpoint(deck)), mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation', as_attachment=True, download_name='presentation.pptx')
+
+@app.post('/api/import-notebook')
+def import_notebook_file():
+    uploaded = request.files.get('file')
+    if not uploaded or not uploaded.filename.lower().endswith('.xlsx'):
+        raise ValueError('Choose the KestrelIQ Notebook .xlsx template.')
+    data = uploaded.read()
+    if not data or len(data) > 25 * 1024 * 1024:
+        raise ValueError('Choose a non-empty Notebook workbook under 25 MB.')
+    deck = import_notebook(data)
+    return jsonify(validate(deck))
 
 @app.errorhandler(ValueError)
 def invalid(error):

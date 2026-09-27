@@ -8,9 +8,11 @@ import io
 import ipaddress
 import json
 import os
+import posixpath
 import re
 import socket
 import subprocess
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -107,7 +109,7 @@ from slide_studio_launcher import launch as launch_slide_studio
 TOOL_PAGES = {
     "/tools/mp4-transcriber": "mp4-transcriber.html",
     "/tools/video-utility": "video-utility.html",
-    "/tools/slide-studio": "slide-studio/templates/index.html",
+    "/tools/slide-studio": "slide-studio-landing.html",
     "/tools/statlens": "statlens/frontend/index.html",
     "/tools/bleu-calculator": "bleu-calculator.html",
     "/tools/textforge": "textforge.html",
@@ -143,6 +145,10 @@ OPENAI_NOTEBOOK_MODEL = os.environ.get("OPENAI_NOTEBOOK_MODEL") or "gpt-5.6-terr
 GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON") or ""
 GOOGLE_DRIVE_FOLDER_ID = (os.environ.get("GOOGLE_DRIVE_FOLDER_ID") or "").strip()
 GOOGLE_DRIVE_SHARED_DRIVE_ID = (os.environ.get("GOOGLE_DRIVE_SHARED_DRIVE_ID") or "").strip()
+GOOGLE_DRIVE_OAUTH_CLIENT_ID = (os.environ.get("GOOGLE_DRIVE_OAUTH_CLIENT_ID") or "").strip()
+GOOGLE_DRIVE_OAUTH_CLIENT_SECRET = (os.environ.get("GOOGLE_DRIVE_OAUTH_CLIENT_SECRET") or "").strip()
+GOOGLE_DRIVE_OAUTH_TOKEN_FILE = ROOT / ".google_drive_oauth.json"
+GOOGLE_DRIVE_OAUTH_SCOPE = "https://www.googleapis.com/auth/drive.file"
 CACHE_SECONDS = 15 * 60
 QUOTE_CACHE_SECONDS = 60
 IST = ZoneInfo("Asia/Kolkata")
@@ -152,6 +158,9 @@ GLOBAL_2000_CACHE = {}
 OPENAI_DISCOVERY_USAGE = {}
 MEMBER_DAILY_CACHE = {}
 MEMBER_VIDEO_CACHE = {}
+GOOGLE_DRIVE_OAUTH_STATES = {}
+GOOGLE_DRIVE_CREDENTIALS = None
+GOOGLE_DRIVE_CREDENTIALS_LOCK = threading.RLock()
 TIMELINE_REFRESH_CACHE = {"time": 0.0, "articles": [], "errors": [], "scan": None, "sync": None}
 
 _ORIGINAL_GETADDRINFO = socket.getaddrinfo
@@ -1043,27 +1052,348 @@ def _delete_jot_item(table, item_id, label, access_token):
     return _supabase_table_request(table, "DELETE", f"?id=eq.{encoded}", access_token=access_token)
 
 
+def _xlsx_relationships(archive, source_path):
+    directory, filename = posixpath.split(source_path)
+    rels_path = posixpath.join(directory, "_rels", filename + ".rels")
+    try:
+        root = ET.fromstring(archive.read(rels_path))
+    except KeyError:
+        return {}
+    relationships = {}
+    for item in root:
+        if str(item.attrib.get("TargetMode") or "").lower() == "external":
+            continue
+        relation_id = str(item.attrib.get("Id") or "")
+        target = str(item.attrib.get("Target") or "").replace("\\", "/")
+        if relation_id and target:
+            relationships[relation_id] = posixpath.normpath(posixpath.join(directory, target)).lstrip("/")
+    return relationships
+
+
+def _xlsx_column_index(reference):
+    letters = re.match(r"[A-Za-z]+", str(reference or ""))
+    if not letters:
+        return -1
+    value = 0
+    for character in letters.group(0).upper():
+        value = value * 26 + ord(character) - 64
+    return value - 1
+
+
+def _xlsx_cell_text(cell, shared_strings):
+    cell_type = str(cell.attrib.get("t") or "")
+    if cell_type == "inlineStr":
+        return "".join(str(node.text or "") for node in cell.iter() if node.tag.endswith("}t"))
+    value_node = next((node for node in cell if node.tag.endswith("}v")), None)
+    value = str(value_node.text or "") if value_node is not None else ""
+    if cell_type == "s" and value.isdigit():
+        index = int(value)
+        return shared_strings[index] if index < len(shared_strings) else ""
+    if cell_type == "b":
+        return "TRUE" if value == "1" else "FALSE"
+    return value
+
+
+def _parse_jot_xlsx(payload):
+    if not payload or len(payload) > 25 * 1024 * 1024:
+        raise ValueError("Use an Excel template no larger than 25 MB.")
+    if not payload.startswith(b"PK"):
+        raise ValueError("Choose a valid .xlsx workbook.")
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(payload))
+    except zipfile.BadZipFile as exc:
+        raise ValueError("The Excel workbook could not be opened.") from exc
+    with archive:
+        members = archive.infolist()
+        if len(members) > 2000 or sum(item.file_size for item in members) > 100 * 1024 * 1024:
+            raise ValueError("The Excel workbook contains too much data.")
+        if any(name.startswith("/") or ".." in Path(name).parts for name in archive.namelist()):
+            raise ValueError("The Excel workbook contains an unsafe file path.")
+        try:
+            workbook_root = ET.fromstring(archive.read("xl/workbook.xml"))
+        except (KeyError, ET.ParseError) as exc:
+            raise ValueError("The workbook structure is invalid.") from exc
+        workbook_rels = _xlsx_relationships(archive, "xl/workbook.xml")
+        sheet_element = next((node for node in workbook_root.iter() if node.tag.endswith("}sheet")), None)
+        relation_key = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+        sheet_path = workbook_rels.get(str(sheet_element.attrib.get(relation_key) or "")) if sheet_element is not None else ""
+        if not sheet_path:
+            raise ValueError("The workbook does not contain a readable worksheet.")
+        try:
+            sheet_root = ET.fromstring(archive.read(sheet_path))
+        except (KeyError, ET.ParseError) as exc:
+            raise ValueError("The first worksheet could not be read.") from exc
+
+        shared_strings = []
+        if "xl/sharedStrings.xml" in archive.namelist():
+            shared_root = ET.fromstring(archive.read("xl/sharedStrings.xml"))
+            for entry in shared_root:
+                shared_strings.append("".join(str(node.text or "") for node in entry.iter() if node.tag.endswith("}t")))
+
+        sheet_rows = []
+        for row in (node for node in sheet_root.iter() if node.tag.endswith("}row")):
+            values = {}
+            for cell in (node for node in row if node.tag.endswith("}c")):
+                column = _xlsx_column_index(cell.attrib.get("r"))
+                if column >= 0:
+                    values[column] = _xlsx_cell_text(cell, shared_strings).strip()
+            sheet_rows.append((int(row.attrib.get("r") or len(sheet_rows) + 1), values))
+        nonempty_rows = [(number, values) for number, values in sheet_rows if any(values.values())]
+        if not nonempty_rows:
+            raise ValueError("The workbook is empty.")
+        header_row_number, header_values = nonempty_rows[0]
+        normalized_headers = {
+            re.sub(r"[^a-z0-9]+", "", value.lower()): column
+            for column, value in header_values.items() if value
+        }
+        aliases = {
+            "notebook": ("notebook", "maintopic"),
+            "chapter": ("chapter", "subtopic"),
+            "pageheading": ("pageheading", "cardheading"),
+            "pagedetails": ("pagedetails", "carddetails"),
+            "videourl": ("videourl", "youtubeurl", "video"),
+            "localvideourl": ("localvideourl", "localurl"),
+            "diagram": ("diagram", "image", "pageimage"),
+            "pageorder": ("pageorder", "cardorder"),
+        }
+        columns = {
+            key: next((normalized_headers[name] for name in names if name in normalized_headers), None)
+            for key, names in aliases.items()
+        }
+        for required in ("notebook", "chapter", "pageheading"):
+            if columns[required] is None:
+                raise ValueError(f"Missing required column: {required.replace('pageheading', 'page heading').title()}.")
+
+        diagrams = {}
+        sheet_rels = _xlsx_relationships(archive, sheet_path)
+        drawing = next((node for node in sheet_root.iter() if node.tag.endswith("}drawing")), None)
+        drawing_path = sheet_rels.get(str(drawing.attrib.get(relation_key) or "")) if drawing is not None else ""
+        if drawing_path:
+            drawing_root = ET.fromstring(archive.read(drawing_path))
+            drawing_rels = _xlsx_relationships(archive, drawing_path)
+            embed_key = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed"
+            for anchor in drawing_root:
+                origin = next((node for node in anchor if node.tag.endswith("}from")), None)
+                row_node = next((node for node in origin or [] if node.tag.endswith("}row")), None)
+                col_node = next((node for node in origin or [] if node.tag.endswith("}col")), None)
+                blip = next((node for node in anchor.iter() if node.tag.endswith("}blip")), None)
+                if row_node is None or col_node is None or blip is None:
+                    continue
+                excel_row = int(row_node.text or 0) + 1
+                excel_column = int(col_node.text or 0)
+                if columns["diagram"] is not None and excel_column != columns["diagram"]:
+                    continue
+                image_path = drawing_rels.get(str(blip.attrib.get(embed_key) or ""))
+                if not image_path or image_path not in archive.namelist():
+                    continue
+                image_bytes = archive.read(image_path)
+                if len(image_bytes) > 10 * 1024 * 1024:
+                    raise ValueError(f"Diagram in row {excel_row} is larger than 10 MB.")
+                extension = Path(image_path).suffix.lower()
+                mime = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}.get(extension)
+                if not mime:
+                    raise ValueError(f"Diagram in row {excel_row} must be PNG, JPEG, or WebP.")
+                if excel_row in diagrams:
+                    raise ValueError(f"Row {excel_row} contains more than one diagram. Use one optional diagram per page.")
+                diagrams[excel_row] = {
+                    "name": Path(image_path).name,
+                    "type": mime,
+                    "data": base64.b64encode(image_bytes).decode("ascii"),
+                }
+
+        rows = []
+        errors = []
+        for excel_row, values in sheet_rows:
+            if excel_row <= header_row_number or not any(values.values()) and excel_row not in diagrams:
+                continue
+            read = lambda key: str(values.get(columns[key], "") or "").strip() if columns[key] is not None else ""
+            notebook, chapter, heading = read("notebook"), read("chapter"), read("pageheading")
+            if not notebook or not chapter or not heading:
+                errors.append(f"Row {excel_row}: Notebook, Chapter, and Page Heading are required.")
+                continue
+            order_value = read("pageorder")
+            try:
+                order = float(order_value) if order_value else len(rows) + 1
+            except ValueError:
+                errors.append(f"Row {excel_row}: Page Order must be a number.")
+                continue
+            rows.append({
+                "topic": notebook,
+                "subtopic": chapter,
+                "heading": heading,
+                "details": read("pagedetails"),
+                "videoUrl": read("videourl"),
+                "localVideoUrl": read("localvideourl"),
+                "diagramUrl": read("diagram"),
+                "order": order,
+                "rowNumber": excel_row,
+                "diagram": diagrams.get(excel_row),
+            })
+        if errors:
+            suffix = f" {len(errors) - 3} more row errors." if len(errors) > 3 else ""
+            raise ValueError(" ".join(errors[:3]) + suffix)
+        if not rows:
+            raise ValueError("The template does not contain any page rows.")
+        if len(rows) > 500:
+            raise ValueError("Import up to 500 page rows at a time.")
+        return {"rows": rows, "diagramCount": sum(1 for row in rows if row.get("diagram"))}
+
+
 def _google_drive_configured():
-    return bool(GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON and GOOGLE_DRIVE_FOLDER_ID)
+    service_account_ready = bool(GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON and GOOGLE_DRIVE_FOLDER_ID)
+    oauth_ready = bool(
+        GOOGLE_DRIVE_OAUTH_CLIENT_ID
+        and GOOGLE_DRIVE_OAUTH_CLIENT_SECRET
+        and GOOGLE_DRIVE_OAUTH_TOKEN_FILE.exists()
+    )
+    return service_account_ready or oauth_ready
+
+
+def _google_drive_oauth_available():
+    return bool(GOOGLE_DRIVE_OAUTH_CLIENT_ID and GOOGLE_DRIVE_OAUTH_CLIENT_SECRET)
+
+
+def _google_drive_token_data():
+    if not GOOGLE_DRIVE_OAUTH_TOKEN_FILE.exists():
+        return {}
+    try:
+        data = json.loads(GOOGLE_DRIVE_OAUTH_TOKEN_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("The saved Google Drive connection is invalid. Reconnect Google Drive.") from exc
+    return data if isinstance(data, dict) else {}
+
+
+def _save_google_drive_token(data):
+    global GOOGLE_DRIVE_CREDENTIALS
+    GOOGLE_DRIVE_OAUTH_TOKEN_FILE.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    with GOOGLE_DRIVE_CREDENTIALS_LOCK:
+        GOOGLE_DRIVE_CREDENTIALS = None
+
+
+def _google_drive_redirect_uri(handler):
+    host = (handler.headers.get("Host") or f"localhost:{PORT}").strip()
+    return f"http://{host}/api/google-drive/callback"
+
+
+def _google_drive_authorization_url(handler):
+    if not _google_drive_oauth_available():
+        raise RuntimeError("Add the Google Drive OAuth client ID and secret, then restart KestrelIQ.")
+    state = uuid.uuid4().hex + uuid.uuid4().hex
+    now = time.time()
+    GOOGLE_DRIVE_OAUTH_STATES[state] = now + 600
+    for key, expires_at in list(GOOGLE_DRIVE_OAUTH_STATES.items()):
+        if expires_at < now:
+            GOOGLE_DRIVE_OAUTH_STATES.pop(key, None)
+    query = urllib.parse.urlencode({
+        "client_id": GOOGLE_DRIVE_OAUTH_CLIENT_ID,
+        "redirect_uri": _google_drive_redirect_uri(handler),
+        "response_type": "code",
+        "scope": GOOGLE_DRIVE_OAUTH_SCOPE,
+        "access_type": "offline",
+        "prompt": "consent",
+        "include_granted_scopes": "true",
+        "state": state,
+        "login_hint": "kestreliq1@gmail.com",
+    })
+    return f"https://accounts.google.com/o/oauth2/v2/auth?{query}"
+
+
+def _exchange_google_drive_code(code, redirect_uri):
+    request = urllib.request.Request(
+        "https://oauth2.googleapis.com/token",
+        data=urllib.parse.urlencode({
+            "code": code,
+            "client_id": GOOGLE_DRIVE_OAUTH_CLIENT_ID,
+            "client_secret": GOOGLE_DRIVE_OAUTH_CLIENT_SECRET,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+        }).encode("utf-8"),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError("Google rejected the authorization response. Please try connecting again.") from exc
+    refresh_token = str(result.get("refresh_token") or "").strip()
+    if not refresh_token:
+        raise RuntimeError("Google did not return offline access. Remove KestrelIQ from your Google account permissions and reconnect.")
+    token_data = {
+        "refresh_token": refresh_token,
+        "scope": str(result.get("scope") or GOOGLE_DRIVE_OAUTH_SCOPE),
+        "token_uri": "https://oauth2.googleapis.com/token",
+    }
+    _save_google_drive_token(token_data)
+    return token_data
 
 
 def _google_drive_service():
+    global GOOGLE_DRIVE_CREDENTIALS
     if not _google_drive_configured():
         raise RuntimeError("Google Drive image storage is not configured.")
     try:
+        from google.auth.transport.requests import Request as GoogleAuthRequest
         from google.oauth2 import service_account
+        from google.oauth2.credentials import Credentials
         from googleapiclient.discovery import build
     except ImportError as exc:
         raise RuntimeError("Google Drive dependencies are not installed.") from exc
-    try:
-        credentials_info = json.loads(GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON is invalid JSON.") from exc
-    credentials = service_account.Credentials.from_service_account_info(
-        credentials_info,
-        scopes=["https://www.googleapis.com/auth/drive"],
-    )
+    with GOOGLE_DRIVE_CREDENTIALS_LOCK:
+        credentials = GOOGLE_DRIVE_CREDENTIALS
+        if credentials is None:
+            if GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON and GOOGLE_DRIVE_FOLDER_ID:
+                try:
+                    credentials_info = json.loads(GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON)
+                except json.JSONDecodeError as exc:
+                    raise RuntimeError("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON is invalid JSON.") from exc
+                credentials = service_account.Credentials.from_service_account_info(
+                    credentials_info,
+                    scopes=["https://www.googleapis.com/auth/drive"],
+                )
+            else:
+                token_data = _google_drive_token_data()
+                credentials = Credentials(
+                    token=None,
+                    refresh_token=token_data.get("refresh_token"),
+                    token_uri=token_data.get("token_uri") or "https://oauth2.googleapis.com/token",
+                    client_id=GOOGLE_DRIVE_OAUTH_CLIENT_ID,
+                    client_secret=GOOGLE_DRIVE_OAUTH_CLIENT_SECRET,
+                    scopes=[GOOGLE_DRIVE_OAUTH_SCOPE],
+                )
+        if not credentials.valid:
+            credentials.refresh(GoogleAuthRequest())
+        GOOGLE_DRIVE_CREDENTIALS = credentials
     return build("drive", "v3", credentials=credentials, cache_discovery=False)
+
+
+def _google_drive_image_folder(service):
+    if GOOGLE_DRIVE_FOLDER_ID:
+        return GOOGLE_DRIVE_FOLDER_ID
+    token_data = _google_drive_token_data()
+    saved_id = str(token_data.get("folder_id") or "").strip()
+    if saved_id:
+        return saved_id
+    query = "name = 'KestrelIQ Notebook Images' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    matches = service.files().list(q=query, spaces="drive", fields="files(id,name)", pageSize=10).execute().get("files", [])
+    folder_id = str(matches[0].get("id") or "") if matches else ""
+    if not folder_id:
+        folder = service.files().create(
+            body={
+                "name": "KestrelIQ Notebook Images",
+                "mimeType": "application/vnd.google-apps.folder",
+                "appProperties": {"kestreliqMediaType": "notebook-image-folder"},
+            },
+            fields="id",
+        ).execute()
+        folder_id = str(folder.get("id") or "")
+    if not folder_id:
+        raise RuntimeError("KestrelIQ could not create its Google Drive image folder.")
+    token_data["folder_id"] = folder_id
+    _save_google_drive_token(token_data)
+    return folder_id
 
 
 def _assert_owned_jot_subtopic(subtopic_id, access_token):
@@ -1101,9 +1431,10 @@ def _upload_jot_drive_image(payload, content_type, user_id, subtopic_id, access_
     _assert_owned_jot_subtopic(subtopic_id, access_token)
     from googleapiclient.http import MediaIoBaseUpload
     extension = {"image/webp": "webp", "image/jpeg": "jpg", "image/png": "png"}[content_type]
+    service = _google_drive_service()
     metadata = {
         "name": f"kestreliq-{uuid.uuid4()}.{extension}",
-        "parents": [GOOGLE_DRIVE_FOLDER_ID],
+        "parents": [_google_drive_image_folder(service)],
         "appProperties": {
             "kestreliqUserId": str(user_id),
             "kestreliqSubtopicId": str(subtopic_id),
@@ -1111,7 +1442,7 @@ def _upload_jot_drive_image(payload, content_type, user_id, subtopic_id, access_
         },
     }
     media = MediaIoBaseUpload(io.BytesIO(payload), mimetype=content_type, resumable=False)
-    created = _google_drive_service().files().create(
+    created = service.files().create(
         body=metadata,
         media_body=media,
         fields="id,name,mimeType,size",
@@ -4911,6 +5242,43 @@ class Handler(BaseHTTPRequestHandler):
         if self._redirect_numeric_localhost():
             return
         request_path = urllib.parse.urlparse(self.path).path
+        if request_path == "/api/google-drive/connect":
+            try:
+                if not ipaddress.ip_address(self.client_address[0]).is_loopback:
+                    raise PermissionError("Google Drive can only be connected from this computer.")
+                self.send_response(303)
+                self.send_header("Location", _google_drive_authorization_url(self))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+            except PermissionError as exc:
+                _html_response(self, 403, "<h1>Connection blocked</h1><p>" + html.escape(str(exc)) + "</p>")
+            except RuntimeError as exc:
+                _html_response(self, 503, "<h1>Google Drive is not ready</h1><p>" + html.escape(str(exc)) + "</p>")
+            return
+        if request_path == "/api/google-drive/callback":
+            try:
+                if not ipaddress.ip_address(self.client_address[0]).is_loopback:
+                    raise PermissionError("Google Drive can only be connected from this computer.")
+                query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                if query.get("error"):
+                    raise PermissionError("Google Drive access was not approved.")
+                state = str((query.get("state") or [""])[0])
+                expires_at = GOOGLE_DRIVE_OAUTH_STATES.pop(state, 0)
+                if not state or expires_at < time.time():
+                    raise PermissionError("This Google Drive connection request expired. Start it again.")
+                code = str((query.get("code") or [""])[0])
+                if not code:
+                    raise ValueError("Google did not return an authorization code.")
+                _exchange_google_drive_code(code, _google_drive_redirect_uri(self))
+                service = _google_drive_service()
+                _google_drive_image_folder(service)
+                _html_response(self, 200, """<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width'><title>Google Drive connected</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#002c35;color:#eaffff;font:16px Segoe UI,Arial,sans-serif}main{max-width:540px;margin:24px;padding:32px;border:1px solid #28dcca66;border-radius:18px;background:#073b44;text-align:center}h1{color:#7cf0e7}a{display:inline-block;margin-top:12px;padding:10px 16px;border-radius:9px;background:#19b9ae;color:#00252c;text-decoration:none;font-weight:700}</style></head><body><main><h1>Google Drive connected</h1><p>KestrelIQ created its private notebook image folder and can now store learning diagrams.</p><a href='/'>Return to KestrelIQ</a></main></body></html>""")
+            except PermissionError as exc:
+                _html_response(self, 403, "<h1>Google Drive was not connected</h1><p>" + html.escape(str(exc)) + "</p>")
+            except (RuntimeError, ValueError, OSError) as exc:
+                _html_response(self, 503, "<h1>Google Drive connection failed</h1><p>" + html.escape(str(exc)) + "</p>")
+            return
         if request_path == '/api/mp4-transcriber/file':
             try:
                 query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -5003,7 +5371,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Length", "0")
                 self.end_headers()
                 return
-            if tool_path == "/tools/slide-studio":
+            if tool_path == "/tools/slide-studio" and (urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("editor") or [""])[0] == "1":
                 local_host = urllib.parse.urlsplit("http://" + self.headers.get("Host", "")).hostname
                 if not ipaddress.ip_address(self.client_address[0]).is_loopback or local_host not in {"localhost", "127.0.0.1", "::1"}:
                     _html_response(self, 403, "<h1>Open Slide Studio locally</h1><p>Slide Studio runs on your computer. Open KestrelIQ at http://127.0.0.1:8787 to use this tool.</p>")
@@ -5074,6 +5442,20 @@ class Handler(BaseHTTPRequestHandler):
             return
         if urllib.parse.urlparse(self.path).path == "/assets/learning-video.js":
             _binary_response(self, 200, (ASSET_DIR / "learning-video.js").read_bytes(), "text/javascript; charset=utf-8")
+            return
+        if urllib.parse.urlparse(self.path).path == "/assets/notebook-template.js":
+            _binary_response(self, 200, (ASSET_DIR / "notebook-template.js").read_bytes(), "text/javascript; charset=utf-8")
+            return
+        if urllib.parse.urlparse(self.path).path == "/assets/KestrelIQ_Blank_Notebook_Template.xlsx":
+            template_file = ASSET_DIR / "KestrelIQ_Blank_Notebook_Template.xlsx"
+            if not template_file.exists():
+                _json_response(self, 404, {"error": "The Excel notebook template is unavailable."})
+                return
+            _binary_response(
+                self, 200, template_file.read_bytes(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                template_file.name,
+            )
             return
         if self.path.startswith("/assets/"):
             asset = ASSET_DIR / Path(urllib.parse.urlparse(self.path).path).name
@@ -5374,6 +5756,17 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:
                 _json_response(self, 503, {"error": "Could not verify notebook access.", "detail": str(exc)})
                 return
+        if post_path == "/api/jot-down/template/parse":
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                if length <= 0 or length > 25 * 1024 * 1024:
+                    raise ValueError("Use an Excel template no larger than 25 MB.")
+                _json_response(self, 200, _parse_jot_xlsx(self.rfile.read(length)))
+            except ValueError as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            except Exception as exc:
+                _json_response(self, 500, {"error": "The Excel template could not be processed.", "detail": str(exc)})
+            return
         if post_path == "/api/five-minute-consultant":
             try:
                 payload = _read_json(self)

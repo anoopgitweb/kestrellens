@@ -18,11 +18,11 @@ class AppTests(unittest.TestCase):
             deck=sample(); deck['theme']=theme
             r=self.client.post('/api/preview',json=deck)
             self.assertEqual(r.status_code,200,r.data)
-            self.assertEqual(len(r.json['slides']),9)
+            self.assertEqual(len(r.json['slides']),len(CATALOG))
             r=self.client.post('/api/generate',json=deck)
             self.assertEqual(r.status_code,200,r.data[:300])
             p=Presentation(BytesIO(r.data))
-            self.assertEqual(len(p.slides),9)
+            self.assertEqual(len(p.slides),len(CATALOG))
             for slide,source in zip(p.slides,deck['slides']):
                 text=' '.join(s.text for s in slide.shapes if s.has_text_frame)
                 self.assertIn(source['title'],text)
@@ -42,8 +42,15 @@ class AppTests(unittest.TestCase):
         self.assertIn('&lt;script&gt;',r.json['slides'][0])
         self.assertEqual(self.client.post('/api/generate',json=deck).status_code,200)
     def test_order_and_delete(self):
-        deck=sample();deck['slides']=[deck['slides'][8],deck['slides'][0]]
+        deck=sample();closing=next(slide for slide in deck['slides'] if slide['type']=='closing');title=next(slide for slide in deck['slides'] if slide['type']=='title');deck['slides']=[closing,title]
         p=Presentation(BytesIO(self.client.post('/api/generate',json=deck).data))
         self.assertEqual(len(p.slides),2)
         self.assertIn('Thank you',' '.join(s.text for s in p.slides[0].shapes if s.has_text_frame))
+    def test_title_label_is_editable_and_validated(self):
+        deck=sample();deck['slides']=[deck['slides'][0]];deck['slides'][0]['eyebrow']='AI LEARNING SERIES'
+        preview=self.client.post('/api/preview',json=deck)
+        self.assertEqual(preview.status_code,200,preview.data)
+        self.assertIn('AI LEARNING SERIES',preview.json['slides'][0])
+        deck['slides'][0]['eyebrow']='x'*61
+        self.assertEqual(self.client.post('/api/generate',json=deck).status_code,400)
 if __name__=='__main__': unittest.main()

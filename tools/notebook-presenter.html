@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Notebook Presenter</title>
+<script src="/assets/notebook-template.js?v=1"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Playfair+Display:ital,wght@0,400&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -148,11 +149,23 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--sa
 
 
 /* ── IMAGE SLIDE ── */
-.sl-image{position:absolute;inset:0;display:flex;background:var(--white);box-sizing:border-box;padding:22px}
-.img-side{flex:1.2;position:relative;overflow:hidden;background:#e8e4de;display:flex;align-items:center;justify-content:center;border-radius:14px;margin-right:22px}
-.img-side img{width:100%;height:100%;object-fit:cover;border-radius:14px}
-.img-side-placeholder{font-size:11px;letter-spacing:.1em;color:#bbb;text-transform:uppercase}
-.img-text-side{flex:1;display:flex;flex-direction:column;justify-content:flex-start;padding:6vh 5vw;background:var(--white);overflow-y:auto}
+.sl-image{position:absolute;inset:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;background:var(--white);box-sizing:border-box;padding:22px}
+.img-side{min-width:0;position:relative;overflow:hidden;background:#e8e4de;display:flex;align-items:center;justify-content:center;border-radius:14px;cursor:zoom-in}
+.img-side:focus-visible{outline:3px solid #2563eb;outline-offset:3px}
+.page-media{display:flex;flex-direction:column;min-width:0;min-height:0;gap:10px}
+.page-media-switch{display:flex;gap:6px;flex-shrink:0}
+.page-media-switch button{padding:8px 18px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--ink);font-family:var(--sans);cursor:pointer}
+.page-media-switch button[aria-pressed="true"]{background:var(--ink);color:var(--white)}
+.page-media .img-side,.page-media-video{flex:1;min-height:0}
+.page-media [hidden]{display:none!important}
+.page-media-video .video-side{width:100%;height:100%;border-radius:14px}
+.img-side img{width:100%;height:100%;object-fit:contain;border-radius:14px}
+.img-side-placeholder{font-size:13px;line-height:1.6;color:#555;text-align:center;padding:24px;max-width:340px}
+.img-text-side{min-width:0;min-height:0;display:flex;flex-direction:column;justify-content:flex-start;padding:6vh 4vw;background:var(--white);overflow-y:auto;overflow-wrap:anywhere}
+#image-preview{position:fixed;inset:0;margin:auto;width:min(1100px,90vw);max-width:90vw;height:min(800px,84vh);max-height:84vh;padding:48px 20px 20px;border:1px solid var(--border);border-radius:16px;background:var(--white);color:var(--ink);box-shadow:0 24px 90px #0006;overflow:hidden}
+#image-preview::backdrop{background:rgba(0,0,0,.55)}
+#image-preview img{display:block;width:100%;height:100%;object-fit:contain}
+#image-preview-close{position:absolute;right:12px;top:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--ink);padding:6px 12px;cursor:pointer;font-family:var(--sans)}
 .img-chapter-tag{font-size:12px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:12px}
 .img-heading{font-size:clamp(22px,3vw,42px);font-weight:400;font-family:var(--serif);color:var(--ink);line-height:1.2;margin-bottom:14px}
 .img-body{font-size:var(--body-size,clamp(16px,1.6vw,22px));color:var(--ink2);line-height:1.75;font-weight:300}
@@ -442,7 +455,8 @@ ul.sl-bullets li::marker{color:var(--chapter-color,#999);font-size:.8em}
 .sl-sq-bl-2{position:absolute;width:28px;height:28px;bottom:52px;left:48px;border-radius:0 10px 0 0}
 
 /* ── STAGE ── */
-#stage{flex:1;position:relative;overflow:hidden}
+#stage{flex:1;position:relative;overflow:hidden;min-width:0;transition:margin-right .3s ease}
+#presenter.chapters-pinned #stage{margin-right:320px}
 .slide{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .55s cubic-bezier(.4,0,.2,1)}
 .slide.active{opacity:1;pointer-events:auto}
 
@@ -811,7 +825,7 @@ ul.sl-bullets li::marker{color:var(--chapter-color,#999);font-size:.8em}
     <div class="home-hero-text">
       <div class="home-hero-kicker">Notebook Presenter</div>
       <div class="home-hero-title"><span class="hh-white">Presentation software</span> <span class="hh-light">for the spreadsheet-loving team</span></div>
-      <div class="home-hero-sub">Write your content in a CSV. Get a fully animated, presenter-ready deck — chapters, formatting, charts, and export, all built in.</div>
+      <div class="home-hero-sub">Write your content in Excel or CSV. Get a fully animated, presenter-ready deck — chapters, formatting, charts, and export, all built in.</div>
     </div>
     <div class="home-hero-illo">
       <svg viewBox="0 0 340 300" xmlns="http://www.w3.org/2000/svg">
@@ -841,8 +855,8 @@ ul.sl-bullets li::marker{color:var(--chapter-color,#999);font-size:.8em}
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
       </div>
       <div class="home-block-title">Upload an existing presentation</div>
-      <div class="home-block-desc">Bring in a CSV you already have — Notebook, Chapter, Page Heading, Page Details, and more.</div>
-      <div class="home-block-btn"><span>Upload CSV</span></div>
+      <div class="home-block-desc">Bring in an XLSX or CSV you already have — Notebook, Chapter, Page Heading, Page Details, and more.</div>
+      <div class="home-block-btn"><span>Upload XLSX / CSV</span></div>
     </div>
 
     <div class="home-block" style="background:#f3c94d" onclick="confirmDestructiveNav(openHomeTitleModal)">
@@ -858,7 +872,7 @@ ul.sl-bullets li::marker{color:var(--chapter-color,#999);font-size:.8em}
       <div class="home-block-icon">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       </div>
-      <div class="home-block-title">Get the CSV template</div>
+      <div class="home-block-title">Get the Excel template</div>
       <div class="home-block-desc">Not sure where to start? Download a blank template with the right columns already set up.</div>
       <div class="home-block-btn"><span>Download template</span></div>
     </div>
@@ -903,7 +917,7 @@ ul.sl-bullets li::marker{color:var(--chapter-color,#999);font-size:.8em}
     <div style="margin-bottom:40px;text-align:center">
       <div style="font-size:11px;letter-spacing:.28em;color:rgba(0,0,0,.35);text-transform:uppercase;margin-bottom:10px">Notebook Presenter</div>
       <div style="font-size:clamp(28px,4vw,48px);font-weight:400;font-family:var(--serif);color:#111;letter-spacing:-.5px;line-height:1.1">
-        Turn your CSV into<br><em style="font-style:italic;color:rgba(0,0,0,.45)">a living presentation</em>
+        Turn your spreadsheet into<br><em style="font-style:italic;color:rgba(0,0,0,.45)">a living presentation</em>
       </div>
     </div>
 
@@ -912,12 +926,14 @@ ul.sl-bullets li::marker{color:var(--chapter-color,#999);font-size:.8em}
       <div style="width:52px;height:52px;border-radius:14px;background:rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;margin-bottom:4px">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
       </div>
-      <div style="font-size:16px;font-weight:400;color:#111">Drop your CSV file here</div>
-      <div style="font-size:13px;color:rgba(0,0,0,.4);line-height:1.6;max-width:320px">Notebook · Chapter · Page Heading · Page Details · Page Order</div>
+      <div style="font-size:16px;font-weight:400;color:#111">Drop your XLSX or CSV file here</div>
+      <div style="font-size:13px;color:rgba(0,0,0,.4);line-height:1.6;max-width:320px">Notebook · Chapter · Page Heading · Page Details · Video URL · Local Video URL · Diagram · Page Order</div>
       <button class="browse-btn" onclick="document.getElementById('file-input').click()" style="margin-top:6px;padding:9px 24px;border:.5px solid rgba(0,0,0,.2);border-radius:24px;font-size:12px;color:rgba(0,0,0,.6);background:rgba(0,0,0,.05);cursor:pointer;font-family:var(--sans);transition:all .2s;letter-spacing:.06em">Browse file</button>
-      <input type="file" id="file-input" accept=".csv,text/csv">
+      <input type="file" id="file-input" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv">
     </div>
 
+    <p style="margin-top:16px;font-size:12px;color:var(--ink2);text-align:center">Excel uses the first worksheet. For Diagram, use an image URL or insert a picture using Place over Cells with its top-left corner in the Diagram column on the matching page row. Page Order controls the sequence.</p>
+    <button class="browse-btn" onclick="downloadTemplate()">Download XLSX template</button>
     <div id="uerr" style="margin-top:12px;font-size:12px;color:#f87171;display:none;text-align:center"></div>
 
   </div>
@@ -1040,6 +1056,7 @@ ul.sl-bullets li::marker{color:var(--chapter-color,#999);font-size:.8em}
       <div class="admin-actions">
         <button class="admin-btn fg-toggle" id="fg-toggle-btn" onclick="toggleFmtGuide()">✦ formatting guide</button><button class="admin-btn" onclick="adminAddRow()">+ add row</button>
         <button class="admin-btn success" onclick="adminRebuild()">▶ rebuild presentation</button>
+        <button class="admin-btn" onclick="adminExportXLSX()" title="Download page content in the eight-column template. Use CSV to also retain notes and presentation settings.">↓ export XLSX</button>
         <button class="admin-btn" onclick="adminExportCSV()">↓ export CSV</button>
         <button class="admin-btn" onclick="adminExportPDF()">↓ export PDF</button>
         <button class="admin-btn" onclick="adminExportPPT()">↓ export PPT</button>
@@ -1181,6 +1198,15 @@ ul.sl-bullets li::marker{color:var(--chapter-color,#999);font-size:.8em}
           <div class="form-field">
             <label class="form-label">Video URL <span style="color:#ccc;font-weight:400">(optional)</span></label>
             <input class="form-input" id="f-videourl" placeholder="YouTube, Vimeo or .mp4 URL">
+            <label class="form-label" for="f-localurl" style="margin-top:10px">Local Video URL <span style="font-weight:400">(optional)</span></label>
+            <input class="form-input" id="f-localurl" placeholder="C:\Videos\lesson.mp4 or lesson.mp4" oninput="delete this.dataset.videoUrl;syncLocalVideoField();releaseUnusedLocalVideos()">
+            <div id="local-video-name" style="font-size:12px;overflow-wrap:anywhere;margin-top:6px" aria-live="polite"></div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button type="button" class="admin-btn" onclick="document.getElementById('f-videofile').click()">Choose local MP4</button>
+              <button type="button" class="admin-btn" onclick="clearLocalVideo()">Clear local video</button>
+            </div>
+            <input type="file" id="f-videofile" accept=".mp4,video/mp4" hidden onchange="selectLocalVideo(this)">
+            <p style="font-size:11px;color:var(--ink2);line-height:1.5;margin-top:8px">Local Video URL saves the filename or path as a reference. Choose the file to play it; a typed path cannot be opened automatically. Local videos take priority over Video URL for this session. Select the file again after refreshing. CSV/XLSX exports retain the reference, not the video file.</p>
           </div>
           <div class="form-field" style="display:none">
             <label class="form-label">Page Order</label>
@@ -1513,16 +1539,28 @@ function splitLine(line){
   res.push(cur);return res;
 }
 
-function readFile(file){
+async function readFile(file){
   const errEl=document.getElementById('uerr');errEl.style.display='none';
+  if(!/\.(csv|xlsx)$/i.test(file.name)){
+    errEl.style.display='block';errEl.textContent='Choose a CSV or XLSX file.';return;
+  }
+  const isExcel=/\.xlsx$/i.test(file.name);
+  if(isExcel){
+    try{await ensureNotebookXLSX();}
+    catch(err){errEl.style.display='block';errEl.textContent=err.message;return;}
+  }
   const r=new FileReader();
   r.onload=e=>{
     try{
-      const rows=parseCSV(e.target.result);
+      const rows=isExcel ? parseNotebookXLSX(e.target.result) : parseCSV(e.target.result);
       if(!rows.length) throw new Error('No data rows found.');
       const keys=Object.keys(rows[0]);
       const missing=['Chapter','Page Heading','Page Details'].filter(k=>!keys.find(k2=>k2.trim()===k));
       if(missing.length) throw new Error('Missing columns: '+missing.join(', '));
+      rows.forEach(row=>{
+        if(!row['Image URL']) row['Image URL']=row['Diagram']||'';
+        if(!row['Local Video URL']) row['Local Video URL']=row['Local URL']||'';
+      });
 
       rows.sort((a,b)=>parseInt(a['Page Order']||0)-parseInt(b['Page Order']||0));
       csvRows=rows;
@@ -1538,7 +1576,7 @@ function readFile(file){
         }catch(e){}
       }
 
-      chapterOrder=[];chapterMap={};
+      chapterOrder=[];chapterMap=Object.create(null);
       rows.forEach(r=>{
         const ch=(r['Chapter']||'').trim();
         if(!chapterMap[ch]){chapterMap[ch]=[];chapterOrder.push(ch);}
@@ -1553,7 +1591,8 @@ function readFile(file){
       showSetup();
     }catch(err){errEl.style.display='block';errEl.textContent='Error: '+err.message;}
   };
-  r.readAsText(file);
+  r.onerror=()=>{errEl.style.display='block';errEl.textContent='Could not read the file. Please try again.';};
+  if(isExcel) r.readAsArrayBuffer(file); else r.readAsText(file);
 }
 
 /* ── SETUP ── */
@@ -1922,15 +1961,21 @@ function buildFromSetup(){
       notesArr.push([]);
     }
     chapterMap[ch].forEach((p,pi)=>{
-      const imgUrl=(p['Image URL']||p['image_url']||p['Image']||'').trim();
-      const vidUrl=(p['Video URL']||p['video_url']||p['Video']||'').trim();
+      const imgUrl=(p['Image URL']??p['Diagram']??p['image_url']??p['Image']??'').trim();
+      const onlineVideoUrl=(p['Video URL']||p['video_url']||p['Video']||'').trim();
+      const localVideoUrl=(p._localVideoUrl||'').trim();
+      const localVideoReference=(p['Local Video URL']||p['Local URL']||'').trim();
       slides.push({
         type:'content',layout:chosenLayout,
         chapter:ch,chapterNum:ci+1,
         heading:p['Page Heading']||'',
         details:p['Page Details']||'',
         imageUrl:imgUrl,
-        videoUrl:vidUrl,
+        videoUrl:localVideoUrl||onlineVideoUrl,
+        onlineVideoUrl,
+        localVideoUrl,
+        localVideoReference,
+        sourceRow:p,
         pageIndex:pi,pageCount:chapterMap[ch].length,
         color:chapterColors[ch]||PALETTE[ci%PALETTE.length],
       });
@@ -1991,8 +2036,8 @@ function renderSlide(s){
   if(s.type==='cover')    return renderCover(s);
   if(s.type==='toc')      return renderTOC(s);
   if(s.type==='chapter')  return renderChapter(s);
-  if(s.type==='content'&&s.videoUrl) return renderVideoSlide(s);
   if(s.type==='content'&&s.imageUrl) return renderImageSlide(s);
+  if(s.type==='content'&&(s.videoUrl||s.localVideoReference)) return renderVideoSlide(s);
   switch(s.layout){
     case 'standard': return renderStandard(s);
     case 'dark':     return renderDark(s);
@@ -2179,16 +2224,177 @@ function renderImageSlide(s){
     +'</div></div>';
   const imgWrap=document.createElement('div');
   imgWrap.className='img-side';
+  imgWrap.setAttribute('role','button');
+  imgWrap.tabIndex=0;
+  imgWrap.setAttribute('aria-label','Enlarge image: '+(s.heading||'Page diagram'));
+  imgWrap.title='Click to enlarge image';
   const img=document.createElement('img');
   img.src=s.imageUrl;
-  img.alt='';
-  img.style.cssText='width:100%;height:100%;object-fit:cover';
-  img.onerror=function(){imgWrap.innerHTML='<span class="img-side-placeholder">Image unavailable</span>';};
+  img.alt=s.heading||'Page diagram';
+  img.style.cssText='width:100%;height:100%;object-fit:contain';
   imgWrap.appendChild(img);
-  div.insertBefore(imgWrap,div.firstChild);
+  const mediaOptions=[
+    {key:'image',label:'Image',url:s.imageUrl},
+    {key:'video',label:'Video',url:s.onlineVideoUrl},
+    {key:'local-video',label:'Local Video',url:s.localVideoUrl,reference:s.localVideoReference},
+  ].filter(option=>option.url||option.reference);
+  if(mediaOptions.length){
+    const media=document.createElement('div');
+    media.className='page-media';
+    const controls=document.createElement('div');
+    controls.className='page-media-switch';
+    controls.setAttribute('role','group');
+    controls.setAttribute('aria-label','Page media');
+    mediaOptions.forEach((option,index)=>{
+      const button=document.createElement('button');
+      button.type='button';
+      button.textContent=option.label;
+      button.dataset.media=option.key;
+      if(option.reference) button.dataset.localReference=option.reference;
+      button.setAttribute('aria-pressed',String(index===0));
+      controls.appendChild(button);
+    });
+    imgWrap.dataset.mediaPanel='image';
+    media.append(controls,imgWrap);
+    mediaOptions.filter(option=>option.key!=='image').forEach(option=>{
+      const panel=document.createElement('div');
+      panel.className='page-media-video';
+      panel.dataset.mediaPanel=option.key;
+      panel.hidden=true;
+      const source=document.createElement('template');
+      if(option.url){
+        source.dataset.mediaTemplate=option.key;
+        source.content.appendChild(createVideoSide(option.url));
+        media.append(panel,source);
+      } else media.append(panel);
+    });
+    div.appendChild(media);
+  } else div.appendChild(imgWrap);
   return div.outerHTML;
 }
 
+function switchPageMedia(button){
+  const media=button.closest('.page-media');
+  if(button.dataset.media==='local-video' && !media?.querySelector('template[data-media-template="local-video"]')){
+    chooseLocalVideoForPresentation(button);
+    return;
+  }
+  if(!media || button.getAttribute('aria-pressed')==='true') return;
+  const selected=button.dataset.media;
+  media.querySelectorAll('[data-media-panel]').forEach(panel=>{
+    const active=panel.dataset.mediaPanel===selected;
+    panel.hidden=!active;
+    if(active && panel.classList.contains('page-media-video') && !panel.childElementCount){
+      const source=media.querySelector('template[data-media-template="'+selected+'"]');
+      if(source) panel.appendChild(source.content.cloneNode(true));
+    } else if(!active && panel.classList.contains('page-media-video')){
+      panel.querySelectorAll('video').forEach(player=>player.pause());
+      panel.replaceChildren();
+    }
+  });
+  media.querySelectorAll('.page-media-switch button').forEach(tab=>{
+    tab.setAttribute('aria-pressed',String(tab===button));
+  });
+}
+
+function chooseLocalVideoForPresentation(button){
+  const input=document.createElement('input');
+  input.type='file';input.accept='.mp4,video/mp4';
+  input.onchange=()=>{
+    const file=input.files?.[0];
+    if(!file) return;
+    if(!/\.mp4$/i.test(file.name)||!file.size){alert('Choose a non-empty MP4 video file.');return;}
+    const url=URL.createObjectURL(file);
+    localVideoFiles.set(url,file.name);
+    const slide=slides[cur];
+    if(slide){
+      slide.localVideoUrl=url;slide.videoUrl=url;
+      if(slide.sourceRow) slide.sourceRow._localVideoUrl=url;
+    }
+    const media=button.closest('.page-media');
+    const template=document.createElement('template');
+    template.dataset.mediaTemplate='local-video';
+    template.content.appendChild(createVideoSide(url));
+    media.appendChild(template);
+    button.title='Selected: '+file.name;
+    button.setAttribute('aria-pressed','false');
+    switchPageMedia(button);
+    releaseUnusedLocalVideos();
+  };
+  input.click();
+}
+
+function openImagePreview(panel){
+  const source=panel.querySelector('img');
+  if(!source || source.hidden) return;
+  let dialog=document.getElementById('image-preview');
+  if(!dialog){
+    dialog=document.createElement('dialog');
+    dialog.id='image-preview';
+    dialog.setAttribute('aria-label','Enlarged page image');
+    const close=document.createElement('button');
+    close.id='image-preview-close';
+    close.type='button';
+    close.textContent='Close ×';
+    close.addEventListener('click',()=>dialog.close());
+    dialog.append(close,document.createElement('img'));
+    dialog.addEventListener('click',event=>{
+      if(event.target!==dialog) return;
+      const bounds=dialog.getBoundingClientRect();
+      if(event.clientX<bounds.left || event.clientX>bounds.right || event.clientY<bounds.top || event.clientY>bounds.bottom) dialog.close();
+    });
+    dialog.addEventListener('close',()=>{
+      dialog.querySelector('img').removeAttribute('src');
+      dialog.returnFocus?.focus();
+    });
+    document.body.appendChild(dialog);
+  }
+  dialog.returnFocus=panel;
+  const image=dialog.querySelector('img');
+  image.src=source.currentSrc||source.src;
+  image.alt=source.alt;
+  dialog.showModal();
+}
+// Slides are serialized to HTML, so image listeners must live on the document.
+document.addEventListener('click',event=>{
+  const button=event.target.closest?.('.page-media-switch button');
+  if(button){event.stopPropagation();switchPageMedia(button);return;}
+  const panel=event.target.closest?.('.img-side');
+  if(panel){event.stopPropagation();openImagePreview(panel);}
+});
+document.addEventListener('keydown',event=>{
+  const dialog=document.getElementById('image-preview');
+  if(dialog?.open){
+    event.stopImmediatePropagation();
+    if(event.key==='Escape'){event.preventDefault();dialog.close();}
+    return;
+  }
+  if(event.target.closest?.('.page-media-switch')){
+    event.stopImmediatePropagation();return;
+  }
+  const panel=event.target.closest?.('.img-side');
+  if(panel && (event.key==='Enter'||event.key===' ')){
+    event.preventDefault();event.stopImmediatePropagation();openImagePreview(panel);
+  }
+},true);
+document.addEventListener('error',event=>{
+  const img=event.target;
+  if(img.matches?.('.video-embed-wrap video')){
+    const message=document.createElement('div');
+    message.style.cssText='color:#fff;font-size:13px;line-height:1.6;padding:16px';
+    message.textContent='This video could not play. For a local MP4, try an H.264/AAC encoded file or select the file again after refreshing.';
+    img.parentElement.replaceChildren(message);
+    return;
+  }
+  if(!img.matches?.('.img-side img')) return;
+  const panel=img.parentElement;
+  img.hidden=true;
+  if(panel.querySelector('.img-side-placeholder')) return;
+  const message=document.createElement('div');
+  message.className='img-side-placeholder';
+  message.textContent='Image could not load. Use a direct image URL in the Diagram or Image URL field. The image must be accessible in this browser.';
+  panel.appendChild(message);
+},true);
 
 function getEmbedUrl(url){
   // YouTube
@@ -2202,27 +2408,8 @@ function getEmbedUrl(url){
   return null;
 }
 
-function renderVideoSlide(s){
-  const chName=s.chapter.replace(/^\d+\.\s*/,'');
-  const pips=makePips(s,false);
-  const embedUrl=getEmbedUrl(s.videoUrl);
-
-  const div=document.createElement('div');
-  div.className='sl-video';
-
-  // Text side — LEFT
-  const textSide=document.createElement('div');
-  textSide.className='video-text-side';
-  textSide.innerHTML=
-    '<div class="video-chapter-tag" style="color:'+s.color+'">'+esc(chName)+'</div>'
-    +'<div class="video-heading">'+esc(s.heading)+'</div>'
-    +(s.details?'<div class="video-body">'+fmt(s.details,s.color)+'</div>':'')
-    +'<div class="video-footer">'
-    +'<div class="video-footer-ch">'+esc(s.chapter)+'</div>'
-    +'<div style="display:flex;gap:3px">'+pips+'</div>'
-    +'</div>';
-
-  // Video side — RIGHT
+function createVideoSide(url){
+  const embedUrl=getEmbedUrl(url);
   const videoSide=document.createElement('div');
   videoSide.className='video-side';
 
@@ -2238,24 +2425,69 @@ function renderVideoSlide(s){
     embedWrap.appendChild(iframe);
   } else {
     const vid=document.createElement('video');
-    vid.src=s.videoUrl;
+    vid.src=url;
     vid.controls=true;
-    vid.onerror=function(){embedWrap.innerHTML='<div style="color:rgba(255,255,255,.4);font-size:13px;padding:16px">Video unavailable</div>';};
+    vid.preload='metadata';
     embedWrap.appendChild(vid);
   }
   videoSide.appendChild(embedWrap);
 
   // "Open in YouTube" fallback link
   const openBtn=document.createElement('a');
-  openBtn.href=s.videoUrl;
+  openBtn.href=url;
   openBtn.target='_blank';
   openBtn.rel='noopener noreferrer';
   openBtn.className='video-open-btn';
   openBtn.innerHTML='&#9654; open in browser';
-  videoSide.appendChild(openBtn);
+  if(!url.startsWith('blob:')) videoSide.appendChild(openBtn);
+  return videoSide;
+}
+
+function renderVideoSlide(s){
+  const chName=s.chapter.replace(/^\d+\.\s*/,'');
+  const pips=makePips(s,false);
+  const div=document.createElement('div');
+  div.className='sl-video';
+  const textSide=document.createElement('div');
+  textSide.className='video-text-side';
+  textSide.innerHTML=
+    '<div class="video-chapter-tag" style="color:'+s.color+'">'+esc(chName)+'</div>'
+    +'<div class="video-heading">'+esc(s.heading)+'</div>'
+    +(s.details?'<div class="video-body">'+fmt(s.details,s.color)+'</div>':'')
+    +'<div class="video-footer">'
+    +'<div class="video-footer-ch">'+esc(s.chapter)+'</div>'
+    +'<div style="display:flex;gap:3px">'+pips+'</div>'
+    +'</div>';
 
   div.appendChild(textSide);
-  div.appendChild(videoSide);
+  const sources=[
+    {key:'video',label:'Video',url:s.onlineVideoUrl},
+    {key:'local-video',label:'Local Video',url:s.localVideoUrl,reference:s.localVideoReference},
+  ].filter(source=>source.url||source.reference);
+  if(sources.length){
+    const media=document.createElement('div');
+    media.className='page-media';
+    const controls=document.createElement('div');
+    controls.className='page-media-switch';
+    controls.setAttribute('role','group');
+    controls.setAttribute('aria-label','Page videos');
+    sources.forEach((source,index)=>{
+      const button=document.createElement('button');
+      button.type='button';button.textContent=source.label;button.dataset.media=source.key;
+      if(source.reference) button.dataset.localReference=source.reference;
+      button.setAttribute('aria-pressed',String(index===0));controls.appendChild(button);
+      const panel=document.createElement('div');
+      panel.className='page-media-video';panel.dataset.mediaPanel=source.key;panel.hidden=index!==0;
+      if(index===0&&source.url) panel.appendChild(createVideoSide(source.url));
+      const template=document.createElement('template');
+      if(source.url){template.dataset.mediaTemplate=source.key;template.content.appendChild(createVideoSide(source.url));media.append(panel,template);}
+      else media.append(panel);
+    });
+    media.prepend(controls);
+    div.appendChild(media);
+  } else {
+    div.appendChild(createVideoSide(s.videoUrl));
+  }
   return div.outerHTML;
 }
 
@@ -3373,6 +3605,40 @@ function buildAdminTable(){
   });
 }
 
+const localVideoFiles=new Map();
+function syncLocalVideoField(){
+  const input=document.getElementById('f-localurl');
+  const name=localVideoFiles.get(input.dataset.videoUrl);
+  document.getElementById('local-video-name').textContent=name ? 'Selected local video: '+name : input.value ? 'Select this local file below to enable playback.' : '';
+  document.getElementById('f-videofile').value='';
+}
+function releaseUnusedLocalVideos(){
+  const used=new Set([...csvRows.map(row=>row._localVideoUrl),...slides.map(slide=>slide.videoUrl),document.getElementById('f-localurl').dataset.videoUrl]);
+  for(const url of localVideoFiles.keys()){
+    if(!used.has(url)){URL.revokeObjectURL(url);localVideoFiles.delete(url);}
+  }
+}
+function selectLocalVideo(input){
+  const file=input.files?.[0];
+  if(!file) return;
+  if(!/\.mp4$/i.test(file.name) || !file.size){
+    alert('Choose a non-empty MP4 video file.');input.value='';return;
+  }
+  const url=URL.createObjectURL(file);
+  localVideoFiles.set(url,file.name);
+  const local=document.getElementById('f-localurl');
+  local.dataset.videoUrl=url;
+  local.value=file.name;
+  syncLocalVideoField();
+  releaseUnusedLocalVideos();
+}
+function clearLocalVideo(){
+  const local=document.getElementById('f-localurl');
+  local.value='';
+  delete local.dataset.videoUrl;
+  syncLocalVideoField();
+  releaseUnusedLocalVideos();
+}
 function openEditForm(idx){
   editingRowIdx=idx;
   const row=csvRows[idx];
@@ -3385,6 +3651,9 @@ function openEditForm(idx){
   document.getElementById('f-details').value=row['Page Details']||'';
   document.getElementById('f-imageurl').value=row['Image URL']||'';
   document.getElementById('f-videourl').value=row['Video URL']||'';
+  document.getElementById('f-localurl').value=row['Local Video URL']||row['Local URL']||'';
+  document.getElementById('f-localurl').dataset.videoUrl=row._localVideoUrl||'';
+  syncLocalVideoField();
   document.getElementById('f-order').value=row['Page Order']||'';
   buildChapterHints();
   // highlight selected row
@@ -3426,6 +3695,9 @@ function adminAddRow(){
   document.getElementById('f-imageurl').value='';
   document.getElementById('f-videourl').value='';
   document.getElementById('f-order').value=csvRows.length+1;
+  clearLocalVideo();
+  syncLocalVideoField();
+  releaseUnusedLocalVideos();
   buildChapterHints();
   document.querySelectorAll('#admin-tbody tr').forEach(r=>r.classList.remove('selected-row'));
   document.getElementById('admin-sidebar').style.display='flex';
@@ -3473,6 +3745,9 @@ function sidebarSaveAndAddAnother(){
   document.getElementById('f-imageurl').value='';
   document.getElementById('f-videourl').value='';
   document.getElementById('f-order').value=csvRows.length+1;
+  clearLocalVideo();
+  syncLocalVideoField();
+  releaseUnusedLocalVideos();
   document.getElementById('f-chapter').value=keepChapter;
   buildChapterHints();
   document.getElementById('f-heading').focus();
@@ -3493,6 +3768,8 @@ function collectRowFromForm(){
     'Page Details':details,
     'Image URL':imageurl,
     'Video URL':videourl,
+    'Local Video URL':document.getElementById('f-localurl').value.trim(),
+    _localVideoUrl:document.getElementById('f-localurl').dataset.videoUrl||'',
     'Page Order':order||String(csvRows.length+1),
   };
 }
@@ -3501,6 +3778,10 @@ function closeSidebar(){
   document.getElementById('admin-sidebar').style.display='none';
   document.querySelectorAll('#admin-tbody tr').forEach(r=>r.classList.remove('selected-row'));
   editingRowIdx=null;
+  document.getElementById('f-videourl').value='';
+  clearLocalVideo();
+  syncLocalVideoField();
+  releaseUnusedLocalVideos();
 }
 
 function adminRebuild(){
@@ -3530,7 +3811,7 @@ function adminExportHighlights(){
   a.click();URL.revokeObjectURL(url);
 }
 function adminExportCSV(){
-  const cols=['Notebook','Chapter','Page Heading','Page Details','Image URL','Video URL','Page Order','Notes','Meta'];
+  const cols=[...NOTEBOOK_COLUMNS,'Notes','Meta'];
   const header=cols.join(',');
   const rows=csvRows.map((r,ri)=>cols.map(c=>{
     let v;
@@ -3542,7 +3823,8 @@ function adminExportCSV(){
     } else if(c==='Meta'){
       v=ri===0 ? JSON.stringify({chosenLayout,structOptions,chapterColors}) : '';
     } else {
-      v=String(r[c]||'');
+      v=c==='Diagram' ? String(r['Image URL']??r['Diagram']??'') :
+        c==='Video URL' && String(r[c]||'').startsWith('blob:') ? '' : String(r[c]||'');
     }
     return v.includes(',')||v.includes('"')||v.includes('\n') ? '"'+v.replace(/"/g,'""')+'"' : v;
   }).join(','));
@@ -4172,13 +4454,103 @@ function updateReadIndicator(){
 
 
 /* ── TEMPLATE DOWNLOAD ── */
-function downloadTemplate(){
-  const csv='Notebook,Chapter,Page Heading,Page Details,Page Order,Image URL,Video URL';
-  const blob=new Blob([csv],{type:'text/csv'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;a.download='notebook_template.csv';a.click();
-  URL.revokeObjectURL(url);
+const NOTEBOOK_COLUMNS=window.NotebookTemplate.columns;
+function ensureNotebookXLSX(){return window.NotebookTemplate.ensureExcel();}
+function notebookEmbeddedDiagrams(book,diagramColumn){
+  const images=new Map(),files=book.files;
+  if(!files) return images;
+  const xml=path=>{
+    const content=files[path]?.content;
+    return content ? new DOMParser().parseFromString(new TextDecoder().decode(content),'application/xml') : null;
+  };
+  const nodes=(root,name)=>root ? Array.from(root.getElementsByTagNameNS('*',name)) : [];
+  const relationNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const relationships=path=>{
+    const slash=path.lastIndexOf('/'),dir=path.slice(0,slash+1);
+    const result=new Map();
+    nodes(xml(dir+'_rels/'+path.slice(slash+1)+'.rels'),'Relationship').forEach(node=>{
+      if(node.getAttribute('TargetMode')==='External') return;
+      const target=node.getAttribute('Target')||'';
+      const parts=[];
+      (target.startsWith('/')?target.slice(1):dir+target).split('/').forEach(part=>{
+        if(part==='..') parts.pop(); else if(part && part!=='.') parts.push(part);
+      });
+      result.set(node.getAttribute('Id'),parts.join('/'));
+    });
+    return result;
+  };
+  const firstSheet=nodes(xml('xl/workbook.xml'),'sheet')[0];
+  const sheetPath=relationships('xl/workbook.xml').get(firstSheet?.getAttributeNS(relationNS,'id'));
+  if(!sheetPath) return images;
+  const sheetXML=xml(sheetPath),sheetRels=relationships(sheetPath);
+  nodes(sheetXML,'drawing').forEach(drawing=>{
+    const drawingPath=sheetRels.get(drawing.getAttributeNS(relationNS,'id'));
+    if(!drawingPath) return;
+    const drawingRels=relationships(drawingPath),drawingXML=xml(drawingPath);
+    [...nodes(drawingXML,'oneCellAnchor'),...nodes(drawingXML,'twoCellAnchor')].forEach(anchor=>{
+      const origin=nodes(anchor,'from')[0];
+      const column=Number(nodes(origin,'col')[0]?.textContent);
+      const row=Number(nodes(origin,'row')[0]?.textContent);
+      if(!origin || column!==diagramColumn || !Number.isInteger(row)) return;
+      const blip=nodes(anchor,'blip')[0];
+      const imagePath=drawingRels.get(blip?.getAttributeNS(relationNS,'embed'));
+      const bytes=files[imagePath]?.content;
+      if(!bytes) return;
+      const extension=imagePath.split('.').pop().toLowerCase();
+      const mime={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp'}[extension];
+      if(!mime) throw new Error('Diagram in row '+(row+1)+' must be a PNG, JPEG, GIF, or WebP image.');
+      if(bytes.length>10*1024*1024) throw new Error('Diagram in row '+(row+1)+' exceeds 10 MB.');
+      if(images.has(row)) throw new Error('Use one diagram per row in the Diagram column (row '+(row+1)+').');
+      let binary='';
+      for(let offset=0;offset<bytes.length;offset+=8192) binary+=String.fromCharCode(...bytes.subarray(offset,offset+8192));
+      images.set(row,'data:'+mime+';base64,'+btoa(binary));
+    });
+  });
+  if(nodes(sheetXML,'c').some(cell=>cell.hasAttribute('vm')) && !images.size){
+    throw new Error('This workbook uses in-cell pictures. In Excel, switch the pictures to Place over Cells, position them in the Diagram column on their page rows, save, and upload again.');
+  }
+  return images;
+}
+function parseNotebookXLSX(data){
+  const book=XLSX.read(data,{type:'array',bookFiles:true});
+  if(!book.SheetNames.length) throw new Error('The workbook has no worksheets.');
+  const sheet=book.Sheets[book.SheetNames[0]];
+  const values=XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false,blankrows:true});
+  if(!values.length) throw new Error('The first worksheet is empty.');
+  const headers=values[0].map(value=>String(value).trim()==='Local URL'?'Local Video URL':String(value).trim());
+  const missing=NOTEBOOK_COLUMNS.filter(name=>name!=='Local Video URL'&&!headers.includes(name));
+  if(missing.length) throw new Error('Missing columns: '+missing.join(', '));
+  if(new Set(headers.filter(Boolean)).size!==headers.filter(Boolean).length) throw new Error('Column headings must be unique.');
+  const firstRow=sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']).s.r : 0;
+  const diagrams=notebookEmbeddedDiagrams(book,headers.indexOf('Diagram'));
+  return values.slice(1).map((row,index)=>{
+    const entries=headers.filter(Boolean).map(name=>{
+      const column=headers.indexOf(name);
+      const address=XLSX.utils.encode_cell ? XLSX.utils.encode_cell({r:firstRow+index+1,c:column}) : '';
+      const link=sheet[address]?.l?.Target;
+      const value=name==='Diagram' && diagrams.has(firstRow+index+1) ? diagrams.get(firstRow+index+1) :
+        (name==='Diagram'||name==='Video URL') && link ? link : row[column];
+      return [name,String(value??'')];
+    });
+    return Object.fromEntries(entries);
+  }).filter(row=>Object.values(row).some(value=>value.trim()));
+}
+async function writeNotebookXLSX(rows,filename){return window.NotebookTemplate.write(rows,filename);}
+async function downloadTemplate(){
+  try{await window.NotebookTemplate.download();}
+  catch(err){alert(err.message);}
+}
+async function adminExportXLSX(){
+  if(!csvRows.length){alert('Add at least one page before exporting.');return;}
+  const rows=csvRows.map(row=>NOTEBOOK_COLUMNS.map(name=>{
+    if(name==='Diagram') return row['Image URL']??row['Diagram']??'';
+    if(name==='Notebook') return row[name]||notebookTitle;
+    if(name==='Video URL' && String(row[name]||'').startsWith('blob:')) return '';
+    if(name==='Page Order' && String(row[name]??'').trim() && Number.isFinite(Number(row[name]))) return Number(row[name]);
+    return String(row[name]??'');
+  }));
+  try{await writeNotebookXLSX(rows,(notebookTitle||'notebook').replace(/[\\/:*?"<>|\s]+/g,'_')+'.xlsx');}
+  catch(err){alert(err.message);}
 }
 
 
@@ -4383,7 +4755,9 @@ function togglePinPanel(){
   panelPinned=!panelPinned;
   const panel=document.getElementById('ch-panel');
   const btn=document.getElementById('ch-pin-btn');
+  const presenter=document.getElementById('presenter');
   panel.classList.toggle('pinned',panelPinned);
+  presenter.classList.toggle('chapters-pinned',panelPinned);
   if(panelPinned){
     setTimeout(updateChapterPanel,50);
     btn.style.color='#2563eb';

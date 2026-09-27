@@ -1,5 +1,5 @@
 [
- {"id":"title","name":"Title","layout":"hero","title":"Quarterly business review","subtitle":"A clear view of progress and priorities","fields":[],"content":"September 2026"},
+ {"id":"title","name":"Title","layout":"hero","eyebrow":"PRESENTATION","title":"Quarterly business review","subtitle":"A clear view of progress and priorities","fields":[],"content":"September 2026"},
  {"id":"summary","name":"Executive Summary","layout":"summary","title":"Executive summary","subtitle":"The key points at a glance","fields":["Key point"],"content":"Revenue grew across our core products.\nCustomer retention remains a priority.\nNext quarter focuses on onboarding."},
  {"id":"kpi","name":"KPI Cards","layout":"cards","title":"Performance at a glance","subtitle":"Illustrative figures • Replace with your data","fields":["Value","Metric","Context"],"content":"24% | Revenue growth | Compared with last quarter\n92% | Retention | Up 3 percentage points\n1,250 | Customers | 180 new this quarter"},
  {"id":"comparison","name":"Comparison","layout":"comparison","title":"Options compared","subtitle":"The tradeoffs that matter","fields":["Option","Description"],"content":"Option A | Faster launch with the existing platform\nOption B | Greater flexibility with a custom solution"},
@@ -7,5 +7,10 @@
  {"id":"process","name":"Process Flow","layout":"process","title":"Delivery process","subtitle":"From brief to launch","fields":["Step","Description"],"content":"Discover | Agree on the problem\nDesign | Review the proposed solution\nBuild | Develop and test\nLaunch | Release and monitor"},
  {"id":"timeline","name":"Timeline / Roadmap","layout":"timeline","title":"Product roadmap","subtitle":"Milestones for the next four quarters","fields":["Period","Milestone"],"content":"Q1 | Research and planning\nQ2 | Prototype and testing\nQ3 | Pilot release\nQ4 | General availability"},
  {"id":"actions","name":"Action Plan","layout":"table","title":"Next steps","subtitle":"Clear ownership and dates","fields":["Action","Owner","Due"],"content":"Confirm scope | Product team | 15 Sep\nReview prototype | Design team | 30 Sep\nApprove launch | Project lead | 15 Oct"},
+ {"id":"notebook","name":"Notebook Page","layout":"notebook","title":"Page heading","subtitle":"Chapter","fields":[],"content":"Add the page details here."},
+ {"id":"image-focus","name":"Large Image","layout":"image-focus","title":"A visual worth pausing on","subtitle":"Use one strong image to carry the message","fields":[],"content":"Add a short caption or source note."},
+ {"id":"image-caption","name":"Image + Caption","layout":"image-caption","title":"Show and explain","subtitle":"Pair the visual with a concise interpretation","fields":[],"content":"Explain what the audience should notice and why it matters."},
+ {"id":"quote","name":"Quote","layout":"quote","title":"A point of view","subtitle":"Name or source","fields":[],"content":"A memorable statement can reset the room and focus the discussion."},
+ {"id":"big-number","name":"Big Number","layout":"big-number","title":"The number that matters","subtitle":"Give the metric context","fields":["Value","Label","Context"],"content":"92% | Customer retention | Up 3 percentage points from last quarter"},
  {"id":"closing","name":"Closing","layout":"hero","title":"Thank you","subtitle":"Questions and discussion","fields":[],"content":"team@example.com"}
 ]

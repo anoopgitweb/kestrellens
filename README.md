@@ -49,7 +49,15 @@ The regular **Ask** mode continues to use the existing Wikipedia and Google News
 
 New Learning Experience page images are stored as private files in a Google
 Drive folder. Supabase continues to provide authentication and notebook data.
-Configure these server-only Render environment variables:
+For a personal Gmail account, configure `GOOGLE_DRIVE_OAUTH_CLIENT_ID` and
+`GOOGLE_DRIVE_OAUTH_CLIENT_SECRET`, restart KestrelIQ, then open
+`http://localhost:8787/api/google-drive/connect`. KestrelIQ requests the
+`drive.file` scope, stores the refresh token in the Git-ignored local file
+`.google_drive_oauth.json`, and creates a private `KestrelIQ Notebook Images`
+folder. The OAuth redirect URI must be exactly
+`http://localhost:8787/api/google-drive/callback`.
+
+For a Google Workspace Shared Drive, configure these server-only variables:
 
 ```text
 GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON={the complete service-account JSON object}
@@ -66,6 +74,13 @@ authenticated backend; it does not create public Drive links.
 Existing notebook images with Supabase Storage paths remain readable during
 the transition. New images use Drive IDs prefixed with `gdrive:`. Existing
 files should be migrated separately after Drive configuration is verified.
+
+The Discover & Learn blank template is an Excel `.xlsx` workbook. Notebook,
+Chapter, and Page Heading are required for each populated row. Page Details,
+Video URL, Diagram, and Page Order are optional. Place at most one PNG, JPEG,
+or WebP diagram in the Diagram cell for its row and set the picture to move
+and size with cells. During import, diagrams are optimized and uploaded to the
+private Google Drive folder; rows without diagrams import as text-only pages.
 
 ### Shared timeline refresh
 

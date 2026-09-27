@@ -12,7 +12,29 @@ Requires Python 3.10 or newer. Install dependencies once with `python -m pip ins
 
 ## Use
 
-The starter deck contains all nine slide types with illustrative content. Select a slide in the left sidebar, edit its title, subtitle, and rows on the right, and select one of three themes. Use Add slide, Copy, the up/down arrows, and Delete to manage the deck. Content rows use `|` between fields; the editor shows the expected format.
+The starter deck contains the available slide types with illustrative content. Select a slide in the left sidebar, edit its title, subtitle, and rows on the right, and select one of three themes. Use Add slide, Copy, the up/down arrows, and Delete to manage the deck. Content rows use `|` between fields; the editor shows the expected format.
+
+Import Notebook accepts the shared KestrelIQ `.xlsx` Notebook template. It creates a title slide, chapter dividers, and editable page slides in Page Order. Embedded PNG, JPEG, or WebP diagrams in the Diagram column are added to their page slides. Long page details are split into continuation slides, online video URLs become PowerPoint links, and local video filenames remain visible references. Import replaces the current project after confirmation and supports up to 60 generated slides.
+
+Run PPT opens the complete deck in a presentation viewer without generating a file. Use the on-screen controls, Left/Right arrows, Space, Page Up/Page Down, Home/End, or fullscreen mode to review the flow before exporting.
+
+Click a slide image or chart in the editor preview or Run PPT to open Image zoom. Use the on-screen controls, mouse wheel, `+`, `-`, or `0` to inspect and reset the image without advancing the presentation.
+
+Company branding accepts one PNG, JPEG, or WebP logo and embeds it in previews, saved projects, and generated PowerPoint files. Choose its corner and size, and optionally hide it on title slides.
+
+Title page images accept up to five PNG, JPEG, or WebP files. Slide Studio crops them without stretching and uses a shuffled rotation across cover and chapter title pages, so every uploaded image appears before one repeats. The assignment stays stable in editor previews, Run PPT, saved projects, and generated PowerPoint files.
+
+Title slides include an editable Title label above the main heading. New general title slides use `PRESENTATION`; Notebook imports use `NOTEBOOK PRESENTATION` for the cover and `CHAPTER` for chapter dividers.
+
+The opening title slide includes a compact footer with the company logo, when supplied, and the deck preparation date and time. The timestamp refreshes when Run PPT or Generate PPT is used.
+
+Content slides use a consistent footer with the company logo, deck name, and accurate current/total slide count. Four additional visual layouts are available: Large Image, Image + Caption, Quote, and Big Number.
+
+Slide transitions support None, Fade, Push, Wipe, and Cut with slow, medium, or fast timing. Set a deck default and optionally override individual slides. Run PPT previews the effect, and generated PowerPoint files contain native slide transition data.
+
+The PowerPoint click-to-enlarge option adds a hidden detail slide for each uploaded slide image. Clicking the image during a slideshow opens the enlarged version; clicking the enlarged image or Back returns to the source slide. Hidden detail slides stay out of normal next/previous playback. The exported pictures remain editable.
+
+Slides use a subtle theme-coloured corner-line motif to add depth while keeping the central content area clear.
 
 Trend / Chart slides offer column, horizontal bar, line, area, stacked column, pie, donut, scatter, and column + line charts. Enter up to 12 rows and 4 series as `Category | Value 1 | Value 2`; series names use `Revenue | Target` in their separate field. Pie/donut require one nonnegative series with a positive total. Scatter uses numeric X values in the first column. Combination charts require exactly two series sharing the same value axis. No header row is needed.
 

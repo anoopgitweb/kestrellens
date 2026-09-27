@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 KESTRELIQ_LOCAL_ENV.bat
+.google_drive_oauth.json
 
 # Local StatLens runtime and generated files
 statlens-integration-backup-*/
