@@ -789,6 +789,11 @@ input[type=file]{display:none;}
   height:95vh;max-height:960px;
   display:flex;flex-direction:column;
   overflow:hidden;
+  transition:max-width .2s ease, max-height .2s ease;
+}
+.toolkit-panel.maximized{
+  max-width:97vw;
+  max-height:94vh;
 }
 .tk-side-dock{
   position:fixed;
@@ -996,6 +1001,20 @@ input[type=file]{display:none;}
 .tk-table th{background:var(--panel-2);font-weight:600;color:var(--text-dim);font-size:11.5px;}
 .tk-table td input{width:52px;text-align:center;border:1px solid var(--border);border-radius:5px;background:var(--panel);color:var(--text);padding:3px;}
 .tk-table td.tk-rank{font-weight:700;color:var(--accent);}
+.tk-auto-matrix{table-layout:fixed;}
+.tk-auto-section{
+  text-align:left !important;background:var(--accent-soft) !important;
+  font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;
+  color:var(--text);
+}
+.tk-auto-matrix th,.tk-auto-matrix td{white-space:normal;}
+.tk-auto-rowlabel-head,.tk-auto-rowlabel{
+  text-align:left !important;font-weight:600;color:var(--text-dim);
+  width:200px;min-width:200px;position:sticky;left:0;z-index:1;
+  background:var(--panel);font-size:11.5px;
+}
+.tk-auto-matrix th:not(.tk-auto-rowlabel-head){min-width:140px;}
+.tk-auto-matrix td input,.tk-auto-matrix td select{width:90%;max-width:110px;}
 .tk-grid-2x2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;}
 .tk-quad{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px;min-height:120px;}
 .tk-quad-title{font-size:11.5px;font-weight:700;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;}
@@ -1219,7 +1238,11 @@ input[type=file]{display:none;}
   <div class="toolkit-panel" id="toolkitPanel">
     <div class="toolkit-header">
       <h3>🧰 Toolkit</h3>
-      <button id="toolkitClose" class="icon-btn" title="Close">✕</button>
+      <div style="display:flex;gap:8px;">
+        <button id="toolkitHelp" class="icon-btn" title="Help for this tool">❔</button>
+        <button id="toolkitMaximize" class="icon-btn" title="Maximize">⛶</button>
+        <button id="toolkitClose" class="icon-btn" title="Close">✕</button>
+      </div>
     </div>
     <div class="toolkit-search-row">
       <input type="text" id="toolkitSearch" placeholder="Search tools...">
@@ -1854,7 +1877,7 @@ function renderMain(){
 }
 
 function escapeHtml(s){
-  return (s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
 function formatTimestamp(ts){
@@ -3218,6 +3241,7 @@ function renderTkEffortImpact(container){
     <p class="tk-sub">Rate ideas 1–5 on Impact and Effort for a fast prioritization gut-check. Score = Impact ÷ Effort.</p>
     <div id="tkEiTable"></div>
     <button id="tkEiAdd" style="margin-top:10px;">+ Add idea</button>
+    <button id="tkEiCsvBtn" style="margin-top:10px;">⬇ Export (Excel)</button>
     <div class="tk-skill-legend" style="margin-top:14px;">
       <span><span class="tk-skill-legend-dot" style="background:var(--video-color);"></span>Quick Win</span>
       <span><span class="tk-skill-legend-dot" style="background:var(--ppt-color);"></span>Major Project</span>
@@ -3227,6 +3251,15 @@ function renderTkEffortImpact(container){
   `;
   container.querySelector("#tkEiAdd").addEventListener("click", () => {
     st.items.push({ name: "New idea", impact: 3, effort: 3 }); tkSave(); draw();
+  });
+  container.querySelector("#tkEiCsvBtn").addEventListener("click", () => {
+    const rows = [["Idea","Impact","Effort","Score","Quadrant"]];
+    st.items.forEach(it => {
+      const score = it.effort > 0 ? (it.impact/it.effort) : 0;
+      const q = quadrant(+it.impact||0, +it.effort||0);
+      rows.push([it.name||"", it.impact, it.effort, score.toFixed(2), q.label]);
+    });
+    downloadCsv("effort-vs-impact-" + new Date().toISOString().slice(0,10) + ".csv", rows);
   });
   draw();
 }
@@ -3328,6 +3361,18 @@ function renderTkChurnRate(container){
     }
   };
   [startI, lostI, periodI].forEach(el => el.addEventListener("input", upd));
+}
+
+function downloadCsv(filename, rows){
+  const csvEscape = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; };
+  const csvContent = rows.map(row => row.map(csvEscape).join(",")).join("\r\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 function resolveCssVarsInSvg(svgString){
@@ -3605,13 +3650,17 @@ Missing parts: 8
 Other: 5" style="min-height:110px;"></textarea></div>
     <div id="tkParetoSummary" style="font-size:12px;color:var(--text-dim);margin:8px 0;"></div>
     <div id="tkParetoChart" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px;"></div>
-    <button id="tkParetoPngBtn" style="margin:10px 0;">⬇ Export chart (PNG)</button>
+    <div class="tk-row" style="margin:10px 0;">
+      <button id="tkParetoPngBtn">⬇ Export chart (PNG)</button>
+      <button id="tkParetoCsvBtn">⬇ Export table (Excel)</button>
+    </div>
     <div id="tkParetoTable" style="margin-top:12px;"></div>
   `;
   const input = container.querySelector("#tkParetoInput");
   const summary = container.querySelector("#tkParetoSummary");
   const chart = container.querySelector("#tkParetoChart");
   const table = container.querySelector("#tkParetoTable");
+  let lastRows = [];
 
   function parseLine(line){
     let m = line.match(/^(.*?)[,:]\s*([\d.]+)\s*$/);
@@ -3926,12 +3975,1357 @@ function renderTkWeightedAverage(container){
     <button id="tkWaAddRow" style="margin:10px 0 14px;">+ Add row</button>
     <div class="tk-result"><div class="tk-result-big" id="tkWaResult">—</div><div class="tk-result-label" id="tkWaSub">Weighted average</div></div>
     <div id="tkWaInference" style="font-size:12.5px;color:var(--text-dim);margin-top:10px;"></div>
+    <button id="tkWaCsvBtn" style="margin-top:10px;">⬇ Export (Excel)</button>
   `;
   container.querySelector("#tkWaAddRow").addEventListener("click", () => {
     if(st.items.length < 12){ st.items.push({ value: "", weight: "" }); tkSave(); draw(); }
   });
+  container.querySelector("#tkWaCsvBtn").addEventListener("click", () => {
+    const rows = [["Label","Value","Weight"]];
+    st.items.forEach(it => rows.push([it.label||"", it.value||"", it.weight||""]));
+    downloadCsv("weighted-average-" + new Date().toISOString().slice(0,10) + ".csv", rows);
+  });
   draw();
   compute();
+}
+
+// ---- BPO Metrics ----
+function renderTkBpoWhatIf(container){
+  container.innerHTML = `
+    <h4>What-If Calculator for BPO Metrics</h4>
+    <p class="tk-sub">Set your current baseline, then adjust the levers below to see the staffing and cost impact instantly.</p>
+
+    <div class="tk-section-title">Baseline (today)</div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Call/contact volume per day</label><input type="number" id="tkBpoVolume" placeholder="2000"></div>
+      <div class="tk-field"><label>AHT (seconds)</label><input type="number" id="tkBpoAht" placeholder="420"></div>
+      <div class="tk-field"><label>Hours per FTE per shift</label><input type="number" id="tkBpoShiftHrs" placeholder="8"></div>
+    </div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Shrinkage (%)</label><input type="number" id="tkBpoShrinkage" placeholder="30"></div>
+      <div class="tk-field"><label>Occupancy (%)</label><input type="number" id="tkBpoOccupancy" placeholder="85"></div>
+      <div class="tk-field"><label>Fully-loaded cost per FTE / month (₹)</label><input type="number" id="tkBpoCostFte" placeholder="35000"></div>
+    </div>
+
+    <div class="tk-section-title" style="margin-top:18px;">What if... (adjust the levers)</div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Volume change (%)</label><input type="number" id="tkBpoDVolume" placeholder="0"></div>
+      <div class="tk-field"><label>AHT change (%)</label><input type="number" id="tkBpoDAht" placeholder="0"></div>
+    </div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Shrinkage change (percentage points)</label><input type="number" id="tkBpoDShrinkage" placeholder="0"></div>
+      <div class="tk-field"><label>Occupancy change (percentage points)</label><input type="number" id="tkBpoDOccupancy" placeholder="0"></div>
+    </div>
+
+    <div class="tk-row" style="margin-top:14px;">
+      <div class="tk-field">
+        <label>Required FTEs</label>
+        <div class="tk-result" style="margin-top:0;">
+          <div class="tk-result-big" id="tkBpoFteBaseline" style="font-size:18px;">—</div>
+          <div class="tk-result-label">Baseline</div>
+        </div>
+      </div>
+      <div class="tk-field">
+        <label>&nbsp;</label>
+        <div class="tk-result" style="margin-top:0;">
+          <div class="tk-result-big" id="tkBpoFteWhatIf" style="font-size:18px;">—</div>
+          <div class="tk-result-label" id="tkBpoFteDeltaLabel">What-if</div>
+        </div>
+      </div>
+    </div>
+    <div class="tk-row">
+      <div class="tk-field">
+        <label>Monthly cost</label>
+        <div class="tk-result" style="margin-top:0;">
+          <div class="tk-result-big" id="tkBpoCostBaseline" style="font-size:18px;">—</div>
+          <div class="tk-result-label">Baseline</div>
+        </div>
+      </div>
+      <div class="tk-field">
+        <label>&nbsp;</label>
+        <div class="tk-result" style="margin-top:0;">
+          <div class="tk-result-big" id="tkBpoCostWhatIf" style="font-size:18px;">—</div>
+          <div class="tk-result-label" id="tkBpoCostDeltaLabel">What-if</div>
+        </div>
+      </div>
+    </div>
+    <div id="tkBpoInference" style="font-size:12.5px;color:var(--text-dim);margin-top:12px;"></div>
+  `;
+
+  const ids = ["tkBpoVolume","tkBpoAht","tkBpoShiftHrs","tkBpoShrinkage","tkBpoOccupancy","tkBpoCostFte",
+               "tkBpoDVolume","tkBpoDAht","tkBpoDShrinkage","tkBpoDOccupancy"];
+  const els = {}; ids.forEach(id => els[id] = container.querySelector("#"+id));
+
+  function requiredFte(volume, ahtSeconds, shiftHrs, shrinkagePct, occupancyPct){
+    const workloadHours = (volume * ahtSeconds) / 3600;
+    const occupancy = Math.max(0.01, occupancyPct/100);
+    const shrinkage = Math.min(0.99, Math.max(0, shrinkagePct/100));
+    const productiveFte = workloadHours / (shiftHrs * occupancy);
+    return productiveFte / (1 - shrinkage);
+  }
+
+  const upd = () => {
+    const volume = parseFloat(els.tkBpoVolume.value);
+    const aht = parseFloat(els.tkBpoAht.value);
+    const shiftHrs = parseFloat(els.tkBpoShiftHrs.value);
+    const shrinkage = parseFloat(els.tkBpoShrinkage.value);
+    const occupancy = parseFloat(els.tkBpoOccupancy.value);
+    const costFte = parseFloat(els.tkBpoCostFte.value);
+
+    const fteBaseEl = container.querySelector("#tkBpoFteBaseline"), fteWhatEl = container.querySelector("#tkBpoFteWhatIf");
+    const costBaseEl = container.querySelector("#tkBpoCostBaseline"), costWhatEl = container.querySelector("#tkBpoCostWhatIf");
+    const fteDeltaLabel = container.querySelector("#tkBpoFteDeltaLabel"), costDeltaLabel = container.querySelector("#tkBpoCostDeltaLabel");
+    const inference = container.querySelector("#tkBpoInference");
+
+    if([volume,aht,shiftHrs,shrinkage,occupancy,costFte].some(isNaN) || shiftHrs<=0 || occupancy<=0){
+      fteBaseEl.textContent = "—"; fteWhatEl.textContent = "—"; costBaseEl.textContent = "—"; costWhatEl.textContent = "—";
+      inference.textContent = ""; return;
+    }
+
+    const baselineFte = requiredFte(volume, aht, shiftHrs, shrinkage, occupancy);
+    const baselineCost = baselineFte * costFte;
+
+    const dVolume = parseFloat(els.tkBpoDVolume.value) || 0;
+    const dAht = parseFloat(els.tkBpoDAht.value) || 0;
+    const dShrinkage = parseFloat(els.tkBpoDShrinkage.value) || 0;
+    const dOccupancy = parseFloat(els.tkBpoDOccupancy.value) || 0;
+
+    const newVolume = volume * (1 + dVolume/100);
+    const newAht = aht * (1 + dAht/100);
+    const newShrinkage = shrinkage + dShrinkage;
+    const newOccupancy = occupancy + dOccupancy;
+
+    const whatIfFte = requiredFte(newVolume, newAht, shiftHrs, newShrinkage, newOccupancy);
+    const whatIfCost = whatIfFte * costFte;
+
+    fteBaseEl.textContent = baselineFte.toFixed(1);
+    fteWhatEl.textContent = whatIfFte.toFixed(1);
+    costBaseEl.textContent = "₹" + Math.round(baselineCost).toLocaleString();
+    costWhatEl.textContent = "₹" + Math.round(whatIfCost).toLocaleString();
+
+    const fteDelta = whatIfFte - baselineFte;
+    const costDelta = whatIfCost - baselineCost;
+    fteWhatEl.style.color = fteDelta > 0.05 ? "var(--danger)" : fteDelta < -0.05 ? "var(--video-color)" : "var(--text)";
+    costWhatEl.style.color = costDelta > 1 ? "var(--danger)" : costDelta < -1 ? "var(--video-color)" : "var(--text)";
+    fteDeltaLabel.textContent = `What-if (${fteDelta>=0?"+":""}${fteDelta.toFixed(1)} FTEs)`;
+    costDeltaLabel.textContent = `What-if (${costDelta>=0?"+":""}₹${Math.round(costDelta).toLocaleString()}/mo)`;
+
+    const fteDeltaPct = baselineFte !== 0 ? (fteDelta/baselineFte)*100 : 0;
+    const direction = fteDelta > 0.05 ? "increase" : fteDelta < -0.05 ? "reduce" : "barely change";
+    const color = fteDelta > 0.05 ? "var(--danger)" : fteDelta < -0.05 ? "var(--video-color)" : "var(--text-dim)";
+    inference.innerHTML = `<b style="color:${color};">Inference:</b> These changes would ${direction} required staffing by ${Math.abs(fteDelta).toFixed(1)} FTEs (${Math.abs(fteDeltaPct).toFixed(1)}%), a monthly cost ${costDelta>=0?"increase":"decrease"} of ₹${Math.abs(Math.round(costDelta)).toLocaleString()}.`;
+  };
+
+  ids.forEach(id => els[id].addEventListener("input", upd));
+}
+
+function renderTkNpsWhatIf(container){
+  container.innerHTML = `
+    <h4>What-If Calculator for NPS</h4>
+    <p class="tk-sub">Enter your actual Promoter/Passive/Detractor counts, then model moving customers between groups to see the NPS impact.</p>
+
+    <div class="tk-section-title">Baseline (today)</div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Promoters (count)</label><input type="number" id="tkNwPromoters" placeholder="59"></div>
+      <div class="tk-field"><label>Passives (count)</label><input type="number" id="tkNwPassives" placeholder="25"></div>
+      <div class="tk-field"><label>Detractors (count)</label><input type="number" id="tkNwDetractors" placeholder="16"></div>
+    </div>
+    <div id="tkNwTotalNote" style="font-size:11.5px;color:var(--text-dim);margin-bottom:10px;"></div>
+
+    <div class="tk-section-title" style="margin-top:14px;">What if... (move customers between groups)</div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Promoters change (count, +/-)</label><input type="number" id="tkNwDPromoters" placeholder="0"></div>
+      <div class="tk-field"><label>Detractors change (count, +/-)</label><input type="number" id="tkNwDDetractors" placeholder="0"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">Total responses stays the same — any customers added to Promoters or Detractors are assumed to move out of Passives.</div>
+
+    <div class="tk-row" style="margin-top:14px;">
+      <div class="tk-field">
+        <label>NPS</label>
+        <div class="tk-result" style="margin-top:0;">
+          <div class="tk-result-big" id="tkNwNpsBaseline" style="font-size:18px;">—</div>
+          <div class="tk-result-label">Baseline</div>
+        </div>
+      </div>
+      <div class="tk-field">
+        <label>&nbsp;</label>
+        <div class="tk-result" style="margin-top:0;">
+          <div class="tk-result-big" id="tkNwNpsWhatIf" style="font-size:18px;">—</div>
+          <div class="tk-result-label" id="tkNwNpsDeltaLabel">What-if</div>
+        </div>
+      </div>
+    </div>
+    <div id="tkNwInference" style="font-size:12.5px;color:var(--text-dim);margin-top:12px;"></div>
+  `;
+
+  const ids = ["tkNwPromoters","tkNwPassives","tkNwDetractors","tkNwDPromoters","tkNwDDetractors"];
+  const els = {}; ids.forEach(id => els[id] = container.querySelector("#"+id));
+  const totalNote = container.querySelector("#tkNwTotalNote");
+
+  const upd = () => {
+    const promoters = parseFloat(els.tkNwPromoters.value);
+    const passives = parseFloat(els.tkNwPassives.value);
+    const detractors = parseFloat(els.tkNwDetractors.value);
+    const dPromoters = parseFloat(els.tkNwDPromoters.value) || 0;
+    const dDetractors = parseFloat(els.tkNwDDetractors.value) || 0;
+
+    const npsBaseEl = container.querySelector("#tkNwNpsBaseline"), npsWhatEl = container.querySelector("#tkNwNpsWhatIf");
+    const npsDeltaLabel = container.querySelector("#tkNwNpsDeltaLabel");
+    const inference = container.querySelector("#tkNwInference");
+
+    if([promoters,passives,detractors].some(n => isNaN(n) || n < 0)){
+      npsBaseEl.textContent = "—"; npsWhatEl.textContent = "—"; inference.textContent = ""; totalNote.textContent = "";
+      return;
+    }
+    const total = promoters + passives + detractors;
+    if(total === 0){
+      npsBaseEl.textContent = "—"; npsWhatEl.textContent = "—"; inference.textContent = ""; totalNote.textContent = "Enter at least one response.";
+      return;
+    }
+    totalNote.innerHTML = `Total responses: <b style="color:var(--text);">${total.toLocaleString()}</b> (Promoters ${(promoters/total*100).toFixed(1)}%, Passives ${(passives/total*100).toFixed(1)}%, Detractors ${(detractors/total*100).toFixed(1)}%).`;
+
+    const baselineNps = ((promoters - detractors) / total) * 100;
+
+    let newPromoters = Math.max(0, promoters + dPromoters);
+    let newDetractors = Math.max(0, detractors + dDetractors);
+    let newPassives = total - newPromoters - newDetractors;
+    if(newPassives < 0){
+      // deltas exceed available passives to draw from — clamp so counts still sum to total
+      const overflow = -newPassives;
+      newPromoters = Math.max(0, newPromoters - overflow/2);
+      newDetractors = Math.max(0, newDetractors - overflow/2);
+      newPassives = Math.max(0, total - newPromoters - newDetractors);
+    }
+    const whatIfNps = ((newPromoters - newDetractors) / total) * 100;
+
+    npsBaseEl.textContent = (baselineNps>=0?"+":"") + baselineNps.toFixed(1);
+    npsWhatEl.textContent = (whatIfNps>=0?"+":"") + whatIfNps.toFixed(1);
+
+    const npsDelta = whatIfNps - baselineNps;
+    npsWhatEl.style.color = npsDelta > 0.05 ? "var(--video-color)" : npsDelta < -0.05 ? "var(--danger)" : "var(--text)";
+    npsDeltaLabel.textContent = `What-if (${npsDelta>=0?"+":""}${npsDelta.toFixed(1)} pts)`;
+
+    const direction = npsDelta > 0.05 ? "improve" : npsDelta < -0.05 ? "worsen" : "barely change";
+    const color = npsDelta > 0.05 ? "var(--video-color)" : npsDelta < -0.05 ? "var(--danger)" : "var(--text-dim)";
+    inference.innerHTML = `<b style="color:${color};">Inference:</b> This shift would ${direction} NPS by ${Math.abs(npsDelta).toFixed(1)} points (from ${baselineNps.toFixed(1)} to ${whatIfNps.toFixed(1)}). New mix: ${Math.round(newPromoters)} promoters, ${Math.round(newPassives)} passives, ${Math.round(newDetractors)} detractors (of ${total.toLocaleString()} total).`;
+  };
+
+  ids.forEach(id => els[id].addEventListener("input", upd));
+}
+
+function renderTkAttritionWhatIf(container){
+  container.innerHTML = `
+    <h4>What-If Calculator for Attrition &amp; Hiring</h4>
+    <p class="tk-sub">Project headcount forward month by month, then adjust attrition and hiring to see the gap or surplus.</p>
+
+    <div class="tk-section-title">Baseline (today)</div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Current headcount</label><input type="number" id="tkAwHeadcount" placeholder="200"></div>
+      <div class="tk-field"><label>Monthly attrition rate (%)</label><input type="number" id="tkAwAttrition" placeholder="5"></div>
+      <div class="tk-field"><label>New hires per month</label><input type="number" id="tkAwHiring" placeholder="8"></div>
+      <div class="tk-field"><label>Project forward (months)</label><input type="number" id="tkAwMonths" placeholder="6"></div>
+    </div>
+
+    <div class="tk-section-title" style="margin-top:14px;">What if... (adjust the levers)</div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Attrition rate change (percentage points)</label><input type="number" id="tkAwDAttrition" placeholder="0"></div>
+      <div class="tk-field"><label>New hires per month change (+/-)</label><input type="number" id="tkAwDHiring" placeholder="0"></div>
+    </div>
+
+    <div class="tk-row" style="margin-top:14px;">
+      <div class="tk-field">
+        <label>Projected headcount</label>
+        <div class="tk-result" style="margin-top:0;">
+          <div class="tk-result-big" id="tkAwBaseline" style="font-size:18px;">—</div>
+          <div class="tk-result-label" id="tkAwBaselineLabel">Baseline</div>
+        </div>
+      </div>
+      <div class="tk-field">
+        <label>&nbsp;</label>
+        <div class="tk-result" style="margin-top:0;">
+          <div class="tk-result-big" id="tkAwWhatIf" style="font-size:18px;">—</div>
+          <div class="tk-result-label" id="tkAwDeltaLabel">What-if</div>
+        </div>
+      </div>
+    </div>
+    <div id="tkAwInference" style="font-size:12.5px;color:var(--text-dim);margin:8px 0 14px;"></div>
+    <div id="tkAwChart" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px;"></div>
+    <button id="tkAwPngBtn" style="margin-top:10px;">⬇ Export chart (PNG)</button>
+  `;
+
+  const ids = ["tkAwHeadcount","tkAwAttrition","tkAwHiring","tkAwMonths","tkAwDAttrition","tkAwDHiring"];
+  const els = {}; ids.forEach(id => els[id] = container.querySelector("#"+id));
+  const chart = container.querySelector("#tkAwChart");
+
+  function project(startHeadcount, attritionPct, hiring, months){
+    const series = [startHeadcount];
+    let hc = startHeadcount;
+    const rate = Math.max(0, Math.min(1, attritionPct/100));
+    for(let m = 1; m <= months; m++){
+      hc = Math.max(0, hc - (hc * rate) + hiring);
+      series.push(hc);
+    }
+    return series;
+  }
+
+  const upd = () => {
+    const headcount = parseFloat(els.tkAwHeadcount.value);
+    const attrition = parseFloat(els.tkAwAttrition.value);
+    const hiring = parseFloat(els.tkAwHiring.value);
+    const months = parseInt(els.tkAwMonths.value, 10);
+    const dAttrition = parseFloat(els.tkAwDAttrition.value) || 0;
+    const dHiring = parseFloat(els.tkAwDHiring.value) || 0;
+
+    const baseEl = container.querySelector("#tkAwBaseline"), whatEl = container.querySelector("#tkAwWhatIf");
+    const baseLabelEl = container.querySelector("#tkAwBaselineLabel"), deltaLabelEl = container.querySelector("#tkAwDeltaLabel");
+    const inference = container.querySelector("#tkAwInference");
+
+    if([headcount,attrition,hiring,months].some(isNaN) || months <= 0 || headcount < 0){
+      baseEl.textContent = "—"; whatEl.textContent = "—"; inference.textContent = ""; chart.innerHTML = "";
+      return;
+    }
+
+    const baselineSeries = project(headcount, attrition, hiring, months);
+    const whatIfSeries = project(headcount, attrition + dAttrition, hiring + dHiring, months);
+    const baselineEnd = baselineSeries[baselineSeries.length-1];
+    const whatIfEnd = whatIfSeries[whatIfSeries.length-1];
+
+    baseLabelEl.textContent = `Baseline (month ${months})`;
+    baseEl.textContent = Math.round(baselineEnd).toLocaleString();
+    whatEl.textContent = Math.round(whatIfEnd).toLocaleString();
+    const delta = whatIfEnd - baselineEnd;
+    whatEl.style.color = delta < -0.5 ? "var(--danger)" : delta > 0.5 ? "var(--video-color)" : "var(--text)";
+    deltaLabelEl.textContent = `What-if (${delta>=0?"+":""}${Math.round(delta)})`;
+
+    const gapVsStart = whatIfEnd - headcount;
+    const direction = delta < -0.5 ? "a shortfall versus the baseline plan" : delta > 0.5 ? "a surplus versus the baseline plan" : "roughly the same outcome as the baseline plan";
+    const color = delta < -0.5 ? "var(--danger)" : delta > 0.5 ? "var(--video-color)" : "var(--text-dim)";
+    inference.innerHTML = `<b style="color:${color};">Inference:</b> By month ${months}, this scenario produces ${direction} (${delta>=0?"+":""}${Math.round(delta)} headcount vs. baseline).` +
+      ` Compared to today's headcount of ${headcount.toLocaleString()}, the what-if scenario nets ${gapVsStart>=0?"a gain":"a loss"} of ${Math.abs(Math.round(gapVsStart))} over ${months} month${months===1?"":"s"}.`;
+
+    // Chart
+    const W = 460, H = 200, pad = 28;
+    const allVals = [...baselineSeries, ...whatIfSeries];
+    const yMin = Math.min(...allVals), yMax = Math.max(...allVals);
+    const yRange = (yMax-yMin) || 1;
+    const toX = (i) => pad + (i/months) * (W-pad*2);
+    const toY = (v) => (H-pad) - ((v-yMin)/yRange) * (H-pad*1.4);
+    const linePath = (series) => series.map((v,i) => `${i===0?"M":"L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
+    chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
+      <path d="${linePath(baselineSeries)}" fill="none" stroke="var(--text-dim)" stroke-width="2" stroke-dasharray="5,3"></path>
+      <path d="${linePath(whatIfSeries)}" fill="none" stroke="var(--accent)" stroke-width="2.2"></path>
+      <text x="${pad}" y="16" font-size="10.5" fill="var(--text-dim)">Dashed = Baseline · Solid = What-if</text>
+      <text x="${toX(months)}" y="${toY(baselineSeries[baselineSeries.length-1])-6}" font-size="9.5" fill="var(--text-dim)" text-anchor="end">${Math.round(baselineSeries[baselineSeries.length-1])}</text>
+      <text x="${toX(months)}" y="${toY(whatIfSeries[whatIfSeries.length-1])-6}" font-size="9.5" fill="var(--accent)" text-anchor="end">${Math.round(whatIfSeries[whatIfSeries.length-1])}</text>
+    </svg>`;
+  };
+
+  ids.forEach(id => els[id].addEventListener("input", upd));
+  container.querySelector("#tkAwPngBtn").addEventListener("click", () => {
+    exportSvgAsPng(chart.querySelector("svg"), "attrition-whatif-" + new Date().toISOString().slice(0,10) + ".png");
+  });
+}
+
+// ---- Automation ----
+// Qualitative criteria: things that genuinely can't be measured directly, rated 1-5.
+const AUTOMATION_FEASIBILITY_CRITERIA = [
+  { key: "stability", label: "Process Stability" },
+  { key: "accessibility", label: "System Accessibility" },
+  { key: "dataReadiness", label: "Data / Digital Readiness" },
+  { key: "lowRisk", label: "Low Compliance / Risk Sensitivity" },
+  { key: "lowComplexity", label: "Low Implementation Complexity" }
+];
+const AUTOMATION_VALUE_CRITERIA = [
+  { key: "businessValue", label: "Business Value / Criticality" }
+];
+const AUTOMATION_ALL_QUAL = AUTOMATION_FEASIBILITY_CRITERIA.concat(AUTOMATION_VALUE_CRITERIA);
+
+function renderTkAutomationScorer(container){
+  tkState.automationScorer = tkState.automationScorer || { items: [], standardFteHours: "" };
+  const st = tkState.automationScorer;
+  if(st.items.length === 0) st.items.push(blankAutomationProcess());
+
+  function blankAutomationProcess(){
+    const base = { name: "New process", monthlyVolume: "", timePerTxn: "", pctStandardized: "", pctException: "" };
+    AUTOMATION_ALL_QUAL.forEach(c => base[c.key] = 3);
+    return base;
+  }
+
+  function classify(feasibility, value){
+    const hiFeas = feasibility >= 4.0, hiVal = value >= 4.0;
+    if(hiFeas && hiVal) return { label: "Automate Now", color: "var(--video-color)" };
+    if(hiFeas && !hiVal) return { label: "Feasible, Lower Priority", color: "var(--doc-color)" };
+    if(!hiFeas && hiVal) return { label: "High Value, Needs Groundwork", color: "var(--ppt-color)" };
+    return { label: "Not Ready", color: "var(--danger)" };
+  }
+
+  function computeRow(it){
+    const volume = parseFloat(it.monthlyVolume) || 0;
+    const timePerTxn = parseFloat(it.timePerTxn) || 0;
+    const hoursPerMonth = (volume * timePerTxn) / 60;
+    const fteHours = parseFloat(st.standardFteHours) || 0;
+    const fteRequired = fteHours > 0 ? hoursPerMonth / fteHours : 0;
+    const pctStd = Math.max(0, Math.min(100, parseFloat(it.pctStandardized) || 0));
+    const pctExc = Math.max(0, Math.min(100, parseFloat(it.pctException) || 0));
+    const pctAutomatable = Math.max(0, pctStd * (1 - pctExc/100));
+    const automatableHours = hoursPerMonth * (pctAutomatable/100);
+    const automatableFte = fteHours > 0 ? automatableHours / fteHours : 0;
+    const feasScores = AUTOMATION_FEASIBILITY_CRITERIA.map(c => +it[c.key] || 0);
+    const feasAvg = feasScores.reduce((a,b)=>a+b,0) / AUTOMATION_FEASIBILITY_CRITERIA.length;
+    const valueAvg = (+it.businessValue) || 0;
+    return { hoursPerMonth, fteRequired, pctAutomatable, automatableHours, automatableFte, feasAvg, valueAvg };
+  }
+
+  // Row definitions for the transposed layout: label + how to render/edit each process's cell
+  function metricRows(){
+    const rows = [];
+    rows.push({ section: "Workload" });
+    rows.push({ label: "Monthly Volume", render: (it,i) => `<input type="number" data-f="monthlyVolume_${i}" value="${escapeHtml(it.monthlyVolume||"")}" placeholder="e.g. 4000">` });
+    rows.push({ label: "Avg Time / Txn (min)", render: (it,i) => `<input type="number" data-f="timePerTxn_${i}" value="${escapeHtml(it.timePerTxn||"")}" placeholder="e.g. 6">` });
+    rows.push({ label: "Est. Hours / Month", computed: true, render: (it,i,c) => `<b>${c.hoursPerMonth > 0 ? c.hoursPerMonth.toLocaleString(undefined,{maximumFractionDigits:0}) : "—"}</b>` });
+    rows.push({ label: "FTEs Required", computed: true, render: (it,i,c) => `<b>${c.fteRequired > 0 ? c.fteRequired.toFixed(2) : "—"}</b>` });
+
+    rows.push({ section: "Automation Potential" });
+    rows.push({ label: "% Volume Standardized / Rule-Based", render: (it,i) => `<input type="number" data-f="pctStandardized_${i}" value="${escapeHtml(it.pctStandardized||"")}" placeholder="e.g. 80" min="0" max="100">` });
+    rows.push({ label: "% Exception Rate (within that volume)", render: (it,i) => `<input type="number" data-f="pctException_${i}" value="${escapeHtml(it.pctException||"")}" placeholder="e.g. 10" min="0" max="100">` });
+    rows.push({ label: "Est. % Volume Automatable", computed: true, highlight: true, render: (it,i,c) => `<b style="font-size:14px;">${c.pctAutomatable.toFixed(0)}%</b>` });
+    rows.push({ label: "Est. Automatable Hours / Month", computed: true, render: (it,i,c) => `<b>${c.automatableHours > 0 ? c.automatableHours.toLocaleString(undefined,{maximumFractionDigits:0}) : "—"}</b>` });
+    rows.push({ label: "Est. Automatable FTEs", computed: true, render: (it,i,c) => `<b>${c.automatableFte > 0 ? c.automatableFte.toFixed(2) : "—"}</b>` });
+
+    rows.push({ section: "Feasibility (can we?)" });
+    AUTOMATION_FEASIBILITY_CRITERIA.forEach(c => {
+      rows.push({ label: c.label + " (1-5)", render: (it,i) => `<select data-f="${c.key}_${i}">${[1,2,3,4,5].map(v=>`<option value="${v}" ${+it[c.key]===v?"selected":""}>${v}</option>`).join("")}</select>` });
+    });
+    rows.push({ label: "Feasibility Score", computed: true, render: (it,i,c) => `<b>${c.feasAvg.toFixed(1)}</b>` });
+
+    rows.push({ section: "Business Value (should we?)" });
+    AUTOMATION_VALUE_CRITERIA.forEach(c => {
+      rows.push({ label: c.label + " (1-5)", render: (it,i) => `<select data-f="${c.key}_${i}">${[1,2,3,4,5].map(v=>`<option value="${v}" ${+it[c.key]===v?"selected":""}>${v}</option>`).join("")}</select>` });
+    });
+    rows.push({ label: "Business Value Score", computed: true, render: (it,i,c) => `<b>${c.valueAvg.toFixed(1)}</b>` });
+
+    rows.push({ section: "Verdict" });
+    rows.push({ label: "Priority Verdict", computed: true, render: (it,i,c) => { const v = classify(c.feasAvg, c.valueAvg); return `<b style="color:${v.color};font-size:11px;">${v.label}</b>`; } });
+    return rows;
+  }
+
+  function draw(){
+    const computed = st.items.map(it => computeRow(it));
+    const rows = metricRows();
+
+    let html = `<table class="tk-table tk-auto-matrix"><thead><tr><th class="tk-auto-rowlabel-head">Metric</th>${st.items.map((it,i) => `
+      <th><input type="text" data-procname="${i}" value="${escapeHtml(it.name||"")}" style="width:100%;text-align:center;font-weight:700;">
+      <button class="tk-del-btn" data-rmv="${i}" title="Remove process" style="display:block;margin:2px auto 0;">&times;</button></th>
+    `).join("")}</tr></thead><tbody>`;
+
+    rows.forEach(row => {
+      if(row.section){
+        html += `<tr><td class="tk-auto-section" colspan="${st.items.length+1}">${row.section}</td></tr>`;
+        return;
+      }
+      html += `<tr${row.highlight ? ' style="background:var(--accent-soft);"' : ""}><td class="tk-auto-rowlabel">${row.label}</td>`;
+      st.items.forEach((it,i) => {
+        html += `<td>${row.render(it, i, computed[i])}</td>`;
+      });
+      html += `</tr>`;
+    });
+    html += `</tbody></table>`;
+
+    const tbl = container.querySelector("#tkAutoTable");
+    tbl.innerHTML = html;
+
+    tbl.querySelectorAll("[data-procname]").forEach(inp => inp.addEventListener("input", () => { st.items[+inp.dataset.procname].name = inp.value; tkSave(); }));
+    tbl.querySelectorAll("[data-rmv]").forEach(btn => btn.addEventListener("click", () => {
+      if(st.items.length <= 1) return;
+      st.items.splice(+btn.dataset.rmv,1); tkSave(); draw();
+    }));
+    tbl.querySelectorAll("[data-f]").forEach(el => {
+      const evt = el.tagName === "SELECT" ? "change" : "input";
+      el.addEventListener(evt, () => {
+        const [field, idx] = el.dataset.f.split("_");
+        st.items[+idx][field] = el.value;
+        tkSave();
+        const fKey = el.dataset.f;
+        const selStart = el.selectionStart, selEnd = el.selectionEnd;
+        draw();
+        const newEl = container.querySelector(`[data-f="${fKey}"]`);
+        if(newEl){
+          newEl.focus();
+          if(selStart != null && newEl.setSelectionRange){ try{ newEl.setSelectionRange(selStart, selEnd); }catch(e){} }
+        }
+      });
+    });
+
+    const totalHours = computed.reduce((s,c) => s + c.hoursPerMonth, 0);
+    const totalAutomatableHours = computed.reduce((s,c) => s + c.automatableHours, 0);
+    const totalFte = computed.reduce((s,c) => s + c.fteRequired, 0);
+    const totalAutomatableFte = computed.reduce((s,c) => s + c.automatableFte, 0);
+    const summary = container.querySelector("#tkAutoSummary");
+    summary.innerHTML = totalHours > 0
+      ? `Combined across all processes: <b style="color:var(--text);">~${totalHours.toLocaleString(undefined,{maximumFractionDigits:0})} hours/month</b> (~${totalFte.toFixed(1)} FTEs) spent today, of which <b style="color:var(--video-color);">~${totalAutomatableHours.toLocaleString(undefined,{maximumFractionDigits:0})} hours/month</b> (~${totalAutomatableFte.toFixed(1)} FTEs) look automatable based on your inputs.`
+      : "";
+
+    // Feasibility vs Value quadrant chart
+    const chart = container.querySelector("#tkAutoQuadChart");
+    const W = 420, H = 260, pad = 42;
+    const toX = (v) => pad + (v/5) * (W-pad*2);
+    const toY = (v) => (H-pad) - (v/5) * (H-pad*2);
+    const dots = st.items.map((it,i) => {
+      const c = computed[i];
+      const v = classify(c.feasAvg, c.valueAvg);
+      const cx = toX(c.feasAvg), cy = toY(c.valueAvg);
+      return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="7" fill="${v.color}"></circle>
+        <text x="${cx.toFixed(1)}" y="${(cy-11).toFixed(1)}" font-size="9.5" fill="var(--text)" text-anchor="middle">${escapeHtml((it.name||"Process").slice(0,16))}</text>`;
+    }).join("");
+    chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
+      <rect x="${pad}" y="${pad}" width="${W-pad*2}" height="${H-pad*2}" fill="none" stroke="var(--border)" stroke-width="1"></rect>
+      <line x1="${toX(4)}" y1="${pad}" x2="${toX(4)}" y2="${H-pad}" stroke="var(--border)" stroke-dasharray="3,3"></line>
+      <line x1="${pad}" y1="${toY(4)}" x2="${W-pad}" y2="${toY(4)}" stroke="var(--border)" stroke-dasharray="3,3"></line>
+      <text x="0" y="${toY(5)+4}" font-size="9" fill="var(--text-dim)">5</text>
+      <text x="0" y="${toY(0)+4}" font-size="9" fill="var(--text-dim)">0</text>
+      <text x="${toX(0)-4}" y="${H-pad+14}" font-size="9" fill="var(--text-dim)" text-anchor="middle">0</text>
+      <text x="${toX(5)}" y="${H-pad+14}" font-size="9" fill="var(--text-dim)" text-anchor="middle">5</text>
+      <text x="${W/2}" y="${H-10}" font-size="10.5" fill="var(--text-dim)" text-anchor="middle">Feasibility Score →</text>
+      <text x="14" y="${H/2}" font-size="10.5" fill="var(--text-dim)" text-anchor="middle" transform="rotate(-90 14 ${H/2})">Business Value Score →</text>
+      ${dots}
+    </svg>`;
+  }
+
+  container.innerHTML = `
+    <h4>Automation Feasibility Scorer</h4>
+    <p class="tk-sub">Each column is a process. Enter real volume and standardization data for a defensible % automatable and FTE impact, then rate Feasibility and Business Value separately.</p>
+    <div class="tk-row" style="max-width:320px;">
+      <div class="tk-field"><label>Standard working hours per FTE / month</label><input type="number" id="tkAutoFteHours" value="${escapeHtml(st.standardFteHours||"")}" placeholder="e.g. 160"></div>
+    </div>
+    <div id="tkAutoTable" style="overflow-x:auto;"></div>
+    <button id="tkAutoAdd" style="margin-top:10px;">+ Add process</button>
+    <div id="tkAutoSummary" style="font-size:12px;color:var(--text-dim);margin-top:10px;"></div>
+    <div class="tk-skill-legend" style="margin-top:14px;">
+      <span><span class="tk-skill-legend-dot" style="background:var(--video-color);"></span>Automate Now</span>
+      <span><span class="tk-skill-legend-dot" style="background:var(--doc-color);"></span>Feasible, Lower Priority</span>
+      <span><span class="tk-skill-legend-dot" style="background:var(--ppt-color);"></span>High Value, Needs Groundwork</span>
+      <span><span class="tk-skill-legend-dot" style="background:var(--danger);"></span>Not Ready</span>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);margin:10px 0;">
+      <b>% Volume Automatable</b> and <b>FTE</b> figures come directly from your inputs, not from ratings. <b>Feasibility</b> (can we?) covers Process Stability, System Accessibility, Data/Digital Readiness, Low Compliance/Risk Sensitivity, and Low Implementation Complexity. <b>Business Value</b> (should we?) is scored separately so a highly feasible but low-value process doesn't get the same priority as a highly feasible, high-value one — the Priority Verdict combines both.
+    </div>
+    <div class="tk-section-title">Feasibility vs. Business Value</div>
+    <div id="tkAutoQuadChart" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:6px;max-width:420px;"></div>
+    <div class="tk-row" style="margin-top:10px;">
+      <button id="tkAutoPngBtn">⬇ Export chart (PNG)</button>
+      <button id="tkAutoCsvBtn">⬇ Export matrix (Excel)</button>
+    </div>
+  `;
+  container.querySelector("#tkAutoFteHours").addEventListener("input", (e) => { st.standardFteHours = e.target.value; tkSave(); draw(); });
+  container.querySelector("#tkAutoAdd").addEventListener("click", () => {
+    if(st.items.length < 8){ st.items.push(blankAutomationProcess()); tkSave(); draw(); }
+  });
+  container.querySelector("#tkAutoCsvBtn").addEventListener("click", () => {
+    const computed = st.items.map(it => computeRow(it));
+    const rows = [["Metric", ...st.items.map(it => it.name||"Process")]];
+    rows.push(["Monthly Volume", ...st.items.map(it => it.monthlyVolume||"")]);
+    rows.push(["Avg Time/Txn (min)", ...st.items.map(it => it.timePerTxn||"")]);
+    rows.push(["Est. Hours/Month", ...computed.map(c => c.hoursPerMonth.toFixed(0))]);
+    rows.push(["FTEs Required", ...computed.map(c => c.fteRequired.toFixed(2))]);
+    rows.push(["% Volume Standardized", ...st.items.map(it => it.pctStandardized||"")]);
+    rows.push(["% Exception Rate", ...st.items.map(it => it.pctException||"")]);
+    rows.push(["Est. % Volume Automatable", ...computed.map(c => c.pctAutomatable.toFixed(0)+"%")]);
+    rows.push(["Est. Automatable Hours/Month", ...computed.map(c => c.automatableHours.toFixed(0))]);
+    rows.push(["Est. Automatable FTEs", ...computed.map(c => c.automatableFte.toFixed(2))]);
+    AUTOMATION_FEASIBILITY_CRITERIA.forEach(cr => rows.push([cr.label, ...st.items.map(it => it[cr.key])]));
+    rows.push(["Feasibility Score", ...computed.map(c => c.feasAvg.toFixed(1))]);
+    AUTOMATION_VALUE_CRITERIA.forEach(cr => rows.push([cr.label, ...st.items.map(it => it[cr.key])]));
+    rows.push(["Business Value Score", ...computed.map(c => c.valueAvg.toFixed(1))]);
+    rows.push(["Priority Verdict", ...computed.map(c => classify(c.feasAvg, c.valueAvg).label)]);
+    downloadCsv("automation-feasibility-" + new Date().toISOString().slice(0,10) + ".csv", rows);
+  });
+  container.querySelector("#tkAutoPngBtn").addEventListener("click", () => {
+    exportSvgAsPng(container.querySelector("#tkAutoQuadChart svg"), "automation-feasibility-" + new Date().toISOString().slice(0,10) + ".png");
+  });
+  draw();
+}
+
+const TMS_CATEGORY_COLORS = { "VA": "var(--video-color)", "NVA": "var(--danger)", "NVA-N": "var(--ppt-color)" };
+const TMS_CATEGORY_LABELS = { "VA": "Value-Added", "NVA": "Non-Value-Added", "NVA-N": "NVA but Necessary" };
+
+function renderTkTimeMotionStudy(container){
+  tkState.timeMotionStudy = tkState.timeMotionStudy || { processName: "", steps: [] };
+  const st = tkState.timeMotionStudy;
+  if(st.steps.length === 0){
+    st.steps.push({ name: "Step 1", observations: "", rating: 100, allowance: 15, category: "VA" });
+  }
+
+  function computeStep(step){
+    const obs = (step.observations||"").split(/[\n,]/).map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+    const avgObserved = obs.length ? obs.reduce((a,b)=>a+b,0)/obs.length : 0;
+    const variance = obs.length > 1 ? obs.reduce((s,v) => s+Math.pow(v-avgObserved,2), 0) / (obs.length-1) : 0;
+    const stdDev = Math.sqrt(variance);
+    const cv = avgObserved > 0 ? (stdDev/avgObserved)*100 : 0;
+    const rating = parseFloat(step.rating);
+    const allowance = parseFloat(step.allowance);
+    const ratingFactor = isNaN(rating) ? 1 : rating/100;
+    const allowanceFactor = isNaN(allowance) ? 0 : allowance/100;
+    const normalTime = avgObserved * ratingFactor;
+    const standardTime = normalTime * (1 + allowanceFactor);
+    return { obsCount: obs.length, avgObserved, stdDev, cv, normalTime, standardTime };
+  }
+
+  function draw(){
+    const computed = st.steps.map(s => computeStep(s));
+    const totalStandard = computed.reduce((sum,c) => sum + c.standardTime, 0);
+    const maxStandard = Math.max(...computed.map(c => c.standardTime), 0);
+    const HIGH_CV_THRESHOLD = 25;
+
+    let html = `<table class="tk-table" style="width:100%;">
+      <thead><tr>
+        <th style="text-align:left;">Step / Element</th>
+        <th>Category</th>
+        <th>Observed Times</th>
+        <th>Avg</th>
+        <th>Std Dev</th>
+        <th>CV %</th>
+        <th>Rating %</th>
+        <th>Normal Time</th>
+        <th>Allowance %</th>
+        <th>Standard Time</th>
+        <th>% of Total</th>
+        <th></th>
+      </tr></thead><tbody>`;
+    st.steps.forEach((s,i) => {
+      const c = computed[i];
+      const cat = s.category || "VA";
+      const isBottleneck = c.standardTime > 0 && c.standardTime === maxStandard;
+      const isHighCv = c.obsCount >= 2 && c.cv > HIGH_CV_THRESHOLD;
+      const pctTotal = totalStandard > 0 ? (c.standardTime/totalStandard)*100 : 0;
+      html += `<tr${isBottleneck ? ' style="background:rgba(224,168,60,.15);"' : ""}>
+        <td style="text-align:left;"><input type="text" data-name="${i}" value="${escapeHtml(s.name||"")}" style="width:100px;text-align:left;"></td>
+        <td><select data-cat="${i}" style="color:${TMS_CATEGORY_COLORS[cat]};font-weight:700;">
+          <option value="VA" ${cat==="VA"?"selected":""}>VA</option>
+          <option value="NVA" ${cat==="NVA"?"selected":""}>NVA</option>
+          <option value="NVA-N" ${cat==="NVA-N"?"selected":""}>NVA-N</option>
+        </select></td>
+        <td><input type="text" data-obs="${i}" value="${escapeHtml(s.observations||"")}" placeholder="12,14,13" style="width:100px;"></td>
+        <td>${c.avgObserved ? c.avgObserved.toFixed(2) : "—"}</td>
+        <td>${c.obsCount>=2 ? c.stdDev.toFixed(2) : "—"}</td>
+        <td style="color:${isHighCv?'var(--danger)':'var(--text)'};font-weight:${isHighCv?'700':'400'};">${c.obsCount>=2 ? c.cv.toFixed(0)+"%"+(isHighCv?" ⚠":"") : "—"}</td>
+        <td><input type="number" data-rating="${i}" value="${escapeHtml(s.rating)}" style="width:55px;"></td>
+        <td>${c.normalTime ? c.normalTime.toFixed(2) : "—"}</td>
+        <td><input type="number" data-allow="${i}" value="${escapeHtml(s.allowance)}" style="width:55px;"></td>
+        <td style="font-weight:700;">${c.standardTime ? c.standardTime.toFixed(2) : "—"}${isBottleneck ? " ⚠" : ""}</td>
+        <td>${totalStandard > 0 ? pctTotal.toFixed(0)+"%" : "—"}</td>
+        <td><button class="tk-del-btn" data-rmv="${i}">&times;</button></td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+
+    const tbl = container.querySelector("#tkTmsTable");
+    tbl.innerHTML = html;
+    function tmsRedraw(attr, inp){
+      const key = inp.dataset[attr];
+      const selStart = inp.selectionStart, selEnd = inp.selectionEnd;
+      draw();
+      const newEl = container.querySelector(`[data-${attr}="${key}"]`);
+      if(newEl){ newEl.focus(); if(selStart!=null && newEl.setSelectionRange){ try{ newEl.setSelectionRange(selStart, selEnd); }catch(e){} } }
+    }
+    tbl.querySelectorAll("[data-name]").forEach(inp => inp.addEventListener("input", () => { st.steps[+inp.dataset.name].name = inp.value; tkSave(); tmsRedraw("name", inp); }));
+    tbl.querySelectorAll("[data-obs]").forEach(inp => inp.addEventListener("input", () => { st.steps[+inp.dataset.obs].observations = inp.value; tkSave(); tmsRedraw("obs", inp); }));
+    tbl.querySelectorAll("[data-rating]").forEach(inp => inp.addEventListener("input", () => { st.steps[+inp.dataset.rating].rating = inp.value; tkSave(); tmsRedraw("rating", inp); }));
+    tbl.querySelectorAll("[data-allow]").forEach(inp => inp.addEventListener("input", () => { st.steps[+inp.dataset.allow].allowance = inp.value; tkSave(); tmsRedraw("allow", inp); }));
+    tbl.querySelectorAll("[data-cat]").forEach(sel => sel.addEventListener("change", () => { st.steps[+sel.dataset.cat].category = sel.value; tkSave(); draw(); }));
+    tbl.querySelectorAll("[data-rmv]").forEach(btn => btn.addEventListener("click", () => {
+      if(st.steps.length <= 1) return;
+      st.steps.splice(+btn.dataset.rmv,1); tkSave(); draw();
+    }));
+
+    // Summary + inference
+    const summary = container.querySelector("#tkTmsSummary");
+    const bottleneckStep = st.steps[computed.findIndex(c => c.standardTime === maxStandard && c.standardTime > 0)];
+    const highCvSteps = st.steps.filter((s,i) => computed[i].obsCount >= 2 && computed[i].cv > HIGH_CV_THRESHOLD).map(s => s.name);
+    if(totalStandard > 0){
+      const pct = maxStandard/totalStandard*100;
+      const vaTotal = st.steps.reduce((sum,s,i) => sum + ((s.category||"VA")==="VA" ? computed[i].standardTime : 0), 0);
+      const pce = (vaTotal/totalStandard)*100;
+      const wasteSteps = st.steps.map((s,i) => ({ s, c: computed[i] })).filter(({s,c}) => s.category && s.category !== "VA" && c.standardTime > 0);
+      const biggestWaste = wasteSteps.sort((a,b) => b.c.standardTime - a.c.standardTime)[0];
+
+      let pceVerdict, pceColor;
+      if(pce >= 50){ pceVerdict = "Good — most of the cycle time is value-added."; pceColor = "var(--video-color)"; }
+      else if(pce >= 25){ pceVerdict = "Typical for many processes, but meaningful waste remains."; pceColor = "var(--ppt-color)"; }
+      else{ pceVerdict = "Low — most of the cycle time is non-value-added; this process has significant improvement potential."; pceColor = "var(--danger)"; }
+
+      let html2 = `<b style="color:var(--text);">Total standard time for this process: ${totalStandard.toFixed(2)} (per unit/transaction).</b><br>
+        <b style="color:var(--ppt-color);">Bottleneck:</b> "${escapeHtml(bottleneckStep?.name||"")}" takes the longest at ${maxStandard.toFixed(2)} (${pct.toFixed(0)}% of total cycle time) — the biggest lever for reducing overall cycle time.<br>
+        <b style="color:${pceColor};">Process Cycle Efficiency:</b> ${pce.toFixed(0)}% of total time is value-added. ${pceVerdict}`;
+      if(biggestWaste){
+        const wastePct = (biggestWaste.c.standardTime/totalStandard)*100;
+        html2 += ` The largest non-value-added step is "${escapeHtml(biggestWaste.s.name)}" (${TMS_CATEGORY_LABELS[biggestWaste.s.category]}, ${biggestWaste.c.standardTime.toFixed(2)}, ${wastePct.toFixed(0)}% of total) — a strong candidate for elimination or reduction.`;
+      }
+      if(highCvSteps.length > 0){
+        html2 += `<br><b style="color:var(--danger);">Inconsistency:</b> ${highCvSteps.map(n=>`"${escapeHtml(n)}"`).join(", ")} ${highCvSteps.length===1?"has":"have"} high variability (CV &gt; ${HIGH_CV_THRESHOLD}%) — this is a different problem from slowness: the time isn't reliable, which usually means the step isn't standardized yet. Worth investigating before setting it as a firm time standard, and before automating it.`;
+      }
+      summary.innerHTML = html2;
+    }else{
+      summary.textContent = "";
+    }
+
+    // Pareto chart: steps ranked by Standard Time, with cumulative % line and 80% cutoff
+    const chart = container.querySelector("#tkTmsChart");
+    if(totalStandard > 0){
+      const paretoRows = buildTmsParetoRows(computed, totalStandard);
+      const W = 460, H = 220, pad = 10, bottomPad = 46, leftPad = 10;
+      const maxVal = Math.max(...paretoRows.map(r => r.standardTime));
+      const fragment = buildParetoFragment(paretoRows, maxVal, W, H, leftPad, pad, bottomPad);
+      chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">${fragment}</svg>`;
+    }else{
+      chart.innerHTML = "";
+    }
+  }
+
+  function buildTmsParetoRows(computed, totalStandard){
+    const ranked = st.steps.map((s,i) => ({ name: s.name, standardTime: computed[i].standardTime, category: s.category || "VA" }))
+      .filter(r => r.standardTime > 0)
+      .sort((a,b) => b.standardTime - a.standardTime);
+    let running = 0;
+    return ranked.map(r => { running += r.standardTime; return { ...r, cumPct: (running/totalStandard)*100 }; });
+  }
+
+  function buildParetoFragment(rows, maxVal, W, H, leftPad, pad, bottomPad){
+    const barAreaW = W - leftPad - pad;
+    const barW = (barAreaW / rows.length) * 0.6;
+    const gap = barAreaW / rows.length;
+    const toBarY = (v) => (H-bottomPad) - (v/maxVal) * (H-bottomPad-pad);
+    const toLineY = (pct) => (H-bottomPad) - (pct/100) * (H-bottomPad-pad);
+    const bars = rows.map((r,i) => {
+      const x = leftPad + i*gap + (gap-barW)/2;
+      const y = toBarY(r.standardTime);
+      const fill = TMS_CATEGORY_COLORS[r.category] || "var(--accent)";
+      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${(H-bottomPad-y).toFixed(1)}" fill="${fill}" opacity=".85"></rect>
+        <text x="${(x+barW/2).toFixed(1)}" y="${H-bottomPad+14}" font-size="8.5" fill="var(--text-dim)" text-anchor="middle">${escapeHtml((r.name||"").length>10?r.name.slice(0,9)+"…":r.name||"")}</text>`;
+    }).join("");
+    const linePts = rows.map((r,i) => `${leftPad + i*gap + gap/2},${toLineY(r.cumPct).toFixed(1)}`).join(" ");
+    const dots = rows.map((r,i) => `<circle cx="${(leftPad + i*gap + gap/2).toFixed(1)}" cy="${toLineY(r.cumPct).toFixed(1)}" r="2.6" fill="var(--ppt-color)"></circle>`).join("");
+    return `${bars}
+      <line x1="${leftPad}" y1="${toLineY(80).toFixed(1)}" x2="${W-pad}" y2="${toLineY(80).toFixed(1)}" stroke="var(--danger)" stroke-width="1" stroke-dasharray="4,3"></line>
+      <text x="${W-pad}" y="${toLineY(80)-4}" font-size="8.5" fill="var(--danger)" text-anchor="end">80%</text>
+      <polyline points="${linePts}" fill="none" stroke="var(--ppt-color)" stroke-width="1.6"></polyline>
+      ${dots}`;
+  }
+
+  function exportTmsAll(){
+    const computed = st.steps.map(s => computeStep(s));
+    const totalStandard = computed.reduce((sum,c) => sum + c.standardTime, 0);
+    if(totalStandard <= 0){ alert("Enter at least one step's observed times first."); return; }
+    const maxStandard = Math.max(...computed.map(c => c.standardTime));
+    const HIGH_CV_THRESHOLD = 25;
+
+    const colWidths = [120,65,140,60,60,50,55,65,60,75,60];
+    const colLabels = ["Step","Category","Observed Times","Avg","Std Dev","CV%","Rating%","Normal","Allow%","Standard","% Total"];
+    const tableX = 40;
+    let colX = []; let cx = tableX;
+    colWidths.forEach(w => { colX.push(cx); cx += w; });
+    const tableWidth = cx - tableX;
+
+    const rowH = 24;
+    const headerY = 110;
+    const tableTop = headerY + 16;
+    const tableHeight = rowH * st.steps.length;
+
+    const chartW = Math.max(tableWidth, 500);
+    const chartH = 220, chartPad = 10, chartBottomPad = 46, chartLeftPad = 10;
+    const chartY = tableTop + tableHeight + 56;
+    const totalHeight = chartY + chartH + 40;
+    const totalWidth = tableX*2 + tableWidth;
+
+    let svgParts = "";
+    svgParts += `<rect x="0" y="0" width="${totalWidth}" height="${totalHeight}" fill="#ffffff"></rect>`;
+    svgParts += `<text x="${tableX}" y="40" font-size="22" font-weight="bold" fill="#1b2028" font-family="Arial">${escapeHtml(st.processName||"Time & Motion Study")}</text>`;
+    svgParts += `<text x="${tableX}" y="62" font-size="13" fill="#6b7280" font-family="Arial">Time &amp; Motion Study</text>`;
+
+    colLabels.forEach((label,ci) => {
+      svgParts += `<text x="${colX[ci]}" y="${headerY}" font-size="10" font-weight="bold" fill="#6b7280" font-family="Arial">${escapeHtml(label)}</text>`;
+    });
+    svgParts += `<line x1="${tableX}" y1="${headerY+8}" x2="${tableX+tableWidth}" y2="${headerY+8}" stroke="#333333" stroke-width="1"></line>`;
+
+    st.steps.forEach((s,i) => {
+      const c = computed[i];
+      const y = tableTop + i*rowH + 15;
+      const isBottleneck = c.standardTime > 0 && c.standardTime === maxStandard;
+      const isHighCv = c.obsCount >= 2 && c.cv > HIGH_CV_THRESHOLD;
+      const pctTotal = totalStandard > 0 ? (c.standardTime/totalStandard)*100 : 0;
+      if(isBottleneck){
+        svgParts += `<rect x="${tableX}" y="${tableTop+i*rowH}" width="${tableWidth}" height="${rowH}" fill="#fdf0d8"></rect>`;
+      }
+      const cat = s.category || "VA";
+      const catHex = { "VA": "#2f9e55", "NVA": "#c23f38", "NVA-N": "#d89a2e" }[cat] || "#333333";
+      const rowVals = [
+        (s.name||"").slice(0,15),
+        cat,
+        (s.observations||"").slice(0,16),
+        c.avgObserved ? c.avgObserved.toFixed(2) : "—",
+        c.obsCount>=2 ? c.stdDev.toFixed(2) : "—",
+        c.obsCount>=2 ? c.cv.toFixed(0)+"%" : "—",
+        String(s.rating ?? ""),
+        c.normalTime ? c.normalTime.toFixed(2) : "—",
+        String(s.allowance ?? ""),
+        c.standardTime ? c.standardTime.toFixed(2) : "—",
+        totalStandard>0 ? pctTotal.toFixed(0)+"%" : "—"
+      ];
+      rowVals.forEach((val,ci) => {
+        let color = "#333333";
+        if(ci===1) color = catHex;
+        if(ci===5 && isHighCv) color = "#c23f38";
+        const weight = (ci===1 || ci===9) ? "bold" : "normal";
+        svgParts += `<text x="${colX[ci]}" y="${y}" font-size="10.5" fill="${color}" font-weight="${weight}" font-family="Arial">${escapeHtml(val)}</text>`;
+      });
+    });
+
+    const paretoRows = buildTmsParetoRows(computed, totalStandard);
+    svgParts += `<text x="${tableX}" y="${chartY-16}" font-size="13" font-weight="bold" fill="#1b2028" font-family="Arial">Pareto: Standard Time by Step</text>`;
+    const fragment = buildParetoFragment(paretoRows, maxStandard, chartW, chartH, chartLeftPad, chartPad, chartBottomPad);
+    svgParts += `<g transform="translate(${tableX}, ${chartY})">${fragment}</g>`;
+
+    const fullSvg = `<svg viewBox="0 0 ${totalWidth} ${totalHeight}" xmlns="http://www.w3.org/2000/svg">${svgParts}</svg>`;
+    const temp = document.createElement("div");
+    temp.style.position = "fixed"; temp.style.left = "-9999px";
+    temp.innerHTML = fullSvg;
+    document.body.appendChild(temp);
+    exportSvgAsPng(temp.querySelector("svg"), "time-motion-study-full-" + new Date().toISOString().slice(0,10) + ".png");
+    setTimeout(() => temp.remove(), 1000);
+  }
+
+  container.innerHTML = `
+    <h4>Time &amp; Motion Study</h4>
+    <p class="tk-sub">Record observed times per step, apply a performance rating and PFD allowance. A Pareto view ranks steps by time, and variability analysis flags steps that aren't consistent yet.</p>
+    <div class="tk-field" style="max-width:320px;"><label>Process name</label><input type="text" id="tkTmsProcessName" value="${escapeHtml(st.processName||"")}" placeholder="e.g. Invoice Processing"></div>
+    <div id="tkTmsTable" style="overflow-x:auto;margin-top:10px;"></div>
+    <button id="tkTmsAdd" style="margin:10px 0;">+ Add step</button>
+    <div id="tkTmsSummary" style="font-size:12.5px;color:var(--text-dim);margin-bottom:12px;"></div>
+    <div class="tk-section-title">Pareto: Standard Time by Step (colored by VA / NVA / NVA-N)</div>
+    <div id="tkTmsChart" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:6px;max-width:420px;"></div>
+    <div class="tk-skill-legend" style="margin-top:10px;">
+      <span><span class="tk-skill-legend-dot" style="background:var(--video-color);"></span>VA — Value-Added</span>
+      <span><span class="tk-skill-legend-dot" style="background:var(--danger);"></span>NVA — Non-Value-Added (waste)</span>
+      <span><span class="tk-skill-legend-dot" style="background:var(--ppt-color);"></span>NVA-N — Non-Value-Added but Necessary</span>
+    </div>
+    <div class="tk-row" style="margin-top:10px;">
+      <button id="tkTmsPngBtn">⬇ Export chart (PNG)</button>
+      <button id="tkTmsAllBtn">⬇ Export All (table + chart, PNG)</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:12px;">
+      <b>Normal Time</b> = Avg Observed Time × Rating%. <b>Standard Time</b> = Normal Time × (1 + Allowance%). Allowance (PFD) covers personal needs, fatigue, and unavoidable delays — 10–15% is a common default. <b>CV% (Coefficient of Variation)</b> = Std Dev ÷ Avg — a high CV (&gt;25%) means the step's time is inconsistent across observations, a sign it needs standardization before being trusted as a time standard or automated. <b>Category</b>: tag each step VA (adds value the customer would pay for), NVA (pure waste — the goal is to eliminate it), or NVA-N (doesn't add value but can't be removed yet, e.g. compliance checks). <b>Process Cycle Efficiency</b> = VA time ÷ total time — a core Lean metric for how much of the cycle is actually productive. Paste multiple stopwatch readings per step (comma or newline separated) — at least 2 are needed to calculate variability.
+    </div>
+  `;
+  container.querySelector("#tkTmsProcessName").addEventListener("input", (e) => { st.processName = e.target.value; tkSave(); });
+  container.querySelector("#tkTmsAdd").addEventListener("click", () => {
+    if(st.steps.length < 15){ st.steps.push({ name: "Step " + (st.steps.length+1), observations: "", rating: 100, allowance: 15, category: "VA" }); tkSave(); draw(); }
+  });
+  container.querySelector("#tkTmsPngBtn").addEventListener("click", () => {
+    exportSvgAsPng(container.querySelector("#tkTmsChart svg"), "time-motion-study-" + new Date().toISOString().slice(0,10) + ".png");
+  });
+  container.querySelector("#tkTmsAllBtn").addEventListener("click", exportTmsAll);
+  draw();
+}
+
+function renderTkSopBuilder(container){
+  tkState.sopBuilder = tkState.sopBuilder || {
+    processName: "", owner: "", frequency: "", volume: "", trigger: "", steps: "", systems: "", exceptions: ""
+  };
+  const st = tkState.sopBuilder;
+
+  function linesToNumbered(text){
+    return text.split("\n").map(l => l.trim()).filter(Boolean).map((l,i) => `${i+1}. ${l}`).join("\n");
+  }
+  function linesToBullets(text){
+    return text.split("\n").map(l => l.trim()).filter(Boolean).map(l => `- ${l}`).join("\n");
+  }
+
+  function buildOutput(){
+    let out = `PROCESS DOCUMENTATION (AS-IS) — ${st.processName.trim() || "[Process Name]"}\n`;
+    out += `Owner: ${st.owner.trim() || "[Owner]"}\n`;
+    if(st.frequency.trim()) out += `Frequency: ${st.frequency.trim()}\n`;
+    if(st.volume.trim()) out += `Average Volume: ${st.volume.trim()}\n`;
+    out += `\nTRIGGER\n${st.trigger.trim() || "[What starts this process?]"}\n`;
+    out += `\nPROCESS STEPS\n${st.steps.trim() ? linesToNumbered(st.steps) : "[not yet filled in]"}\n`;
+    out += `\nSYSTEMS / APPLICATIONS USED\n${st.systems.trim() ? linesToBullets(st.systems) : "[not yet filled in]"}\n`;
+    out += `\nEXCEPTIONS / EDGE CASES\n${st.exceptions.trim() ? linesToBullets(st.exceptions) : "[not yet filled in]"}`;
+    container.querySelector("#tkSopOutput").textContent = out.trim();
+  }
+
+  container.innerHTML = `
+    <h4>Process Documentation Template (SOP Builder)</h4>
+    <p class="tk-sub">Capture the as-is process cleanly — the standard first step before designing any automation.</p>
+    <div class="tk-row">
+      <div class="tk-field"><label>Process name</label><input type="text" id="tkSopName" placeholder="e.g. Vendor Invoice Reconciliation"></div>
+      <div class="tk-field"><label>Owner</label><input type="text" id="tkSopOwner" placeholder="e.g. Priya S., AP Team Lead"></div>
+    </div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Frequency (optional)</label><input type="text" id="tkSopFreq" placeholder="e.g. Daily, Mon-Fri"></div>
+      <div class="tk-field"><label>Average volume (optional)</label><input type="text" id="tkSopVolume" placeholder="e.g. 150 invoices/day"></div>
+    </div>
+    <div class="tk-field"><label>Trigger — what starts this process?</label><textarea id="tkSopTrigger" placeholder="e.g. Invoice received in shared mailbox"></textarea></div>
+    <div class="tk-field"><label>Process steps (one per line, in order)</label><textarea id="tkSopSteps" placeholder="Open invoice email
+Extract vendor name, amount, PO number
+Match against PO in ERP
+Approve or flag for review
+File in document system" style="min-height:100px;"></textarea></div>
+    <div class="tk-field"><label>Systems / applications used (one per line)</label><textarea id="tkSopSystems" placeholder="Outlook
+SAP
+Shared drive"></textarea></div>
+    <div class="tk-field"><label>Exceptions / edge cases (one per line)</label><textarea id="tkSopExceptions" placeholder="PO number missing or incorrect
+Amount mismatch beyond tolerance
+Duplicate invoice detected"></textarea></div>
+
+    <div class="tk-section-title" style="margin-top:18px;">Generated SOP</div>
+    <pre id="tkSopOutput" style="white-space:pre-wrap;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12.5px;font-family:inherit;color:var(--text);margin-top:6px;"></pre>
+    <button class="primary" id="tkSopCopyBtn" style="margin-top:8px;">⧉ Copy to clipboard</button>
+    <div id="tkSopCopyMsg" style="font-size:12px;color:var(--video-color);margin-top:6px;min-height:14px;"></div>
+  `;
+
+  const fieldMap = [
+    ["tkSopName","processName"], ["tkSopOwner","owner"], ["tkSopFreq","frequency"], ["tkSopVolume","volume"],
+    ["tkSopTrigger","trigger"], ["tkSopSteps","steps"], ["tkSopSystems","systems"], ["tkSopExceptions","exceptions"]
+  ];
+  fieldMap.forEach(([id,key]) => {
+    const el = container.querySelector("#"+id);
+    el.value = st[key];
+    el.addEventListener("input", () => { st[key] = el.value; tkSave(); buildOutput(); });
+  });
+
+  container.querySelector("#tkSopCopyBtn").addEventListener("click", () => {
+    const text = container.querySelector("#tkSopOutput").textContent;
+    const msg = container.querySelector("#tkSopCopyMsg");
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(() => {
+        msg.textContent = "✓ Copied to clipboard";
+        setTimeout(() => { if(msg.textContent === "✓ Copied to clipboard") msg.textContent = ""; }, 2500);
+      }).catch(() => prompt("Copy this SOP:", text));
+    }else{
+      prompt("Copy this SOP:", text);
+    }
+  });
+
+  buildOutput();
+}
+
+function renderTkBotRoi(container){
+  container.innerHTML = `
+    <h4>Bot ROI / Business Case Calculator</h4>
+    <p class="tk-sub">Unlike a generic ROI calculator, this accounts for ongoing license and maintenance costs — bots need upkeep, and that changes the real payback period.</p>
+    <div class="tk-row">
+      <div class="tk-field"><label>One-time build cost (₹)</label><input type="number" id="tkBrBuild" placeholder="800000"></div>
+      <div class="tk-field"><label>Annual license / subscription (₹)</label><input type="number" id="tkBrLicense" placeholder="100000"></div>
+      <div class="tk-field"><label>Annual maintenance (% of build cost)</label><input type="number" id="tkBrMaint" placeholder="15"></div>
+    </div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Hours saved per month</label><input type="number" id="tkBrHours" placeholder="120"></div>
+      <div class="tk-field"><label>Fully-loaded cost per hour (₹)</label><input type="number" id="tkBrRate" placeholder="400"></div>
+    </div>
+    <div class="tk-row">
+      <div class="tk-field">
+        <label>Monthly savings</label>
+        <div class="tk-result" style="margin-top:0;"><div class="tk-result-big" id="tkBrMonthlySavings" style="font-size:16px;">—</div></div>
+      </div>
+      <div class="tk-field">
+        <label>Payback period</label>
+        <div class="tk-result" style="margin-top:0;"><div class="tk-result-big" id="tkBrPayback" style="font-size:16px;">—</div></div>
+      </div>
+      <div class="tk-field">
+        <label>3-year net savings</label>
+        <div class="tk-result" style="margin-top:0;"><div class="tk-result-big" id="tkBrNet3yr" style="font-size:16px;">—</div></div>
+      </div>
+    </div>
+    <div id="tkBrInference" style="font-size:12.5px;color:var(--text-dim);margin:8px 0 14px;"></div>
+    <div id="tkBrChart" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px;max-width:500px;"></div>
+    <button id="tkBrPngBtn" style="margin-top:10px;">⬇ Export chart (PNG)</button>
+  `;
+  const buildI = container.querySelector("#tkBrBuild"), licenseI = container.querySelector("#tkBrLicense"), maintI = container.querySelector("#tkBrMaint");
+  const hoursI = container.querySelector("#tkBrHours"), rateI = container.querySelector("#tkBrRate");
+  const monthlyEl = container.querySelector("#tkBrMonthlySavings"), paybackEl = container.querySelector("#tkBrPayback"), net3yrEl = container.querySelector("#tkBrNet3yr");
+  const inference = container.querySelector("#tkBrInference");
+  const chart = container.querySelector("#tkBrChart");
+
+  const upd = () => {
+    const build = parseFloat(buildI.value), license = parseFloat(licenseI.value) || 0, maintPct = parseFloat(maintI.value) || 0;
+    const hours = parseFloat(hoursI.value), rate = parseFloat(rateI.value);
+    if(isNaN(build) || isNaN(hours) || isNaN(rate) || build < 0){
+      monthlyEl.textContent = "—"; paybackEl.textContent = "—"; net3yrEl.textContent = "—"; inference.textContent = ""; chart.innerHTML = "";
+      return;
+    }
+    const monthlySavings = hours * rate;
+    const monthlyLicense = license / 12;
+    const monthlyMaint = (build * maintPct/100) / 12;
+    const monthlyNet = monthlySavings - monthlyLicense - monthlyMaint;
+
+    monthlyEl.textContent = "₹" + Math.round(monthlySavings).toLocaleString();
+
+    // month-by-month cumulative cash flow for payback + chart
+    const months = 36;
+    const series = [-build];
+    let cumulative = -build;
+    let paybackMonth = null;
+    for(let m = 1; m <= months; m++){
+      cumulative += monthlyNet;
+      series.push(cumulative);
+      if(paybackMonth === null && cumulative >= 0) paybackMonth = m;
+    }
+    const net3yr = cumulative;
+
+    paybackEl.textContent = paybackMonth ? paybackMonth + " months" : (monthlyNet > 0 ? "> 36 months" : "Never (costs exceed savings)");
+    paybackEl.style.color = paybackMonth && paybackMonth <= 18 ? "var(--video-color)" : paybackMonth ? "var(--ppt-color)" : "var(--danger)";
+    net3yrEl.textContent = "₹" + Math.round(net3yr).toLocaleString();
+    net3yrEl.style.color = net3yr > 0 ? "var(--video-color)" : "var(--danger)";
+
+    const color = net3yr > 0 ? "var(--video-color)" : "var(--danger)";
+    inference.innerHTML = `<b style="color:${color};">Inference:</b> ` +
+      (monthlyNet <= 0
+        ? `Ongoing license and maintenance costs (₹${Math.round(monthlyLicense+monthlyMaint).toLocaleString()}/month) exceed the monthly savings — this bot doesn't pay for itself as scoped. Revisit volume, hours saved, or ongoing cost assumptions.`
+        : paybackMonth
+          ? `Pays back the build cost in ${paybackMonth} months, then nets ₹${Math.round(net3yr).toLocaleString()} over 3 years after accounting for license and maintenance.`
+          : `Doesn't pay back within 3 years at this rate — reconsider scope or cost assumptions.`);
+
+    const W = 460, H = 220, pad = 16, bottomPad = 30;
+    const yMin = Math.min(...series), yMax = Math.max(...series);
+    const yRange = (yMax-yMin) || 1;
+    const toX = (i) => pad + (i/months) * (W-pad*2);
+    const toY = (v) => (H-bottomPad) - ((v-yMin)/yRange) * (H-bottomPad-pad);
+    const zeroY = toY(0);
+    const linePath = series.map((v,i) => `${i===0?"M":"L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
+    chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
+      <line x1="${pad}" y1="${zeroY.toFixed(1)}" x2="${W-pad}" y2="${zeroY.toFixed(1)}" stroke="var(--text-dim)" stroke-width="1" stroke-dasharray="3,3"></line>
+      <text x="${pad}" y="${zeroY-4}" font-size="9" fill="var(--text-dim)">Break-even</text>
+      <path d="${linePath}" fill="none" stroke="${net3yr>0?'var(--video-color)':'var(--danger)'}" stroke-width="2"></path>
+      <text x="${pad}" y="14" font-size="10" fill="var(--text-dim)">Cumulative cash flow over 36 months</text>
+    </svg>`;
+  };
+  [buildI, licenseI, maintI, hoursI, rateI].forEach(el => el.addEventListener("input", upd));
+  container.querySelector("#tkBrPngBtn").addEventListener("click", () => {
+    exportSvgAsPng(chart.querySelector("svg"), "bot-roi-" + new Date().toISOString().slice(0,10) + ".png");
+  });
+}
+
+// ---- AI Tools ----
+const GENAI_FEASIBILITY_CRITERIA = [
+  { key: "complexity", label: "Manageable Content Complexity" },
+  { key: "hallucinationTolerance", label: "Hallucination Risk Tolerance" },
+  { key: "dataPrivacy", label: "Data Privacy Safety" },
+  { key: "humanInLoop", label: "Human-in-the-Loop Feasibility" }
+];
+const GENAI_VALUE_CRITERIA = [ { key: "businessValue", label: "Business Value / Criticality" } ];
+const GENAI_ALL_QUAL = GENAI_FEASIBILITY_CRITERIA.concat(GENAI_VALUE_CRITERIA);
+
+function renderTkGenAiScorer(container){
+  tkState.genAiScorer = tkState.genAiScorer || { items: [], standardFteHours: "" };
+  const st = tkState.genAiScorer;
+  if(st.items.length === 0) st.items.push(blankGenAi());
+
+  function blankGenAi(){
+    const base = { name: "New use case", monthlyVolume: "", timePerItem: "", pctUnstructured: "" };
+    GENAI_ALL_QUAL.forEach(c => base[c.key] = 3);
+    return base;
+  }
+  function classify(feas, val){
+    const hiFeas = feas >= 4.0, hiVal = val >= 4.0;
+    if(hiFeas && hiVal) return { label: "Pursue Now", color: "var(--video-color)" };
+    if(hiFeas && !hiVal) return { label: "Feasible, Lower Priority", color: "var(--doc-color)" };
+    if(!hiFeas && hiVal) return { label: "High Value, Needs Groundwork", color: "var(--ppt-color)" };
+    return { label: "Not Ready", color: "var(--danger)" };
+  }
+  function computeRow(it){
+    const volume = parseFloat(it.monthlyVolume) || 0;
+    const timePerItem = parseFloat(it.timePerItem) || 0;
+    const hoursPerMonth = (volume * timePerItem) / 60;
+    const fteHours = parseFloat(st.standardFteHours) || 0;
+    const fteRequired = fteHours > 0 ? hoursPerMonth / fteHours : 0;
+    const pctUnstructured = Math.max(0, Math.min(100, parseFloat(it.pctUnstructured) || 0));
+    const feasScores = GENAI_FEASIBILITY_CRITERIA.map(c => +it[c.key] || 0);
+    const feasAvg = feasScores.reduce((a,b)=>a+b,0) / GENAI_FEASIBILITY_CRITERIA.length;
+    const valueAvg = (+it.businessValue) || 0;
+    return { hoursPerMonth, fteRequired, pctUnstructured, feasAvg, valueAvg };
+  }
+
+  function metricRows(){
+    const rows = [];
+    rows.push({ section: "Workload" });
+    rows.push({ label: "Monthly Volume (items)", render: (it,i) => `<input type="number" data-f="monthlyVolume_${i}" value="${escapeHtml(it.monthlyVolume||"")}" placeholder="e.g. 2000">` });
+    rows.push({ label: "Avg Time / Item (min)", render: (it,i) => `<input type="number" data-f="timePerItem_${i}" value="${escapeHtml(it.timePerItem||"")}" placeholder="e.g. 10">` });
+    rows.push({ label: "Est. Hours / Month", computed: true, render: (it,i,c) => `<b>${c.hoursPerMonth > 0 ? c.hoursPerMonth.toLocaleString(undefined,{maximumFractionDigits:0}) : "—"}</b>` });
+    rows.push({ label: "FTEs Involved", computed: true, render: (it,i,c) => `<b>${c.fteRequired > 0 ? c.fteRequired.toFixed(2) : "—"}</b>` });
+
+    rows.push({ section: "Data Fit" });
+    rows.push({ label: "% Content Unstructured / Text-Based", highlight: true, render: (it,i) => `<input type="number" data-f="pctUnstructured_${i}" value="${escapeHtml(it.pctUnstructured||"")}" placeholder="e.g. 80" min="0" max="100">` });
+
+    rows.push({ section: "Feasibility (can GenAI do this well?)" });
+    GENAI_FEASIBILITY_CRITERIA.forEach(c => {
+      rows.push({ label: c.label + " (1-5)", render: (it,i) => `<select data-f="${c.key}_${i}">${[1,2,3,4,5].map(v=>`<option value="${v}" ${+it[c.key]===v?"selected":""}>${v}</option>`).join("")}</select>` });
+    });
+    rows.push({ label: "Feasibility Score", computed: true, render: (it,i,c) => `<b>${c.feasAvg.toFixed(1)}</b>` });
+
+    rows.push({ section: "Business Value (should we?)" });
+    GENAI_VALUE_CRITERIA.forEach(c => {
+      rows.push({ label: c.label + " (1-5)", render: (it,i) => `<select data-f="${c.key}_${i}">${[1,2,3,4,5].map(v=>`<option value="${v}" ${+it[c.key]===v?"selected":""}>${v}</option>`).join("")}</select>` });
+    });
+    rows.push({ label: "Business Value Score", computed: true, render: (it,i,c) => `<b>${c.valueAvg.toFixed(1)}</b>` });
+
+    rows.push({ section: "Verdict" });
+    rows.push({ label: "Priority Verdict", computed: true, render: (it,i,c) => { const v = classify(c.feasAvg, c.valueAvg); return `<b style="color:${v.color};font-size:11px;">${v.label}</b>`; } });
+    return rows;
+  }
+
+  function draw(){
+    const computed = st.items.map(it => computeRow(it));
+    const rows = metricRows();
+    let html = `<table class="tk-table tk-auto-matrix"><thead><tr><th class="tk-auto-rowlabel-head">Metric</th>${st.items.map((it,i) => `
+      <th><input type="text" data-procname="${i}" value="${escapeHtml(it.name||"")}" style="width:100%;text-align:center;font-weight:700;">
+      <button class="tk-del-btn" data-rmv="${i}" title="Remove use case" style="display:block;margin:2px auto 0;">&times;</button></th>
+    `).join("")}</tr></thead><tbody>`;
+    rows.forEach(row => {
+      if(row.section){ html += `<tr><td class="tk-auto-section" colspan="${st.items.length+1}">${row.section}</td></tr>`; return; }
+      html += `<tr${row.highlight ? ' style="background:var(--accent-soft);"' : ""}><td class="tk-auto-rowlabel">${row.label}</td>`;
+      st.items.forEach((it,i) => { html += `<td>${row.render(it, i, computed[i])}</td>`; });
+      html += `</tr>`;
+    });
+    html += `</tbody></table>`;
+    const tbl = container.querySelector("#tkGaTable");
+    tbl.innerHTML = html;
+    tbl.querySelectorAll("[data-procname]").forEach(inp => inp.addEventListener("input", () => { st.items[+inp.dataset.procname].name = inp.value; tkSave(); }));
+    tbl.querySelectorAll("[data-rmv]").forEach(btn => btn.addEventListener("click", () => { if(st.items.length<=1) return; st.items.splice(+btn.dataset.rmv,1); tkSave(); draw(); }));
+    tbl.querySelectorAll("[data-f]").forEach(el => {
+      const evt = el.tagName === "SELECT" ? "change" : "input";
+      el.addEventListener(evt, () => {
+        const [field, idx] = el.dataset.f.split("_");
+        st.items[+idx][field] = el.value; tkSave();
+        const fKey = el.dataset.f; const selStart = el.selectionStart, selEnd = el.selectionEnd;
+        draw();
+        const newEl = container.querySelector(`[data-f="${fKey}"]`);
+        if(newEl){ newEl.focus(); if(selStart!=null && newEl.setSelectionRange){ try{ newEl.setSelectionRange(selStart, selEnd); }catch(e){} } }
+      });
+    });
+
+    const quadChart = container.querySelector("#tkGaQuadChart");
+    const W = 420, H = 260, pad = 42;
+    const toX = (v) => pad + (v/5) * (W-pad*2);
+    const toY = (v) => (H-pad) - (v/5) * (H-pad*2);
+    const dots = st.items.map((it,i) => {
+      const c = computed[i]; const v = classify(c.feasAvg, c.valueAvg);
+      const cx = toX(c.feasAvg), cy = toY(c.valueAvg);
+      return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="7" fill="${v.color}"></circle>
+        <text x="${cx.toFixed(1)}" y="${(cy-11).toFixed(1)}" font-size="9.5" fill="var(--text)" text-anchor="middle">${escapeHtml((it.name||"Use case").slice(0,16))}</text>`;
+    }).join("");
+    quadChart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
+      <rect x="${pad}" y="${pad}" width="${W-pad*2}" height="${H-pad*2}" fill="none" stroke="var(--border)" stroke-width="1"></rect>
+      <line x1="${toX(4)}" y1="${pad}" x2="${toX(4)}" y2="${H-pad}" stroke="var(--border)" stroke-dasharray="3,3"></line>
+      <line x1="${pad}" y1="${toY(4)}" x2="${W-pad}" y2="${toY(4)}" stroke="var(--border)" stroke-dasharray="3,3"></line>
+      <text x="${W/2}" y="${H-10}" font-size="10.5" fill="var(--text-dim)" text-anchor="middle">Feasibility Score →</text>
+      <text x="14" y="${H/2}" font-size="10.5" fill="var(--text-dim)" text-anchor="middle" transform="rotate(-90 14 ${H/2})">Business Value Score →</text>
+      ${dots}
+    </svg>`;
+  }
+
+  container.innerHTML = `
+    <h4>GenAI Use Case Feasibility Scorer</h4>
+    <p class="tk-sub">Different lens than RPA: GenAI thrives on unstructured data and judgment calls. Score each use case on fit and value separately.</p>
+    <div class="tk-row" style="max-width:320px;">
+      <div class="tk-field"><label>Standard working hours per FTE / month</label><input type="number" id="tkGaFteHours" value="${escapeHtml(st.standardFteHours||"")}" placeholder="e.g. 160"></div>
+    </div>
+    <div id="tkGaTable" style="overflow-x:auto;"></div>
+    <button id="tkGaAdd" style="margin-top:10px;">+ Add use case</button>
+    <div class="tk-skill-legend" style="margin-top:14px;">
+      <span><span class="tk-skill-legend-dot" style="background:var(--video-color);"></span>Pursue Now</span>
+      <span><span class="tk-skill-legend-dot" style="background:var(--doc-color);"></span>Feasible, Lower Priority</span>
+      <span><span class="tk-skill-legend-dot" style="background:var(--ppt-color);"></span>High Value, Needs Groundwork</span>
+      <span><span class="tk-skill-legend-dot" style="background:var(--danger);"></span>Not Ready</span>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);margin:10px 0;">
+      <b>Hallucination Risk Tolerance</b>: how costly is a wrong or made-up answer here — low-stakes content scores higher. <b>Data Privacy Safety</b>: can this data safely be processed by an LLM (no PII/regulatory blocker). <b>Human-in-the-Loop Feasibility</b>: how easily a person can review output before it's acted on.
+    </div>
+    <div class="tk-section-title">Feasibility vs. Business Value</div>
+    <div id="tkGaQuadChart" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:6px;max-width:420px;"></div>
+    <div class="tk-row" style="margin-top:10px;">
+      <button id="tkGaPngBtn">⬇ Export chart (PNG)</button>
+      <button id="tkGaCsvBtn">⬇ Export matrix (Excel)</button>
+    </div>
+  `;
+  container.querySelector("#tkGaFteHours").addEventListener("input", (e) => { st.standardFteHours = e.target.value; tkSave(); draw(); });
+  container.querySelector("#tkGaAdd").addEventListener("click", () => { if(st.items.length < 8){ st.items.push(blankGenAi()); tkSave(); draw(); } });
+  container.querySelector("#tkGaCsvBtn").addEventListener("click", () => {
+    const computed = st.items.map(it => computeRow(it));
+    const rows = [["Metric", ...st.items.map(it => it.name||"Use case")]];
+    rows.push(["Monthly Volume (items)", ...st.items.map(it => it.monthlyVolume||"")]);
+    rows.push(["Avg Time/Item (min)", ...st.items.map(it => it.timePerItem||"")]);
+    rows.push(["Est. Hours/Month", ...computed.map(c => c.hoursPerMonth.toFixed(0))]);
+    rows.push(["FTEs Involved", ...computed.map(c => c.fteRequired.toFixed(2))]);
+    rows.push(["% Content Unstructured", ...st.items.map(it => it.pctUnstructured||"")]);
+    GENAI_FEASIBILITY_CRITERIA.forEach(cr => rows.push([cr.label, ...st.items.map(it => it[cr.key])]));
+    rows.push(["Feasibility Score", ...computed.map(c => c.feasAvg.toFixed(1))]);
+    GENAI_VALUE_CRITERIA.forEach(cr => rows.push([cr.label, ...st.items.map(it => it[cr.key])]));
+    rows.push(["Business Value Score", ...computed.map(c => c.valueAvg.toFixed(1))]);
+    rows.push(["Priority Verdict", ...computed.map(c => classify(c.feasAvg, c.valueAvg).label)]);
+    downloadCsv("genai-feasibility-" + new Date().toISOString().slice(0,10) + ".csv", rows);
+  });
+  container.querySelector("#tkGaPngBtn").addEventListener("click", () => {
+    exportSvgAsPng(container.querySelector("#tkGaQuadChart svg"), "genai-feasibility-" + new Date().toISOString().slice(0,10) + ".png");
+  });
+  draw();
+}
+
+const AGENTIC_FEASIBILITY_CRITERIA = [
+  { key: "decomposability", label: "Task Decomposability" },
+  { key: "toolAvailability", label: "Tool / API Availability" },
+  { key: "autonomyRisk", label: "Autonomy Risk Tolerance" },
+  { key: "reasoningComplexity", label: "Manageable Reasoning Complexity" },
+  { key: "errorRecovery", label: "Error Recovery / Rollback Capability" }
+];
+const AGENTIC_VALUE_CRITERIA = [ { key: "businessValue", label: "Business Value / Criticality" } ];
+const AGENTIC_ALL_QUAL = AGENTIC_FEASIBILITY_CRITERIA.concat(AGENTIC_VALUE_CRITERIA);
+
+function renderTkAgenticScorer(container){
+  tkState.agenticScorer = tkState.agenticScorer || { items: [], standardFteHours: "" };
+  const st = tkState.agenticScorer;
+  if(st.items.length === 0) st.items.push(blankAgentic());
+
+  function blankAgentic(){
+    const base = { name: "New task", monthlyVolume: "", timePerTask: "" };
+    AGENTIC_ALL_QUAL.forEach(c => base[c.key] = 3);
+    return base;
+  }
+  function classify(feas, val){
+    const hiFeas = feas >= 4.0, hiVal = val >= 4.0;
+    if(hiFeas && hiVal) return { label: "Pursue Now", color: "var(--video-color)" };
+    if(hiFeas && !hiVal) return { label: "Feasible, Lower Priority", color: "var(--doc-color)" };
+    if(!hiFeas && hiVal) return { label: "High Value, Needs Groundwork", color: "var(--ppt-color)" };
+    return { label: "Not Ready", color: "var(--danger)" };
+  }
+  function computeRow(it){
+    const volume = parseFloat(it.monthlyVolume) || 0;
+    const timePerTask = parseFloat(it.timePerTask) || 0;
+    const hoursPerMonth = (volume * timePerTask) / 60;
+    const fteHours = parseFloat(st.standardFteHours) || 0;
+    const fteRequired = fteHours > 0 ? hoursPerMonth / fteHours : 0;
+    const feasScores = AGENTIC_FEASIBILITY_CRITERIA.map(c => +it[c.key] || 0);
+    const feasAvg = feasScores.reduce((a,b)=>a+b,0) / AGENTIC_FEASIBILITY_CRITERIA.length;
+    const valueAvg = (+it.businessValue) || 0;
+    return { hoursPerMonth, fteRequired, feasAvg, valueAvg };
+  }
+
+  function metricRows(){
+    const rows = [];
+    rows.push({ section: "Workload" });
+    rows.push({ label: "Monthly Volume (tasks)", render: (it,i) => `<input type="number" data-f="monthlyVolume_${i}" value="${escapeHtml(it.monthlyVolume||"")}" placeholder="e.g. 500">` });
+    rows.push({ label: "Avg Time / Task (min)", render: (it,i) => `<input type="number" data-f="timePerTask_${i}" value="${escapeHtml(it.timePerTask||"")}" placeholder="e.g. 20">` });
+    rows.push({ label: "Est. Hours / Month", computed: true, render: (it,i,c) => `<b>${c.hoursPerMonth > 0 ? c.hoursPerMonth.toLocaleString(undefined,{maximumFractionDigits:0}) : "—"}</b>` });
+    rows.push({ label: "FTEs Involved", computed: true, render: (it,i,c) => `<b>${c.fteRequired > 0 ? c.fteRequired.toFixed(2) : "—"}</b>` });
+
+    rows.push({ section: "Feasibility (is this ready for an autonomous agent?)" });
+    AGENTIC_FEASIBILITY_CRITERIA.forEach(c => {
+      rows.push({ label: c.label + " (1-5)", render: (it,i) => `<select data-f="${c.key}_${i}">${[1,2,3,4,5].map(v=>`<option value="${v}" ${+it[c.key]===v?"selected":""}>${v}</option>`).join("")}</select>` });
+    });
+    rows.push({ label: "Feasibility Score", computed: true, render: (it,i,c) => `<b>${c.feasAvg.toFixed(1)}</b>` });
+
+    rows.push({ section: "Business Value (should we?)" });
+    AGENTIC_VALUE_CRITERIA.forEach(c => {
+      rows.push({ label: c.label + " (1-5)", render: (it,i) => `<select data-f="${c.key}_${i}">${[1,2,3,4,5].map(v=>`<option value="${v}" ${+it[c.key]===v?"selected":""}>${v}</option>`).join("")}</select>` });
+    });
+    rows.push({ label: "Business Value Score", computed: true, render: (it,i,c) => `<b>${c.valueAvg.toFixed(1)}</b>` });
+
+    rows.push({ section: "Verdict" });
+    rows.push({ label: "Priority Verdict", computed: true, render: (it,i,c) => { const v = classify(c.feasAvg, c.valueAvg); return `<b style="color:${v.color};font-size:11px;">${v.label}</b>`; } });
+    return rows;
+  }
+
+  function draw(){
+    const computed = st.items.map(it => computeRow(it));
+    const rows = metricRows();
+    let html = `<table class="tk-table tk-auto-matrix"><thead><tr><th class="tk-auto-rowlabel-head">Metric</th>${st.items.map((it,i) => `
+      <th><input type="text" data-procname="${i}" value="${escapeHtml(it.name||"")}" style="width:100%;text-align:center;font-weight:700;">
+      <button class="tk-del-btn" data-rmv="${i}" title="Remove task" style="display:block;margin:2px auto 0;">&times;</button></th>
+    `).join("")}</tr></thead><tbody>`;
+    rows.forEach(row => {
+      if(row.section){ html += `<tr><td class="tk-auto-section" colspan="${st.items.length+1}">${row.section}</td></tr>`; return; }
+      html += `<tr><td class="tk-auto-rowlabel">${row.label}</td>`;
+      st.items.forEach((it,i) => { html += `<td>${row.render(it, i, computed[i])}</td>`; });
+      html += `</tr>`;
+    });
+    html += `</tbody></table>`;
+    const tbl = container.querySelector("#tkAgTable");
+    tbl.innerHTML = html;
+    tbl.querySelectorAll("[data-procname]").forEach(inp => inp.addEventListener("input", () => { st.items[+inp.dataset.procname].name = inp.value; tkSave(); }));
+    tbl.querySelectorAll("[data-rmv]").forEach(btn => btn.addEventListener("click", () => { if(st.items.length<=1) return; st.items.splice(+btn.dataset.rmv,1); tkSave(); draw(); }));
+    tbl.querySelectorAll("[data-f]").forEach(el => {
+      const evt = el.tagName === "SELECT" ? "change" : "input";
+      el.addEventListener(evt, () => {
+        const [field, idx] = el.dataset.f.split("_");
+        st.items[+idx][field] = el.value; tkSave();
+        const fKey = el.dataset.f; const selStart = el.selectionStart, selEnd = el.selectionEnd;
+        draw();
+        const newEl = container.querySelector(`[data-f="${fKey}"]`);
+        if(newEl){ newEl.focus(); if(selStart!=null && newEl.setSelectionRange){ try{ newEl.setSelectionRange(selStart, selEnd); }catch(e){} } }
+      });
+    });
+
+    const quadChart = container.querySelector("#tkAgQuadChart");
+    const W = 420, H = 260, pad = 42;
+    const toX = (v) => pad + (v/5) * (W-pad*2);
+    const toY = (v) => (H-pad) - (v/5) * (H-pad*2);
+    const dots = st.items.map((it,i) => {
+      const c = computed[i]; const v = classify(c.feasAvg, c.valueAvg);
+      const cx = toX(c.feasAvg), cy = toY(c.valueAvg);
+      return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="7" fill="${v.color}"></circle>
+        <text x="${cx.toFixed(1)}" y="${(cy-11).toFixed(1)}" font-size="9.5" fill="var(--text)" text-anchor="middle">${escapeHtml((it.name||"Task").slice(0,16))}</text>`;
+    }).join("");
+    quadChart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
+      <rect x="${pad}" y="${pad}" width="${W-pad*2}" height="${H-pad*2}" fill="none" stroke="var(--border)" stroke-width="1"></rect>
+      <line x1="${toX(4)}" y1="${pad}" x2="${toX(4)}" y2="${H-pad}" stroke="var(--border)" stroke-dasharray="3,3"></line>
+      <line x1="${pad}" y1="${toY(4)}" x2="${W-pad}" y2="${toY(4)}" stroke="var(--border)" stroke-dasharray="3,3"></line>
+      <text x="${W/2}" y="${H-10}" font-size="10.5" fill="var(--text-dim)" text-anchor="middle">Feasibility Score →</text>
+      <text x="14" y="${H/2}" font-size="10.5" fill="var(--text-dim)" text-anchor="middle" transform="rotate(-90 14 ${H/2})">Business Value Score →</text>
+      ${dots}
+    </svg>`;
+  }
+
+  container.innerHTML = `
+    <h4>Agentic AI Readiness Scorer</h4>
+    <p class="tk-sub">A different lens again: agents take multi-step autonomous actions, so the risk and readiness questions are about actions, not just content.</p>
+    <div class="tk-row" style="max-width:320px;">
+      <div class="tk-field"><label>Standard working hours per FTE / month</label><input type="number" id="tkAgFteHours" value="${escapeHtml(st.standardFteHours||"")}" placeholder="e.g. 160"></div>
+    </div>
+    <div id="tkAgTable" style="overflow-x:auto;"></div>
+    <button id="tkAgAdd" style="margin-top:10px;">+ Add task</button>
+    <div class="tk-skill-legend" style="margin-top:14px;">
+      <span><span class="tk-skill-legend-dot" style="background:var(--video-color);"></span>Pursue Now</span>
+      <span><span class="tk-skill-legend-dot" style="background:var(--doc-color);"></span>Feasible, Lower Priority</span>
+      <span><span class="tk-skill-legend-dot" style="background:var(--ppt-color);"></span>High Value, Needs Groundwork</span>
+      <span><span class="tk-skill-legend-dot" style="background:var(--danger);"></span>Not Ready</span>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);margin:10px 0;">
+      <b>Task Decomposability</b>: can this break into discrete steps/tool calls an agent can execute one at a time. <b>Tool / API Availability</b>: does the agent actually have systems it can act on. <b>Autonomy Risk Tolerance</b>: how safe is it to let the agent act with minimal human approval — financial or irreversible actions score low. <b>Error Recovery</b>: can mistakes be detected and undone before causing harm.
+    </div>
+    <div class="tk-section-title">Feasibility vs. Business Value</div>
+    <div id="tkAgQuadChart" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:6px;max-width:420px;"></div>
+    <div class="tk-row" style="margin-top:10px;">
+      <button id="tkAgPngBtn">⬇ Export chart (PNG)</button>
+      <button id="tkAgCsvBtn">⬇ Export matrix (Excel)</button>
+    </div>
+  `;
+  container.querySelector("#tkAgFteHours").addEventListener("input", (e) => { st.standardFteHours = e.target.value; tkSave(); draw(); });
+  container.querySelector("#tkAgAdd").addEventListener("click", () => { if(st.items.length < 8){ st.items.push(blankAgentic()); tkSave(); draw(); } });
+  container.querySelector("#tkAgCsvBtn").addEventListener("click", () => {
+    const computed = st.items.map(it => computeRow(it));
+    const rows = [["Metric", ...st.items.map(it => it.name||"Task")]];
+    rows.push(["Monthly Volume (tasks)", ...st.items.map(it => it.monthlyVolume||"")]);
+    rows.push(["Avg Time/Task (min)", ...st.items.map(it => it.timePerTask||"")]);
+    rows.push(["Est. Hours/Month", ...computed.map(c => c.hoursPerMonth.toFixed(0))]);
+    rows.push(["FTEs Involved", ...computed.map(c => c.fteRequired.toFixed(2))]);
+    AGENTIC_FEASIBILITY_CRITERIA.forEach(cr => rows.push([cr.label, ...st.items.map(it => it[cr.key])]));
+    rows.push(["Feasibility Score", ...computed.map(c => c.feasAvg.toFixed(1))]);
+    AGENTIC_VALUE_CRITERIA.forEach(cr => rows.push([cr.label, ...st.items.map(it => it[cr.key])]));
+    rows.push(["Business Value Score", ...computed.map(c => c.valueAvg.toFixed(1))]);
+    rows.push(["Priority Verdict", ...computed.map(c => classify(c.feasAvg, c.valueAvg).label)]);
+    downloadCsv("agentic-readiness-" + new Date().toISOString().slice(0,10) + ".csv", rows);
+  });
+  container.querySelector("#tkAgPngBtn").addEventListener("click", () => {
+    exportSvgAsPng(container.querySelector("#tkAgQuadChart svg"), "agentic-readiness-" + new Date().toISOString().slice(0,10) + ".png");
+  });
+  draw();
 }
 
 // ---- Reporting ----
@@ -4620,8 +6014,15 @@ function renderTkDecisionMatrix(container){
     html += `</tbody></table>`;
     const tbl = container.querySelector("#tkDmTable");
     tbl.innerHTML = html;
-    tbl.querySelectorAll("[data-score]").forEach(inp => inp.addEventListener("input", () => { dm.scores[inp.dataset.score] = inp.value; tkSave(); draw(); }));
-    tbl.querySelectorAll("[data-weight]").forEach(inp => inp.addEventListener("input", () => { dm.criteria[+inp.dataset.weight].weight = parseFloat(inp.value)||0; tkSave(); draw(); }));
+    function dmRedraw(attr, inp){
+      const key = inp.dataset[attr];
+      const selStart = inp.selectionStart, selEnd = inp.selectionEnd;
+      draw();
+      const newEl = container.querySelector(`[data-${attr}="${key}"]`);
+      if(newEl){ newEl.focus(); if(selStart!=null && newEl.setSelectionRange){ try{ newEl.setSelectionRange(selStart, selEnd); }catch(e){} } }
+    }
+    tbl.querySelectorAll("[data-score]").forEach(inp => inp.addEventListener("input", () => { dm.scores[inp.dataset.score] = inp.value; tkSave(); dmRedraw("score", inp); }));
+    tbl.querySelectorAll("[data-weight]").forEach(inp => inp.addEventListener("input", () => { dm.criteria[+inp.dataset.weight].weight = parseFloat(inp.value)||0; tkSave(); dmRedraw("weight", inp); }));
     tbl.querySelectorAll("[data-optname]").forEach(inp => inp.addEventListener("input", () => { dm.options[+inp.dataset.optname] = inp.value; tkSave(); }));
   }
   container.innerHTML = `
@@ -4631,10 +6032,21 @@ function renderTkDecisionMatrix(container){
     <div class="tk-row" style="margin-top:12px;">
       <button id="tkDmAddOpt">+ Add option</button>
       <button id="tkDmAddCrit">+ Add criterion</button>
+      <button id="tkDmCsvBtn">⬇ Export (Excel)</button>
     </div>
   `;
   container.querySelector("#tkDmAddOpt").addEventListener("click", () => { if(dm.options.length<8){ dm.options.push("Option "+(dm.options.length+1)); tkSave(); draw(); } });
   container.querySelector("#tkDmAddCrit").addEventListener("click", () => { if(dm.criteria.length<6){ dm.criteria.push({name:"Criterion "+(dm.criteria.length+1), weight:3}); tkSave(); draw(); } });
+  container.querySelector("#tkDmCsvBtn").addEventListener("click", () => {
+    const totals = computeTotals();
+    const ranked = totals.map((t,i)=>i).sort((a,b)=>totals[b]-totals[a]);
+    const rows = [["Option", ...dm.criteria.map(c=>c.name+" (weight "+c.weight+")"), "Score", "Rank"]];
+    dm.options.forEach((opt,oi) => {
+      const rowScores = dm.criteria.map((c,ci) => dm.scores[key(oi,ci)]||"");
+      rows.push([opt, ...rowScores, totals[oi].toFixed(2), "#"+(ranked.indexOf(oi)+1)]);
+    });
+    downloadCsv("decision-matrix-" + new Date().toISOString().slice(0,10) + ".csv", rows);
+  });
   draw();
 }
 
@@ -4674,7 +6086,15 @@ function renderTkRiceIce(container){
     tbl.innerHTML = html;
     tbl.querySelectorAll("[data-name]").forEach(inp => inp.addEventListener("input", ()=>{ st.items[+inp.dataset.name].name = inp.value; tkSave(); }));
     tbl.querySelectorAll("[data-f]").forEach(inp => inp.addEventListener("input", ()=>{
-      const [field, idx] = inp.dataset.f.split("_"); st.items[+idx][field] = inp.value; tkSave(); draw();
+      const [field, idx] = inp.dataset.f.split("_"); st.items[+idx][field] = inp.value; tkSave();
+      const fKey = inp.dataset.f;
+      const selStart = inp.selectionStart, selEnd = inp.selectionEnd;
+      draw();
+      const newEl = container.querySelector(`[data-f="${fKey}"]`);
+      if(newEl){
+        newEl.focus();
+        if(selStart != null && newEl.setSelectionRange){ try{ newEl.setSelectionRange(selStart, selEnd); }catch(e){} }
+      }
     }));
     tbl.querySelectorAll("[data-rmv]").forEach(btn => btn.addEventListener("click", ()=>{ st.items.splice(+btn.dataset.rmv,1); tkSave(); draw(); }));
   }
@@ -4687,11 +6107,24 @@ function renderTkRiceIce(container){
       </div>
     </div>
     <div id="tkRiceTable"></div>
-    <button id="tkRiceAdd" style="margin-top:10px;">+ Add item</button>
+    <div class="tk-row" style="margin-top:10px;">
+      <button id="tkRiceAdd">+ Add item</button>
+      <button id="tkRiceCsvBtn">⬇ Export (Excel)</button>
+    </div>
   `;
   container.querySelector("#tkRiceMode").value = st.mode;
   container.querySelector("#tkRiceMode").addEventListener("change", (e) => { st.mode = e.target.value; tkSave(); draw(); });
   container.querySelector("#tkRiceAdd").addEventListener("click", () => { st.items.push({name:"New item"}); tkSave(); draw(); });
+  container.querySelector("#tkRiceCsvBtn").addEventListener("click", () => {
+    const header = st.mode === "RICE" ? ["Item","Reach","Impact","Confidence %","Effort","Score"] : ["Item","Impact","Confidence","Ease","Score"];
+    const rows = [header];
+    st.items.forEach(it => {
+      const score = computeScore(it);
+      if(st.mode === "RICE") rows.push([it.name||"", it.reach||"", it.impact||"", it.conf||"", it.effort||"", score.toFixed(1)]);
+      else rows.push([it.name||"", it.impact||"", it.conf||"", it.ease||"", score.toFixed(1)]);
+    });
+    downloadCsv("rice-ice-scoring-" + new Date().toISOString().slice(0,10) + ".csv", rows);
+  });
   draw();
 }
 
@@ -4707,11 +6140,20 @@ function renderTkEisenhower(container){
       <div class="tk-quad"><div class="tk-quad-title">Delegate (urgent, not important)</div><textarea id="tkEq3"></textarea></div>
       <div class="tk-quad"><div class="tk-quad-title">Eliminate (neither)</div><textarea id="tkEq4"></textarea></div>
     </div>
+    <button id="tkEqCsvBtn" style="margin-top:10px;">⬇ Export (Excel)</button>
   `;
   ["q1","q2","q3","q4"].forEach((k,idx) => {
     const ta = container.querySelector("#tkEq"+(idx+1));
     ta.value = st[k];
     ta.addEventListener("input", () => { st[k] = ta.value; tkSave(); });
+  });
+  container.querySelector("#tkEqCsvBtn").addEventListener("click", () => {
+    const labels = { q1:"Do first (urgent & important)", q2:"Schedule (important, not urgent)", q3:"Delegate (urgent, not important)", q4:"Eliminate (neither)" };
+    const rows = [["Quadrant","Item"]];
+    ["q1","q2","q3","q4"].forEach(k => {
+      (st[k]||"").split("\n").map(l=>l.trim()).filter(Boolean).forEach(item => rows.push([labels[k], item]));
+    });
+    downloadCsv("eisenhower-matrix-" + new Date().toISOString().slice(0,10) + ".csv", rows);
   });
 }
 
@@ -4739,10 +6181,17 @@ function renderTkDotVote(container){
     <div class="tk-row" style="margin-top:10px;">
       <button id="tkDvAdd">+ Add option</button>
       <button id="tkDvReset">Reset votes</button>
+      <button id="tkDvCsvBtn">⬇ Export (Excel)</button>
     </div>
   `;
   container.querySelector("#tkDvAdd").addEventListener("click", () => { st.items.push({name:"New option", votes:0}); tkSave(); draw(); });
   container.querySelector("#tkDvReset").addEventListener("click", () => { st.items.forEach(it=>it.votes=0); tkSave(); draw(); });
+  container.querySelector("#tkDvCsvBtn").addEventListener("click", () => {
+    const sorted = st.items.slice().sort((a,b) => b.votes - a.votes);
+    const rows = [["Option","Votes"]];
+    sorted.forEach(it => rows.push([it.name||"", it.votes]));
+    downloadCsv("dot-voting-" + new Date().toISOString().slice(0,10) + ".csv", rows);
+  });
   draw();
 }
 
@@ -5208,11 +6657,20 @@ function renderTkSwot(container){
       <div class="tk-quad"><div class="tk-quad-title">Opportunities</div><textarea id="tkSwO"></textarea></div>
       <div class="tk-quad"><div class="tk-quad-title">Threats</div><textarea id="tkSwT"></textarea></div>
     </div>
+    <button id="tkSwCsvBtn" style="margin-top:10px;">⬇ Export (Excel)</button>
   `;
   [["s","tkSwS"],["w","tkSwW"],["o","tkSwO"],["t","tkSwT"]].forEach(([k,id]) => {
     const ta = container.querySelector("#"+id);
     ta.value = st[k];
     ta.addEventListener("input", () => { st[k] = ta.value; tkSave(); });
+  });
+  container.querySelector("#tkSwCsvBtn").addEventListener("click", () => {
+    const labels = { s:"Strengths", w:"Weaknesses", o:"Opportunities", t:"Threats" };
+    const rows = [["Category","Item"]];
+    ["s","w","o","t"].forEach(k => {
+      (st[k]||"").split("\n").map(l=>l.trim()).filter(Boolean).forEach(item => rows.push([labels[k], item]));
+    });
+    downloadCsv("swot-canvas-" + new Date().toISOString().slice(0,10) + ".csv", rows);
   });
 }
 
@@ -5254,10 +6712,19 @@ function renderTkRaci(container){
     <div class="tk-row" style="margin-top:12px;">
       <button id="tkRaciAddTask">+ Add task</button>
       <button id="tkRaciAddPerson">+ Add person</button>
+      <button id="tkRaciCsvBtn">⬇ Export (Excel)</button>
     </div>
   `;
   container.querySelector("#tkRaciAddTask").addEventListener("click", () => { if(st.tasks.length<8){ st.tasks.push("Task "+(st.tasks.length+1)); tkSave(); draw(); } });
   container.querySelector("#tkRaciAddPerson").addEventListener("click", () => { if(st.people.length<6){ st.people.push("Person "+(st.people.length+1)); tkSave(); draw(); } });
+  container.querySelector("#tkRaciCsvBtn").addEventListener("click", () => {
+    const rows = [["Task", ...st.people]];
+    st.tasks.forEach((t,ti) => {
+      const rowVals = st.people.map((p,pi) => st.grid[ti+"_"+pi] || "");
+      rows.push([t, ...rowVals]);
+    });
+    downloadCsv("raci-matrix-" + new Date().toISOString().slice(0,10) + ".csv", rows);
+  });
   draw();
 }
 
@@ -5285,9 +6752,17 @@ function renderTkStageGate(container){
     <p class="tk-sub">Track which phase each initiative is in.</p>
     <div id="tkSgSummary" style="font-size:12.5px;color:var(--text-dim);margin-bottom:10px;"></div>
     <div class="tk-list" id="tkSgList"></div>
-    <button id="tkSgAdd" style="margin-top:10px;">+ Add initiative</button>
+    <div class="tk-row" style="margin-top:10px;">
+      <button id="tkSgAdd">+ Add initiative</button>
+      <button id="tkSgCsvBtn">⬇ Export (Excel)</button>
+    </div>
   `;
   container.querySelector("#tkSgAdd").addEventListener("click", () => { st.items.push({name:"New initiative", stage:"Idea"}); tkSave(); draw(); });
+  container.querySelector("#tkSgCsvBtn").addEventListener("click", () => {
+    const rows = [["Initiative","Stage"]];
+    st.items.forEach(it => rows.push([it.name||"", it.stage||""]));
+    downloadCsv("stage-gate-tracker-" + new Date().toISOString().slice(0,10) + ".csv", rows);
+  });
   draw();
 }
 
@@ -5413,10 +6888,16 @@ function renderTkMyExcelFiles(container){
     </div>
     <div class="tk-excel-summary" id="tkExcelSummary"></div>
     <div id="tkExcelList"></div>
+    <button id="tkExcelCsvBtn" style="margin-top:10px;">⬇ Export list (Excel)</button>
   `;
 
   container.querySelector("#tkExcelAddBtn").addEventListener("click", () => openAddModal(null));
   container.querySelector("#tkExcelSearch").addEventListener("input", (e) => { searchTerm = e.target.value; draw(); });
+  container.querySelector("#tkExcelCsvBtn").addEventListener("click", () => {
+    const rows = [["Title","URL","Note","Tags"]];
+    files.forEach(f => rows.push([f.title||"", f.url||"", f.note||"", (f.tags||[]).join("; ")]));
+    downloadCsv("my-excel-files-" + new Date().toISOString().slice(0,10) + ".csv", rows);
+  });
   draw();
 }
 
@@ -5579,10 +7060,16 @@ function renderTkMyLinks(container){
     </div>
     <div class="tk-excel-summary" id="tkLinkSummary"></div>
     <div id="tkLinkList"></div>
+    <button id="tkLinkCsvBtn" style="margin-top:10px;">⬇ Export list (Excel)</button>
   `;
 
   container.querySelector("#tkLinkAddBtn").addEventListener("click", () => openAddModal(null));
   container.querySelector("#tkLinkSearch").addEventListener("input", (e) => { searchTerm = e.target.value; draw(); });
+  container.querySelector("#tkLinkCsvBtn").addEventListener("click", () => {
+    const rows = [["Title","URL","Note","Tags"]];
+    links.forEach(f => rows.push([f.title||"", f.url||"", f.note||"", (f.tags||[]).join("; ")]));
+    downloadCsv("my-links-" + new Date().toISOString().slice(0,10) + ".csv", rows);
+  });
   draw();
 }
 
@@ -5986,6 +7473,21 @@ const TOOLKIT_CATS = [
   { label: "Skill Mapping", tools: [
     { key:"skillMapping", name:"Skill Mapping (WIP)", render: renderTkWorkInProgress },
   ]},
+  { label: "What If Calculator", tools: [
+    { key:"bpowhatif", name:"What-If Calculator (Staffing)", render: renderTkBpoWhatIf },
+    { key:"npswhatif", name:"What-If Calculator (NPS)", render: renderTkNpsWhatIf },
+    { key:"attritionwhatif", name:"What-If Calculator (Attrition & Hiring)", render: renderTkAttritionWhatIf },
+  ]},
+  { label: "Automation", tools: [
+    { key:"automationscorer", name:"Automation Feasibility Scorer", render: renderTkAutomationScorer },
+    { key:"timemotionstudy", name:"Time & Motion Study", render: renderTkTimeMotionStudy },
+    { key:"sopbuilder", name:"Process Documentation (SOP Builder)", render: renderTkSopBuilder },
+    { key:"botroi", name:"Bot ROI / Business Case Calculator", render: renderTkBotRoi },
+  ]},
+  { label: "AI Tools", tools: [
+    { key:"genaiscorer", name:"GenAI Use Case Feasibility Scorer", render: renderTkGenAiScorer },
+    { key:"agenticscorer", name:"Agentic AI Readiness Scorer", render: renderTkAgenticScorer },
+  ]},
   { label: "Reporting", tools: [
     { key:"execsummary", name:"Executive Summary Builder", render: renderTkExecSummary },
     { key:"onepager", name:"One-Pager Builder", render: renderTkOnePager },
@@ -5996,6 +7498,99 @@ const TOOLKIT_CATS = [
     { key:"stagegate", name:"Stage-Gate Tracker", render: renderTkStageGate },
   ]},
 ];
+
+const TOOL_HELP = {
+  myExcelFiles: { purpose: "A personal, general-purpose list of spreadsheet links you use often — separate from any project.", howTo: "Click + Add Excel file and give it a title and URL (any link works, including SharePoint/OneDrive). Note and tags are optional, for your own organization and search.", calc: "No calculations — this is a bookmark list. Use the 🖥 Desktop button to try opening a file directly in Excel, or ✎/✕ to edit or remove entries." },
+  myLinks: { purpose: "A personal, general-purpose list of any links you use often — separate from any project.", howTo: "Click + Add link and fill in title, URL, optional note and tags.", calc: "No calculations. Open, Share, and Copy actions work on each link; Share uses your device's native share sheet if available, otherwise it copies the link." },
+  delegationSetup: { purpose: "Build your team roster once so you don't have to re-type names across every delegation and skill-mapping screen.", howTo: "Add each person's name. You can also paste a list of names at once, and back up or restore all delegation data as JSON.", calc: "No calculations — this is just a shared list used by Assign Tasks, Task Status, and Skill Mapping." },
+  delegationAssign: { purpose: "Assign a task to one person or your whole team at once, with a due date.", howTo: "Pick who it's for (or check 'assign to entire team' to create one copy per person), name the task, and set a due date.", calc: "No calculations — this creates task records that show up in Task Status." },
+  delegationStatus: { purpose: "See every delegated task across your team in one place: what's open, done, or overdue.", howTo: "Use the filter chips to narrow by person, task, or due date. Click a task to mark it complete.", calc: "Completion % = tasks marked done ÷ total tasks assigned to that person. The Export button downloads the currently filtered view as CSV." },
+
+  calc: { purpose: "A standard calculator for quick arithmetic without leaving the app.", howTo: "Click the number/operator buttons or type directly, then press =.", calc: "Operations are evaluated in the order you enter them (left to right), like a basic handheld calculator — not full mathematical order of operations." },
+  percent: { purpose: "Three common percentage questions in one tool: what % one number is of another, what number is X% of another, and percentage change.", howTo: "Pick the mode that matches your question, then fill in the two known numbers.", calc: "% of total = (part ÷ whole) × 100. % change = ((new − old) ÷ old) × 100." },
+  roi: { purpose: "Return on Investment and payback period for a straightforward one-time investment.", howTo: "Enter the investment cost, expected return, and the time period it's measured over.", calc: "ROI % = ((Return − Cost) ÷ Cost) × 100. Payback period = Cost ÷ (Return ÷ period)." },
+  breakeven: { purpose: "How many units you need to sell before covering your fixed costs.", howTo: "Enter fixed costs, price per unit, and variable cost per unit.", calc: "Breakeven units = Fixed Costs ÷ (Price − Variable Cost per unit)." },
+  meetingcost: { purpose: "Puts a real rupee figure on a meeting, based on attendee count, duration, and average salary — useful for questioning whether a meeting is worth it.", howTo: "Enter number of attendees, meeting length, and an average fully-loaded hourly cost.", calc: "Cost = Attendees × Hours × Hourly Rate." },
+  improvement: { purpose: "Compares a baseline to where you are now, and tracks progress toward a target — the general-purpose 'did this get better' calculator.", howTo: "Enter Baseline (before) and Current (after) values, pick whether lower or higher is better for this metric, and optionally a Target.", calc: "% Improvement = (Baseline − Current) ÷ Baseline × 100 (flipped if higher-is-better). Progress to target compares how far you've moved versus the full gap to the target." },
+  copq: { purpose: "Totals the real cost of defects, rework, and failures — a common number in an improvement project's business case.", howTo: "Enter rework, scrap, warranty/returns, and optionally complaint-handling and inspection costs.", calc: "Total COPQ = sum of all entered cost categories." },
+  effortimpact: { purpose: "A fast prioritization gut-check: rate ideas on Impact and Effort to spot quick wins versus time sinks.", howTo: "Add each idea, then rate Impact and Effort 1–5 using your own judgment.", calc: "Score = Impact ÷ Effort. Quadrant: Quick Win (high impact, low effort), Major Project (high/high), Fill-in (low/low), Thankless Task (low impact, high effort)." },
+  nps: { purpose: "Net Promoter Score — a standard customer loyalty metric.", howTo: "Either paste raw 0–10 survey scores (one per line or comma-separated), or enter Promoter/Passive/Detractor counts directly if you already have them.", calc: "Promoters = scores 9–10, Passives = 7–8, Detractors = 0–6. NPS = %Promoters − %Detractors." },
+  churnrate: { purpose: "How many customers you're losing over a period, plus how long an average customer sticks around at that rate.", howTo: "Enter customers at the start of the period and how many churned during it.", calc: "Churn % = Lost ÷ Start × 100. Retention % = 100 − Churn %. Avg lifetime = 100 ÷ Churn %, in your chosen period units." },
+
+  dpmo: { purpose: "Defects Per Million Opportunities — a core Six Sigma quality metric that normalizes defect rates for comparison.", howTo: "Enter units inspected, opportunities for a defect per unit, and defects actually found.", calc: "DPMO = (Defects ÷ (Units × Opportunities)) × 1,000,000. Yield = 1 − (Defects ÷ Total Opportunities)." },
+  sigmalevel: { purpose: "Converts a defect rate into an industry-standard Sigma level, so you can benchmark quality against common targets.", howTo: "Enter either DPMO directly, or a Yield % — the tool converts one to the other automatically.", calc: "Uses the inverse Normal distribution with the standard 1.5σ long-term shift: Sigma = invNorm(1 − DPMO/1,000,000) + 1.5." },
+  processcap: { purpose: "Tests whether a process can actually meet its specification limits — Cp assumes perfect centering, Cpk accounts for an off-center process.", howTo: "Enter the lower and upper spec limits, and the process's actual mean and standard deviation.", calc: "Cp = (USL−LSL)/(6σ). Cpk = min((USL−mean)/(3σ), (mean−LSL)/(3σ)). Cpk ≥1.33 is generally 'capable'." },
+  controlchart: { purpose: "Checks whether a process is stable over time (statistical control) or showing signs of a special-cause problem.", howTo: "Paste a series of sample measurements, one per line or comma-separated.", calc: "Center Line = mean. UCL/LCL = mean ± 3×standard deviation. Points outside the limits are flagged as out of control." },
+  samplesize: { purpose: "How many survey or study responses you need before trusting the result.", howTo: "Enter your desired confidence level and margin of error; population size and expected response split are optional refinements.", calc: "Uses the standard sample-size formula with a finite-population correction when population size is given." },
+  confinterval: { purpose: "The margin of error around a result you've already measured, so you know how much to trust it.", howTo: "Enter your sample size, the observed result (%), and confidence level.", calc: "Margin of Error = z × √(p(1−p)/n), where z depends on the confidence level chosen." },
+  pareto: { purpose: "The classic '80/20' chart — shows which few categories account for most of a total, so you know where to focus.", howTo: "Paste lines as 'Category: count' (or just 'Category count'), one per line.", calc: "Categories are sorted by count descending; the cumulative % line shows how many categories you'd need to address to cover 80% of the total." },
+  boxplot: { purpose: "Compares the spread and median of one or more groups side by side, flagging unusual outliers.", howTo: "Add a group, name it, and paste its values (comma or newline separated). Add more groups to compare.", calc: "Box = Q1 to Q3 (25th–75th percentile), line = median. Whiskers extend to the most extreme point within 1.5×IQR; anything beyond is plotted as an outlier." },
+  linregression: { purpose: "Finds the best-fit line through paired data, and tells you how well one variable predicts the other.", howTo: "Paste pairs as 'x, y', one pair per line.", calc: "Standard least-squares regression. R² shows the % of variation in Y explained by X; closer to 1 is a stronger relationship." },
+  weightedavg: { purpose: "An average where some values count more than others — different from a plain average.", howTo: "Add rows with a value and its weight (e.g. importance, sample size, number of votes).", calc: "Weighted Average = Σ(value×weight) ÷ Σ(weight). Compared against the plain unweighted average so you can see the effect of weighting." },
+
+  datecalc: { purpose: "Finds the number of days between two dates, or adds/subtracts days from a date.", howTo: "Pick the mode and fill in the date fields.", calc: "Simple calendar-day arithmetic." },
+  bizdays: { purpose: "Like Date Calculator, but skips weekends — useful for SLA or working-day deadlines.", howTo: "Enter a start date and number of business days to add, or two dates to find the business days between them.", calc: "Counts only Monday–Friday; does not account for public holidays." },
+  tzconvert: { purpose: "Converts a time from one time zone to several others at once — handy for scheduling across regions.", howTo: "Set the source time and zone; the result table shows the equivalent time in each listed zone.", calc: "Uses standard time zone offsets; does not currently prompt for daylight saving changes beyond what the browser's clock provides." },
+  worldclock: { purpose: "A live, ticking clock for multiple cities at once.", howTo: "Pin the cities you want to track; they update in real time.", calc: "No calculation — live local time per selected city." },
+  calendar: { purpose: "A simple one-month calendar view for quick reference.", howTo: "Use the arrows to move between months.", calc: "No calculation." },
+  countdown: { purpose: "Counts down to a specific date and time, live.", howTo: "Set the target date/time and an optional label.", calc: "Live countdown in days, hours, minutes, seconds." },
+
+  notepad: { purpose: "A simple scratchpad that auto-saves as you type — for quick notes you don't want to lose.", howTo: "Just start typing.", calc: "No calculation." },
+  randompick: { purpose: "Randomly picks one option from a list — for breaking ties or random assignment.", howTo: "Enter options one per line, then click Pick.", calc: "Uses a uniform random selection." },
+
+  decisionmatrix: { purpose: "Scores multiple options against several weighted criteria to reach an objective recommendation.", howTo: "Add your options and criteria, set a weight (importance) per criterion, then score each option 0–5 per criterion.", calc: "Weighted Score = Σ(score×weight) ÷ Σ(weight) per option. Options are ranked by this score." },
+  ricescore: { purpose: "RICE or ICE scoring — standard product-management frameworks for prioritizing initiatives.", howTo: "Pick RICE or ICE mode, add items, and fill in the relevant fields (Reach/Impact/Confidence/Effort, or Impact/Confidence/Ease).", calc: "RICE = (Reach × Impact × Confidence%) ÷ Effort. ICE = average of Impact, Confidence, Ease." },
+  eisenhower: { purpose: "Classic urgency-vs-importance sorting to decide what to do, schedule, delegate, or drop.", howTo: "Type one item per line into the matching quadrant.", calc: "No calculation — a sorting exercise." },
+  dotvote: { purpose: "A live group-voting tally for workshops — add options, let the room vote, see results instantly.", howTo: "Add options, then click +1 on an option each time someone votes for it.", calc: "No calculation — a running tally, sortable for export." },
+
+  skillMapping: { purpose: "Work in progress — not available yet.", howTo: "Check back later.", calc: "" },
+
+  bpowhatif: { purpose: "Models how changing key BPO staffing levers (volume, AHT, shrinkage, occupancy) affects required headcount and cost.", howTo: "Set your current baseline figures, then enter % or percentage-point changes in the 'what if' section to see the impact.", calc: "Required FTEs = (Volume × AHT ÷ 3600) ÷ (Shift Hours × Occupancy) ÷ (1 − Shrinkage). Cost = FTEs × Cost per FTE." },
+  npswhatif: { purpose: "Models what happens to your NPS if you shift customers between Promoter/Passive/Detractor groups.", howTo: "Enter your actual current counts, then enter how many customers you expect to move into/out of Promoters and Detractors.", calc: "NPS = (Promoters − Detractors) ÷ Total × 100, calculated for both your baseline and the what-if scenario." },
+  attritionwhatif: { purpose: "Projects headcount forward over time, and shows the impact of changing attrition rate or hiring pace.", howTo: "Enter current headcount, monthly attrition %, monthly hiring, and how many months to project. Then adjust the what-if levers.", calc: "Each month: headcount = headcount − (headcount × attrition%) + hiring. Repeated month over month for both scenarios." },
+
+  automationscorer: { purpose: "Scores candidate processes for RPA automation — separating what's technically feasible from what's actually worth doing.", howTo: "Each column is a process. Enter real volume/time data, then rate the Feasibility and Business Value criteria 1–5 each.", calc: "% Automatable = %Standardized × (1 − %Exception) — a real number from your inputs, not a guess. FTEs = Hours ÷ your Standard FTE Hours setting. Feasibility and Value are separate averages; the Priority Verdict combines both." },
+  timemotionstudy: { purpose: "Times a process step by step to find the standard cycle time, the bottleneck, and which steps are inconsistent or wasteful.", howTo: "Add each step, paste multiple stopwatch readings, set a performance rating and PFD allowance %, and tag each step VA/NVA/NVA-N.", calc: "Normal Time = Avg Observed × Rating%. Standard Time = Normal Time × (1+Allowance%). CV% = StdDev÷Avg (flags inconsistency above 25%). Process Cycle Efficiency = VA time ÷ total time." },
+  sopbuilder: { purpose: "Captures a clean 'as-is' process document — the standard first step before designing any automation.", howTo: "Fill in the process name, owner, trigger, steps (one per line), systems used, and known exceptions.", calc: "No calculation — generates a formatted document you can copy." },
+  botroi: { purpose: "A bot-specific ROI calculator that accounts for ongoing license and maintenance costs, which a generic ROI tool misses.", howTo: "Enter one-time build cost, annual license cost, annual maintenance % of build cost, and the hours/cost-per-hour the bot saves.", calc: "Monthly net = (Hours×Rate) − (License÷12) − (Build×Maintenance%÷12). Payback = first month cumulative cash flow turns positive. 3-year net = cumulative cash flow after 36 months." },
+
+  genaiscorer: { purpose: "Scores GenAI use cases on a different lens than RPA — GenAI thrives on unstructured data and judgment calls, which RPA explicitly avoids.", howTo: "Each column is a use case. Enter volume/time data and % content that's unstructured text, then rate the Feasibility and Value criteria 1–5.", calc: "Feasibility Score = average of Content Complexity, Hallucination Risk Tolerance, Data Privacy Safety, and Human-in-the-Loop Feasibility. Combined with Business Value for a Priority Verdict." },
+  agenticscorer: { purpose: "Scores whether a task is ready for an autonomous AI agent — a genuinely different question than GenAI content generation, since agents take multi-step actions.", howTo: "Each column is a task. Rate Task Decomposability, Tool/API Availability, Autonomy Risk Tolerance, Reasoning Complexity, and Error Recovery, 1–5 each.", calc: "Feasibility Score = average of the 5 agentic criteria. Combined with Business Value for a Priority Verdict." },
+
+  execsummary: { purpose: "Builds a clean, standard-format executive summary you can paste into an email or export as a slide.", howTo: "Fill in project name, period, status, objective, accomplishments, metrics, risks, and next steps.", calc: "No calculation — formats your input into a standard summary structure." },
+  onepager: { purpose: "A fast pitch format — Problem, Solution, Impact — for getting a quick decision or buy-in.", howTo: "Fill in each section with one point per line; they'll be bulleted automatically.", calc: "No calculation — generates formatted text and an exportable slide image." },
+
+  swot: { purpose: "Classic Strengths/Weaknesses/Opportunities/Threats analysis.", howTo: "Type one point per line into each quadrant.", calc: "No calculation." },
+  raci: { purpose: "Clarifies who is Responsible, Accountable, Consulted, or Informed for each task — removes ambiguity on a project.", howTo: "Add tasks and people, then click a cell to cycle through R / A / C / I.", calc: "No calculation — a responsibility-assignment grid." },
+  stagegate: { purpose: "Tracks which phase each initiative is in, from idea through to business-as-usual.", howTo: "Add an initiative and set its current stage from the dropdown.", calc: "No calculation — a simple stage counter and tracker." }
+};
+
+function getToolDisplayName(key){
+  for(const cat of TOOLKIT_CATS){
+    const found = cat.tools.find(t => t.key === key);
+    if(found) return found.name;
+  }
+  return "This tool";
+}
+
+function showToolHelp(key){
+  const name = getToolDisplayName(key);
+  const help = TOOL_HELP[key];
+  if(!help){
+    openModal(`<h3>❔ ${escapeHtml(name)}</h3><div style="font-size:13px;color:var(--text-dim);">No help written for this tool yet.</div><div class="modal-actions"><button class="primary" id="tkHelpClose">Close</button></div>`,
+      (root) => { root.querySelector("#tkHelpClose").addEventListener("click", closeModal); });
+    return;
+  }
+  openModal(`
+    <h3>❔ ${escapeHtml(name)}</h3>
+    <div style="font-size:13px;color:var(--text);line-height:1.6;max-height:55vh;overflow-y:auto;">
+      <div style="margin-bottom:12px;"><b style="color:var(--accent);">Purpose</b><br>${escapeHtml(help.purpose)}</div>
+      <div style="margin-bottom:12px;"><b style="color:var(--accent);">How to fill it in</b><br>${escapeHtml(help.howTo)}</div>
+      ${help.calc ? `<div><b style="color:var(--accent);">Calculations</b><br>${escapeHtml(help.calc)}</div>` : ""}
+    </div>
+    <div class="modal-actions"><button class="primary" id="tkHelpClose">Got it</button></div>
+  `, (root) => { root.querySelector("#tkHelpClose").addEventListener("click", closeModal); });
+}
 
 let tkActiveTool = "calc";
 let tkActiveInterval = null;
@@ -6084,6 +7679,14 @@ function closeToolkit(){
 }
 document.getElementById("toolkitBtn").addEventListener("click", openToolkit);
 document.getElementById("toolkitClose").addEventListener("click", closeToolkit);
+document.getElementById("toolkitHelp").addEventListener("click", () => showToolHelp(tkActiveTool));
+document.getElementById("toolkitMaximize").addEventListener("click", () => {
+  const panel = document.getElementById("toolkitPanel");
+  const btn = document.getElementById("toolkitMaximize");
+  const isMax = panel.classList.toggle("maximized");
+  btn.textContent = isMax ? "⛶" : "⛶";
+  btn.title = isMax ? "Restore" : "Maximize";
+});
 document.getElementById("toolkitOverlay").addEventListener("click", (e) => {
   if(e.target.id === "toolkitOverlay") closeToolkit();
 });
