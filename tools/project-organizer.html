@@ -91,7 +91,17 @@ header .sub{
   line-height:1;
   flex-shrink:0;
 }
-.link-file-status{font-size:11.5px;color:var(--text-dim);white-space:nowrap;}
+.icon-btn.unsaved-pulse{
+  animation:iconUnsavedPulse 1s ease-in-out infinite;
+  border-color:#e0a83c;
+  background:rgba(224,168,60,.22);
+}
+@keyframes iconUnsavedPulse{
+  0%,100%{opacity:1;transform:scale(1);}
+  50%{opacity:.55;transform:scale(1.18);}
+}
+.link-file-status{font-size:11px;color:var(--text-dim);line-height:1.3;display:flex;flex-direction:column;cursor:default;}
+.link-file-status b{color:var(--text);font-weight:600;}
 button{
   font-family:inherit;
   font-size:13px;
@@ -654,7 +664,7 @@ input[type=file]{display:none;}
 }
 .splash-screen{
   position:fixed;inset:0;
-  background:var(--bg);
+  background:#05050a;
   display:flex;align-items:center;justify-content:center;
   z-index:1000;
   overflow:hidden;
@@ -665,64 +675,94 @@ input[type=file]{display:none;}
   position:absolute;
   width:480px;height:480px;
   border-radius:50%;
-  background:radial-gradient(circle, var(--accent-soft) 0%, transparent 70%);
+  background:radial-gradient(circle, rgba(120,150,255,.18) 0%, transparent 70%);
   opacity:0;
-  animation:splashGlow 2.2s ease-in-out .1s infinite;
+  animation:splashGlow 2.6s ease-in-out .1s infinite;
 }
 .splash-screen.hide{opacity:0;transform:scale(1.06);filter:blur(6px);pointer-events:none;}
-.splash-content{text-align:center;position:relative;z-index:1;}
+.splash-bg-art{position:absolute;inset:0;z-index:0;width:100%;height:100%;pointer-events:none;}
+.splash-net-nodes circle{animation:splashNodePulse 3.5s ease-in-out infinite;}
+.splash-net-nodes circle:nth-child(2n){animation-delay:.6s;}
+.splash-net-nodes circle:nth-child(3n){animation-delay:1.2s;}
+.splash-net-nodes circle:nth-child(4n){animation-delay:1.8s;}
+@keyframes splashNodePulse{
+  0%,100%{opacity:.5;}
+  50%{opacity:1;}
+}
+.splash-bg-icons{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;}
+.splash-bg-icons span{
+  position:absolute;
+  color:rgba(255,255,255,.08);
+  filter:grayscale(1) brightness(1.6);
+  animation:splashIconDrift 12s ease-in-out infinite;
+}
+.splash-bg-icons span:nth-child(2n){animation-duration:15s;animation-direction:reverse;}
+.splash-bg-icons span:nth-child(3n){animation-duration:18s;}
+@keyframes splashIconDrift{
+  0%,100%{transform:translate(0,0) rotate(0deg);}
+  50%{transform:translate(10px,-14px) rotate(4deg);}
+}
+.splash-content{text-align:center;position:relative;z-index:1;padding:20px;opacity:0;}
+.splash-content.show{opacity:1;animation:splashContentIn .6s ease-out forwards;}
 .splash-title{
-  font-size:21px;font-weight:700;letter-spacing:-0.01em;color:var(--text);
-  margin-bottom:6px;
-  opacity:0;
-  animation:splashRise .55s ease-out .1s forwards;
+  font-size:23px;font-weight:700;letter-spacing:-0.01em;color:#fff;
+  margin-bottom:8px;
 }
 .splash-tagline{
-  font-size:13px;color:var(--text-dim);
-  margin-bottom:16px;
-  opacity:0;
-  animation:splashRise .55s ease-out .28s forwards;
+  font-size:13.5px;color:rgba(255,255,255,.65);
+  margin-bottom:20px;
 }
-.splash-dots{display:flex;gap:5px;justify-content:center;opacity:0;animation:splashRise .5s ease-out .48s forwards;}
-.splash-dots span{
-  width:6px;height:6px;border-radius:50%;
+.splash-features{
+  display:flex;gap:22px;justify-content:center;flex-wrap:wrap;
+  margin-bottom:26px;
+  font-size:11.5px;color:rgba(255,255,255,.55);
+}
+.splash-features span{display:block;}
+.splash-features b{display:block;color:rgba(255,255,255,.9);font-size:13px;margin-bottom:2px;}
+.splash-proceed-btn{
   background:var(--accent);
-  animation:dotBounce 1.1s ease-in-out infinite;
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  padding:11px 32px;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  font-family:inherit;
 }
-.splash-dots span:nth-child(2){animation-delay:.15s;}
-.splash-dots span:nth-child(3){animation-delay:.3s;}
+.splash-proceed-btn:hover{opacity:.9;}
 
-@keyframes splashRise{
-  from{opacity:0;transform:translateY(10px);}
+@keyframes splashContentIn{
+  from{opacity:0;transform:translateY(12px);}
   to{opacity:1;transform:translateY(0);}
 }
 @keyframes splashGlow{
   0%,100%{opacity:.25;transform:scale(.9);}
   50%{opacity:.5;transform:scale(1.05);}
 }
-@keyframes dotBounce{
-  0%,80%,100%{transform:translateY(0);opacity:.4;}
-  40%{transform:translateY(-6px);opacity:1;}
-}
+
 .splash-butterfly-fly{
   position:absolute;
-  left:8%;
-  top:65%;
+  left:0;top:0;
   z-index:5;
-  animation:butterflyFly 2.2s ease-in-out forwards;
+  animation:butterflyWander 9s ease-in-out infinite;
 }
 .splash-butterfly{
-  font-size:36px;
+  font-size:34px;
   line-height:1;
   display:inline-block;
   animation:butterflyFlutter .5s ease-in-out infinite;
 }
-@keyframes butterflyFly{
-  0%{transform:translate(0,0) rotate(0deg) scale(.9);}
-  25%{transform:translate(18vw,-14vh) rotate(6deg) scale(.95);}
-  50%{transform:translate(38vw,-22vh) rotate(-6deg) scale(1);}
-  75%{transform:translate(58vw,-38vh) rotate(5deg) scale(1.05);}
-  100%{transform:translate(78vw,-50vh) rotate(-4deg) scale(1.1);}
+@keyframes butterflyWander{
+  0%   {transform:translate(10vw,70vh) rotate(0deg) scale(.9);}
+  12%  {transform:translate(28vw,30vh) rotate(8deg) scale(1);}
+  25%  {transform:translate(55vw,55vh) rotate(-6deg) scale(1.05);}
+  38%  {transform:translate(75vw,20vh) rotate(10deg) scale(.95);}
+  50%  {transform:translate(60vw,75vh) rotate(-8deg) scale(1);}
+  63%  {transform:translate(35vw,60vh) rotate(6deg) scale(1.05);}
+  75%  {transform:translate(15vw,25vh) rotate(-10deg) scale(.95);}
+  88%  {transform:translate(45vw,15vh) rotate(5deg) scale(1);}
+  100% {transform:translate(10vw,70vh) rotate(0deg) scale(.9);}
 }
 @keyframes butterflyFlutter{
   0%,100%{transform:scaleX(1) rotate(0deg);}
@@ -730,9 +770,8 @@ input[type=file]{display:none;}
 }
 @media (prefers-reduced-motion: reduce){
   .splash-screen::before{animation:none;opacity:.3;}
-  .splash-title,.splash-tagline,.splash-dots{animation:none;opacity:1;}
-  .splash-dots span{animation:none;opacity:1;}
-  .splash-butterfly-fly{display:none;}
+  .splash-content{opacity:1;}
+  .splash-content.show{animation:none;}
 }
 /* ---- Toolkit ---- */
 .toolkit-overlay{
@@ -828,6 +867,14 @@ input[type=file]{display:none;}
   flex-shrink:0;
 }
 .toolkit-header h3{margin:0;font-size:15px;}
+.toolkit-search-row{padding:10px 20px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.toolkit-search-row input{
+  width:100%;padding:8px 12px;border-radius:8px;
+  border:1px solid var(--border);background:var(--panel-2);color:var(--text);
+  font-size:13px;font-family:inherit;
+}
+.toolkit-search-row input:focus{border-color:var(--accent);outline:none;}
+.toolkit-nav-empty{font-size:12px;color:var(--text-dim);padding:12px 8px;}
 .toolkit-body{flex:1;display:flex;min-height:0;overflow:hidden;}
 .toolkit-nav{
   width:230px;flex-shrink:0;
@@ -984,15 +1031,93 @@ input[type=file]{display:none;}
 .tk-countdown-unit{text-align:center;}
 .tk-countdown-num{font-size:28px;font-weight:700;color:var(--accent);}
 .tk-countdown-label{font-size:10.5px;color:var(--text-dim);text-transform:uppercase;}
+.password-gate{
+  position:fixed;inset:0;
+  background:var(--bg);
+  z-index:2000;
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+}
+.password-gate-box{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:32px 28px;
+  width:100%;max-width:340px;
+  text-align:center;
+}
+.password-gate-icon{font-size:34px;margin-bottom:10px;}
+.password-gate-box h2{font-size:15px;margin:0 0 6px;}
+.password-gate-box p{font-size:12.5px;color:var(--text-dim);margin:0 0 16px;}
+.password-gate-box input{
+  width:100%;padding:10px 12px;border-radius:8px;
+  border:1px solid var(--border);background:var(--panel-2);color:var(--text);
+  font-size:14px;text-align:center;font-family:inherit;
+}
+.password-gate-box input:focus{border-color:var(--accent);outline:none;}
+#pgError{font-size:12px;color:var(--danger);margin-top:10px;min-height:16px;}
 </style>
 </head>
 <body>
 
-<div id="splashScreen" class="splash-screen">
-  <div class="splash-content">
+<div id="passwordGate" class="password-gate">
+  <div class="password-gate-box">
+    <div class="password-gate-icon">🔒</div>
+    <h2>India Innovation - Organizer and Tool Kit</h2>
+    <p>Enter the password to continue.</p>
+    <input type="password" id="pgInput" placeholder="Password" autocomplete="off">
+    <button class="primary" id="pgSubmit" style="width:100%;margin-top:10px;">Unlock</button>
+    <div id="pgError"></div>
+  </div>
+</div>
+
+<div id="splashScreen" class="splash-screen" style="display:none;">
+  <svg class="splash-bg-art" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <g class="splash-net-lines" stroke="rgba(120,150,255,.16)" stroke-width="1.2" fill="none">
+      <line x1="120" y1="120" x2="320" y2="220"/>
+      <line x1="320" y1="220" x2="560" y2="140"/>
+      <line x1="560" y1="140" x2="820" y2="230"/>
+      <line x1="820" y1="230" x2="1060" y2="150"/>
+      <line x1="320" y1="220" x2="380" y2="420"/>
+      <line x1="380" y1="420" x2="620" y2="480"/>
+      <line x1="620" y1="480" x2="880" y2="410"/>
+      <line x1="880" y1="410" x2="820" y2="230"/>
+      <line x1="150" y1="470" x2="380" y2="420"/>
+      <line x1="880" y1="410" x2="1080" y2="500"/>
+      <line x1="560" y1="140" x2="620" y2="480"/>
+    </g>
+    <g class="splash-net-nodes" fill="rgba(150,175,255,.22)">
+      <circle cx="120" cy="120" r="5"/>
+      <circle cx="320" cy="220" r="6"/>
+      <circle cx="560" cy="140" r="4.5"/>
+      <circle cx="820" cy="230" r="6"/>
+      <circle cx="1060" cy="150" r="5"/>
+      <circle cx="380" cy="420" r="5.5"/>
+      <circle cx="620" cy="480" r="6"/>
+      <circle cx="880" cy="410" r="5"/>
+      <circle cx="150" cy="470" r="4.5"/>
+      <circle cx="1080" cy="500" r="5"/>
+    </g>
+  </svg>
+  <div class="splash-bg-icons">
+    <span style="top:12%;left:8%;font-size:52px;">🔗</span>
+    <span style="top:22%;left:78%;font-size:44px;">📊</span>
+    <span style="top:68%;left:14%;font-size:48px;">✅</span>
+    <span style="top:78%;left:82%;font-size:56px;">🧮</span>
+    <span style="top:45%;left:4%;font-size:40px;">📁</span>
+    <span style="top:8%;left:52%;font-size:38px;">👥</span>
+    <span style="top:85%;left:45%;font-size:42px;">🗓️</span>
+    <span style="top:35%;left:88%;font-size:36px;">📌</span>
+  </div>
+  <div class="splash-content" id="splashContent">
     <div class="splash-title">India Innovation - Organizer and Tool Kit</div>
     <div class="splash-tagline">One place for every project, task, and idea.</div>
-    <div class="splash-dots"><span></span><span></span><span></span></div>
+    <div class="splash-features">
+      <span><b>Organize</b>links &amp; files by project</span>
+      <span><b>Delegate</b>assign &amp; track team tasks</span>
+      <span><b>Equip</b>calculators &amp; quick tools</span>
+    </div>
+    <button class="splash-proceed-btn" id="splashProceedBtn">Proceed</button>
   </div>
   <div class="splash-butterfly-fly"><div class="splash-butterfly">🦋</div></div>
 </div>
@@ -1096,6 +1221,9 @@ input[type=file]{display:none;}
       <h3>🧰 Toolkit</h3>
       <button id="toolkitClose" class="icon-btn" title="Close">✕</button>
     </div>
+    <div class="toolkit-search-row">
+      <input type="text" id="toolkitSearch" placeholder="Search tools...">
+    </div>
     <div class="toolkit-body">
       <div class="toolkit-nav" id="toolkitNav"></div>
       <div class="toolkit-content" id="toolkitContent"></div>
@@ -1104,6 +1232,40 @@ input[type=file]{display:none;}
 </div>
 
 <script>
+// ---- Password gate ----
+// NOTE: this is a client-side-only speed bump, not real security — anyone
+// viewing this file's source can read APP_PASSWORD. Don't rely on it to
+// protect sensitive data.
+const APP_PASSWORD = "innovation2026";
+const GATE_SESSION_KEY = "project-link-organizer-unlocked";
+(function initPasswordGate(){
+  const gate = document.getElementById("passwordGate");
+  const input = document.getElementById("pgInput");
+  const error = document.getElementById("pgError");
+  const submit = document.getElementById("pgSubmit");
+  let unlocked = false;
+  try{ unlocked = sessionStorage.getItem(GATE_SESSION_KEY) === "1"; }catch(e){}
+  if(unlocked){
+    gate.style.display = "none";
+    playSplashSequence();
+  }else{
+    input.focus();
+  }
+  function tryUnlock(){
+    if(input.value === APP_PASSWORD){
+      try{ sessionStorage.setItem(GATE_SESSION_KEY, "1"); }catch(e){}
+      gate.style.display = "none";
+      playSplashSequence();
+    }else{
+      error.textContent = "Incorrect password. Try again.";
+      input.value = "";
+      input.focus();
+    }
+  }
+  submit.addEventListener("click", tryUnlock);
+  input.addEventListener("keydown", (e) => { if(e.key === "Enter") tryUnlock(); });
+})();
+
 const TYPE_META = {
   ppt:   { label: "PPT / Slides",  color: "var(--ppt-color)" },
   pdf:   { label: "PDF",           color: "var(--pdf-color)" },
@@ -1214,20 +1376,35 @@ async function idbClearHandle(){
   }catch(e){ /* ignore */ }
 }
 
+let linkedFileLastSaved = null;
+
 function updateLinkFileStatus(needsReconnect){
   const el = document.getElementById("linkFileStatus");
   const btn = document.getElementById("linkFileBtn");
   if(!el || !btn) return;
+  const shouldPulse = !!linkedFileHandle && (needsReconnect || linkedFileWritePending);
+  btn.classList.toggle("unsaved-pulse", shouldPulse);
   if(!linkedFileHandle){
-    el.textContent = "";
+    el.innerHTML = "";
+    el.title = "";
     btn.textContent = "💾";
     btn.title = "Save to file: auto-save changes to a local file";
   }else if(needsReconnect){
-    el.textContent = `⚠ click to reconnect "${linkedFileName}"`;
+    el.innerHTML = `<b>⚠ ${escapeHtml(linkedFileName)}</b><span>Click 💾 to reconnect</span>`;
+    el.title = `${linkedFileName} — for security, browsers don't expose the full folder path here; only the file name is available.`;
     btn.textContent = "⚠️";
-    btn.title = `Reconnect "${linkedFileName}" to resume auto-save`;
+    btn.title = `Reconnect "${linkedFileName}" to resume auto-save — you have unsaved changes`;
+  }else if(linkedFileWritePending){
+    el.innerHTML = `<b>${escapeHtml(linkedFileName)}</b><span>Saving...</span>`;
+    el.title = `${linkedFileName} — saving now`;
+    btn.textContent = "💾";
+    btn.title = "Saving now...";
   }else{
-    el.textContent = `✓ auto-saving to ${linkedFileName}`;
+    const timeLabel = linkedFileLastSaved
+      ? linkedFileLastSaved.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+      : "—";
+    el.innerHTML = `<b>${escapeHtml(linkedFileName)}</b><span>Saved Time : ${escapeHtml(timeLabel)}</span>`;
+    el.title = `${linkedFileName} — for security, browsers don't expose the full folder path here; only the file name is available.`;
     btn.textContent = "💾";
     btn.title = `Linked to "${linkedFileName}" — click to manage`;
   }
@@ -1239,15 +1416,26 @@ async function writeToLinkedFile(){
     const perm = await linkedFileHandle.queryPermission({ mode: "readwrite" });
     if(perm !== "granted"){ updateLinkFileStatus(true); return; }
     linkedFileWritePending = true;
+    updateLinkFileStatus(false);
     const writable = await linkedFileHandle.createWritable();
     await writable.write(JSON.stringify(buildFullExport(), null, 2));
     await writable.close();
     linkedFileWritePending = false;
+    linkedFileLastSaved = new Date();
     updateLinkFileStatus(false);
   }catch(e){
     linkedFileWritePending = false;
     console.error("Auto-save to linked file failed:", e);
+    updateLinkFileStatus(false);
   }
+}
+
+const LINKED_FILENAME_KEY = "project-link-organizer-linked-filename";
+function rememberLinkedFilename(name){
+  try{ localStorage.setItem(LINKED_FILENAME_KEY, name); }catch(e){}
+}
+function getRememberedLinkedFilename(){
+  try{ return localStorage.getItem(LINKED_FILENAME_KEY) || ""; }catch(e){ return ""; }
 }
 
 async function connectLinkedFile(){
@@ -1255,15 +1443,70 @@ async function connectLinkedFile(){
     alert("Saving directly to a file needs Chrome or Edge on desktop. You can still use Export JSON to download a copy.");
     return;
   }
+  const rememberedName = getRememberedLinkedFilename();
+  if(rememberedName){
+    openModal(`
+      <h3>Reconnect your file</h3>
+      <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">
+        You were previously saving to <b>${escapeHtml(rememberedName)}</b>. Select that same file to keep using it — creating a new one will start a separate copy, disconnected from your existing data.
+      </div>
+      <div class="modal-actions">
+        <button id="lfReconnectExisting">Select existing file...</button>
+        <button class="danger" id="lfCreateNew" style="background:var(--danger);color:#fff;border-color:var(--danger);">Create a new file instead</button>
+      </div>
+    `, (root) => {
+      root.querySelector("#lfReconnectExisting").addEventListener("click", async () => {
+        closeModal();
+        try{
+          const [handle] = await window.showOpenFilePicker({
+            types: [{ description: "JSON", accept: { "application/json": [".json"] } }],
+            multiple: false
+          });
+          const perm = await handle.requestPermission({ mode: "readwrite" });
+          if(perm !== "granted") return;
+          linkedFileHandle = handle;
+          linkedFileName = handle.name;
+          rememberLinkedFilename(handle.name);
+          await idbSetHandle(handle);
+          await writeToLinkedFile();
+        }catch(e){ if(e.name !== "AbortError") console.error(e); }
+      });
+      root.querySelector("#lfCreateNew").addEventListener("click", async () => {
+        closeModal();
+        await createNewLinkedFile();
+      });
+    });
+    return;
+  }
+  await createNewLinkedFile();
+}
+
+async function createNewLinkedFile(){
   try{
     const handle = await window.showSaveFilePicker({
-      suggestedName: "project-links.json",
+      suggestedName: "config.json",
       types: [{ description: "JSON", accept: { "application/json": [".json"] } }]
     });
     linkedFileHandle = handle;
     linkedFileName = handle.name;
+    rememberLinkedFilename(handle.name);
     await idbSetHandle(handle);
     await writeToLinkedFile();
+    openModal(`
+      <h3>✓ Linked to ${escapeHtml(handle.name)}</h3>
+      <div style="font-size:13px;color:var(--text-dim);line-height:1.5;">
+        This is now your file. From here on:
+        <ul style="margin:8px 0 8px 18px;padding:0;">
+          <li>Every change you make saves here automatically — no further prompts.</li>
+          <li>If you ever need to reconnect (new browser, or after clearing data), select this same ${escapeHtml(handle.name)} file — don't create a new one.</li>
+          <li>You can also use <b>Import JSON</b> at any time to load this exact file's contents into a fresh session.</li>
+        </ul>
+        Browsers don't show the full folder path here for security reasons — just remember where you saved it.
+      </div>
+      <div class="modal-actions"><button class="primary" id="lfFirstSaveOk">Got it</button></div>
+    `, (root) => {
+      root.querySelector("#lfFirstSaveOk").addEventListener("click", closeModal);
+    });
   }catch(e){
     if(e.name !== "AbortError") console.error(e);
   }
@@ -1276,6 +1519,7 @@ async function tryRestoreLinkedFile(){
     if(!handle) return;
     linkedFileHandle = handle;
     linkedFileName = handle.name;
+    rememberLinkedFilename(handle.name);
     const perm = await handle.queryPermission({ mode: "readwrite" });
     updateLinkFileStatus(perm !== "granted");
   }catch(e){ /* ignore */ }
@@ -2507,13 +2751,21 @@ document.getElementById("linkFileBtn").addEventListener("click", async () => {
   openModal(`
     <h3>Linked file</h3>
     <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px;">Every change is being auto-saved to <b>${escapeHtml(linkedFileName)}</b>.</div>
+    <div id="lfManualSaveMsg" style="font-size:12px;color:var(--video-color);margin-bottom:6px;min-height:16px;"></div>
     <div class="modal-actions">
       <button class="danger" id="lfDisconnect" style="background:var(--danger);color:#fff;border-color:var(--danger);">Stop syncing</button>
       <button id="lfCancel">Close</button>
-      <button class="primary" id="lfChange">Choose different file</button>
+      <button id="lfChange">Choose different file</button>
+      <button class="primary" id="lfSaveNow">Save now</button>
     </div>
   `, (root) => {
     root.querySelector("#lfCancel").addEventListener("click", closeModal);
+    root.querySelector("#lfSaveNow").addEventListener("click", async () => {
+      const msg = root.querySelector("#lfManualSaveMsg");
+      msg.textContent = "Saving...";
+      await writeToLinkedFile();
+      msg.textContent = `✓ Saved at ${new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+    });
     root.querySelector("#lfDisconnect").addEventListener("click", async () => {
       linkedFileHandle = null; linkedFileName = null;
       await idbClearHandle();
@@ -2551,9 +2803,16 @@ document.getElementById("themeToggleBtn").addEventListener("click", () => {
 })();
 
 window.addEventListener("beforeunload", (e) => {
-  if(linkedFileWritePending){
+  const needsReconnect = document.getElementById("linkFileBtn")?.textContent === "⚠️";
+  if(linkedFileWritePending || needsReconnect){
     e.preventDefault();
-    e.returnValue = "";
+    e.returnValue = "Your changes may not be fully saved to the linked file yet. Leave anyway?";
+    return e.returnValue;
+  }
+});
+window.addEventListener("pagehide", () => {
+  if(linkedFileHandle && !linkedFileWritePending){
+    writeToLinkedFile();
   }
 });
 
@@ -2567,6 +2826,7 @@ function tkLoad(){
 }
 function tkSave(){
   try{ localStorage.setItem(TK_STORAGE_KEY, JSON.stringify(tkState)); }catch(e){}
+  writeToLinkedFile();
 }
 
 // ---- Calculators ----
@@ -2707,6 +2967,1323 @@ function renderTkMeetingCost(container){
     result.textContent = "$"+(cv*rv*(dv/60)).toLocaleString(undefined,{maximumFractionDigits:0});
   };
   [c,r,d].forEach(el=>el.addEventListener("input",upd));
+}
+
+function renderTkImprovement(container){
+  container.innerHTML = `
+    <h4>Improvement Calculator</h4>
+    <p class="tk-sub">Compare a baseline to where you are now, and track progress toward a target.</p>
+    <div class="tk-row">
+      <div class="tk-field"><label>Metric name (optional)</label><input type="text" id="tkImpMetric" placeholder="e.g. Cycle time (days)"></div>
+      <div class="tk-field"><label>Improvement direction</label>
+        <select id="tkImpDir">
+          <option value="lower">Lower is better (e.g. cost, defects, time)</option>
+          <option value="higher">Higher is better (e.g. revenue, CSAT, volume)</option>
+        </select>
+      </div>
+    </div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Baseline (before)</label><input type="number" id="tkImpBaseline" placeholder="100"></div>
+      <div class="tk-field"><label>Current (after)</label><input type="number" id="tkImpCurrent" placeholder="70"></div>
+      <div class="tk-field"><label>Target (optional)</label><input type="number" id="tkImpTarget" placeholder="50"></div>
+    </div>
+    <div class="tk-result">
+      <div class="tk-result-big" id="tkImpResult">—</div>
+      <div class="tk-result-label" id="tkImpSub">Improvement</div>
+    </div>
+    <div class="tk-result" style="margin-top:12px;" id="tkImpTargetBlock">
+      <div class="tk-result-big" id="tkImpTargetResult">—</div>
+      <div class="tk-result-label" id="tkImpTargetSub">Progress to target</div>
+    </div>
+  `;
+  const metricI = container.querySelector("#tkImpMetric");
+  const dirI = container.querySelector("#tkImpDir");
+  const baseI = container.querySelector("#tkImpBaseline");
+  const curI = container.querySelector("#tkImpCurrent");
+  const tgtI = container.querySelector("#tkImpTarget");
+  const result = container.querySelector("#tkImpResult");
+  const sub = container.querySelector("#tkImpSub");
+  const targetResult = container.querySelector("#tkImpTargetResult");
+  const targetSub = container.querySelector("#tkImpTargetSub");
+  const targetBlock = container.querySelector("#tkImpTargetBlock");
+
+  const upd = () => {
+    const metric = metricI.value.trim() || "the metric";
+    const lowerBetter = dirI.value === "lower";
+    const base = parseFloat(baseI.value);
+    const cur = parseFloat(curI.value);
+    const tgt = parseFloat(tgtI.value);
+
+    if(isNaN(base) || isNaN(cur) || base === 0){
+      result.textContent = "—"; sub.textContent = "Improvement";
+      targetBlock.style.display = "none";
+      return;
+    }
+
+    const change = lowerBetter ? (base - cur) : (cur - base);
+    const pct = (change / Math.abs(base)) * 100;
+    const improved = change > 0;
+    result.textContent = (improved ? "▲ " : change < 0 ? "▼ " : "") + Math.abs(pct).toFixed(1) + "%";
+    result.style.color = improved ? "var(--video-color)" : (change < 0 ? "var(--danger)" : "var(--text)");
+    sub.textContent = `${improved ? "Improvement" : change < 0 ? "Decline" : "No change"} in ${escapeHtml(metric)} (${change >= 0 ? "+" : ""}${change.toLocaleString(undefined,{maximumFractionDigits:2})} absolute)`;
+
+    if(isNaN(tgt) || tgt === base){
+      targetBlock.style.display = "none";
+    }else{
+      targetBlock.style.display = "";
+      const totalNeeded = lowerBetter ? (base - tgt) : (tgt - base);
+      const achieved = lowerBetter ? (base - cur) : (cur - base);
+      const pctOfTarget = totalNeeded !== 0 ? (achieved / totalNeeded) * 100 : 0;
+      targetResult.textContent = pctOfTarget.toFixed(0) + "%";
+      targetResult.style.color = pctOfTarget >= 100 ? "var(--video-color)" : "var(--text)";
+      const remaining = lowerBetter ? (cur - tgt) : (tgt - cur);
+      targetSub.textContent = pctOfTarget >= 100
+        ? `Target reached or exceeded for ${escapeHtml(metric)}`
+        : `Progress toward target — ${Math.abs(remaining).toLocaleString(undefined,{maximumFractionDigits:2})} more to go`;
+    }
+  };
+  [metricI, dirI, baseI, curI, tgtI].forEach(el => el.addEventListener("input", upd));
+  dirI.addEventListener("change", upd);
+  upd();
+}
+
+function renderTkDpmo(container){
+  container.innerHTML = `
+    <h4>DPMO Calculator</h4>
+    <p class="tk-sub">Defects Per Million Opportunities — a core Six Sigma quality metric.</p>
+    <div class="tk-row">
+      <div class="tk-field"><label>Units inspected</label><input type="number" id="tkDpmoUnits" placeholder="500"></div>
+      <div class="tk-field"><label>Opportunities per unit</label><input type="number" id="tkDpmoOpp" placeholder="4"></div>
+      <div class="tk-field"><label>Defects found</label><input type="number" id="tkDpmoDefects" placeholder="18"></div>
+    </div>
+    <div class="tk-result"><div class="tk-result-big" id="tkDpmoResult">—</div><div class="tk-result-label">DPMO</div></div>
+    <div class="tk-result" style="margin-top:12px;"><div class="tk-result-big" id="tkDpmoYield">—</div><div class="tk-result-label">Estimated first-pass yield</div></div>
+    <div id="tkDpmoInference" style="font-size:12.5px;color:var(--text-dim);margin-top:12px;"></div>
+  `;
+  const u = container.querySelector("#tkDpmoUnits"), o = container.querySelector("#tkDpmoOpp"), d = container.querySelector("#tkDpmoDefects");
+  const result = container.querySelector("#tkDpmoResult"), yieldEl = container.querySelector("#tkDpmoYield");
+  const inference = container.querySelector("#tkDpmoInference");
+  const upd = () => {
+    const uv = parseFloat(u.value), ov = parseFloat(o.value), dv = parseFloat(d.value);
+    if(isNaN(uv) || isNaN(ov) || isNaN(dv) || uv*ov === 0){ result.textContent = "—"; yieldEl.textContent = "—"; inference.textContent = ""; return; }
+    const totalOpp = uv * ov;
+    const dpmo = (dv / totalOpp) * 1000000;
+    const dpo = dv / totalOpp;
+    result.textContent = Math.round(dpmo).toLocaleString();
+    yieldEl.textContent = (Math.max(0, 1 - dpo) * 100).toFixed(2) + "%";
+    let verdict, color;
+    if(dpmo <= 3.4){ verdict = "Six Sigma level — exceptional quality performance."; color = "var(--video-color)"; }
+    else if(dpmo <= 233){ verdict = "Excellent quality performance, in the 5 Sigma range."; color = "var(--video-color)"; }
+    else if(dpmo <= 6210){ verdict = "Good, industry-competitive performance, in the 4 Sigma range."; color = "var(--video-color)"; }
+    else if(dpmo <= 66807){ verdict = "Average performance for many industries (3 Sigma range) — meaningful room to improve."; color = "var(--ppt-color)"; }
+    else if(dpmo <= 308537){ verdict = "Below average (2 Sigma range) — this is a strong candidate for an improvement project."; color = "var(--ppt-color)"; }
+    else { verdict = "Poor quality performance — this process needs urgent attention."; color = "var(--danger)"; }
+    inference.innerHTML = `<b style="color:${color};">Inference:</b> ${verdict}`;
+  };
+  [u,o,d].forEach(el => el.addEventListener("input", upd));
+}
+
+function invNormalCDF(p){
+  // Peter Acklam's algorithm for the inverse of the standard normal CDF
+  if(p <= 0) return -Infinity;
+  if(p >= 1) return Infinity;
+  const a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+  const b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+  const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+  const dd = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+  const plow = 0.02425, phigh = 1 - plow;
+  let q, r;
+  if(p < plow){
+    q = Math.sqrt(-2*Math.log(p));
+    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((dd[0]*q+dd[1])*q+dd[2])*q+dd[3])*q+1);
+  }else if(p <= phigh){
+    q = p - 0.5; r = q*q;
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+  }else{
+    q = Math.sqrt(-2*Math.log(1-p));
+    return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((dd[0]*q+dd[1])*q+dd[2])*q+dd[3])*q+1);
+  }
+}
+
+function renderTkSigmaLevel(container){
+  container.innerHTML = `
+    <h4>Sigma Level Calculator</h4>
+    <p class="tk-sub">Converts a defect rate into a Six Sigma level (includes the standard 1.5σ long-term shift).</p>
+    <div class="tk-row">
+      <div class="tk-field"><label>Enter as</label>
+        <select id="tkSigmaMode"><option value="dpmo">DPMO</option><option value="yield">Yield %</option></select>
+      </div>
+      <div class="tk-field" id="tkSigmaInputWrap"><label id="tkSigmaInputLabel">DPMO</label><input type="number" id="tkSigmaInput" placeholder="9000"></div>
+    </div>
+    <div class="tk-result"><div class="tk-result-big" id="tkSigmaResult">—</div><div class="tk-result-label">Sigma level</div></div>
+    <div id="tkSigmaInference" style="font-size:12.5px;color:var(--text-dim);margin-top:12px;"></div>
+  `;
+  const mode = container.querySelector("#tkSigmaMode");
+  const input = container.querySelector("#tkSigmaInput");
+  const label = container.querySelector("#tkSigmaInputLabel");
+  const result = container.querySelector("#tkSigmaResult");
+  const inference = container.querySelector("#tkSigmaInference");
+  const upd = () => {
+    label.textContent = mode.value === "dpmo" ? "DPMO" : "Yield %";
+    input.placeholder = mode.value === "dpmo" ? "9000" : "99.1";
+    const v = parseFloat(input.value);
+    if(isNaN(v)){ result.textContent = "—"; inference.textContent = ""; return; }
+    let dpmo;
+    if(mode.value === "dpmo") dpmo = v;
+    else dpmo = (1 - (v/100)) * 1000000;
+    if(dpmo <= 0){ result.textContent = "6.0+"; inference.innerHTML = `<b style="color:var(--video-color);">Inference:</b> World-class (Six Sigma) performance.`; return; }
+    if(dpmo >= 1000000){ result.textContent = "< 0"; inference.textContent = ""; return; }
+    const sigma = invNormalCDF(1 - dpmo/1000000) + 1.5;
+    result.textContent = sigma.toFixed(2) + "σ";
+    let verdict, color;
+    if(sigma >= 6){ verdict = "World-class (Six Sigma) performance."; color = "var(--video-color)"; }
+    else if(sigma >= 5){ verdict = "Excellent — better than most industry benchmarks."; color = "var(--video-color)"; }
+    else if(sigma >= 4){ verdict = "Good — above average for most industries."; color = "var(--video-color)"; }
+    else if(sigma >= 3){ verdict = "Average — typical for many industries, with room to improve."; color = "var(--ppt-color)"; }
+    else if(sigma >= 2){ verdict = "Below average — a meaningful improvement opportunity."; color = "var(--ppt-color)"; }
+    else { verdict = "Poor — this process needs significant improvement."; color = "var(--danger)"; }
+    inference.innerHTML = `<b style="color:${color};">Inference:</b> ${verdict}`;
+  };
+  mode.addEventListener("change", upd);
+  input.addEventListener("input", upd);
+  upd();
+}
+
+function renderTkCopq(container){
+  container.innerHTML = `
+    <h4>Cost of Poor Quality (COPQ)</h4>
+    <p class="tk-sub">Total cost of defects, rework, and failures — a common business-case number for improvement projects.</p>
+    <div class="tk-row">
+      <div class="tk-field"><label>Rework cost</label><input type="number" id="tkCopqRework" placeholder="200000"></div>
+      <div class="tk-field"><label>Scrap cost</label><input type="number" id="tkCopqScrap" placeholder="50000"></div>
+      <div class="tk-field"><label>Warranty / returns cost</label><input type="number" id="tkCopqWarranty" placeholder="100000"></div>
+    </div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Customer complaint handling (optional)</label><input type="number" id="tkCopqComplaint" placeholder="0"></div>
+      <div class="tk-field"><label>Inspection / appraisal (optional)</label><input type="number" id="tkCopqInspection" placeholder="0"></div>
+    </div>
+    <div class="tk-result"><div class="tk-result-big" id="tkCopqResult">—</div><div class="tk-result-label">Total Cost of Poor Quality</div></div>
+  `;
+  const fields = ["tkCopqRework","tkCopqScrap","tkCopqWarranty","tkCopqComplaint","tkCopqInspection"].map(id => container.querySelector("#"+id));
+  const result = container.querySelector("#tkCopqResult");
+  const upd = () => {
+    const total = fields.reduce((sum, el) => sum + (parseFloat(el.value) || 0), 0);
+    result.textContent = total > 0 ? "₹" + total.toLocaleString(undefined,{maximumFractionDigits:0}) : "—";
+  };
+  fields.forEach(el => el.addEventListener("input", upd));
+}
+
+function renderTkEffortImpact(container){
+  tkState.effortImpact = tkState.effortImpact || { items: [] };
+  const st = tkState.effortImpact;
+
+  function quadrant(impact, effort){
+    const hiImpact = impact >= 3, hiEffort = effort >= 3;
+    if(hiImpact && !hiEffort) return { label: "Quick Win", color: "var(--video-color)" };
+    if(hiImpact && hiEffort) return { label: "Major Project", color: "var(--ppt-color)" };
+    if(!hiImpact && !hiEffort) return { label: "Fill-in", color: "var(--doc-color)" };
+    return { label: "Thankless Task", color: "var(--danger)" };
+  }
+
+  function draw(){
+    const rows = st.items.map((it,i) => ({
+      it, i,
+      score: (it.effort > 0 ? (it.impact / it.effort) : 0)
+    })).sort((a,b) => b.score - a.score);
+
+    let html = `<table class="tk-table"><thead><tr><th>Idea</th><th>Impact (1-5)</th><th>Effort (1-5)</th><th>Score</th><th>Quadrant</th><th></th></tr></thead><tbody>`;
+    rows.forEach(({it,i,score}) => {
+      const q = quadrant(+it.impact||0, +it.effort||0);
+      html += `<tr>
+        <td style="text-align:left;"><input type="text" data-name="${i}" value="${escapeHtml(it.name||"")}" style="width:130px;text-align:left;"></td>
+        <td><select data-f="impact_${i}">${[1,2,3,4,5].map(v=>`<option value="${v}" ${+it.impact===v?"selected":""}>${v}</option>`).join("")}</select></td>
+        <td><select data-f="effort_${i}">${[1,2,3,4,5].map(v=>`<option value="${v}" ${+it.effort===v?"selected":""}>${v}</option>`).join("")}</select></td>
+        <td>${score.toFixed(2)}</td>
+        <td style="color:${q.color};font-weight:700;font-size:11px;">${q.label}</td>
+        <td><button class="tk-del-btn" data-rmv="${i}">&times;</button></td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+    const tbl = container.querySelector("#tkEiTable");
+    tbl.innerHTML = html;
+    tbl.querySelectorAll("[data-name]").forEach(inp => inp.addEventListener("input", () => { st.items[+inp.dataset.name].name = inp.value; tkSave(); }));
+    tbl.querySelectorAll("[data-f]").forEach(sel => sel.addEventListener("change", () => {
+      const [field, idx] = sel.dataset.f.split("_"); st.items[+idx][field] = sel.value; tkSave(); draw();
+    }));
+    tbl.querySelectorAll("[data-rmv]").forEach(btn => btn.addEventListener("click", () => { st.items.splice(+btn.dataset.rmv,1); tkSave(); draw(); }));
+  }
+
+  container.innerHTML = `
+    <h4>Effort vs Impact Quick Score</h4>
+    <p class="tk-sub">Rate ideas 1–5 on Impact and Effort for a fast prioritization gut-check. Score = Impact ÷ Effort.</p>
+    <div id="tkEiTable"></div>
+    <button id="tkEiAdd" style="margin-top:10px;">+ Add idea</button>
+    <div class="tk-skill-legend" style="margin-top:14px;">
+      <span><span class="tk-skill-legend-dot" style="background:var(--video-color);"></span>Quick Win</span>
+      <span><span class="tk-skill-legend-dot" style="background:var(--ppt-color);"></span>Major Project</span>
+      <span><span class="tk-skill-legend-dot" style="background:var(--doc-color);"></span>Fill-in</span>
+      <span><span class="tk-skill-legend-dot" style="background:var(--danger);"></span>Thankless Task</span>
+    </div>
+  `;
+  container.querySelector("#tkEiAdd").addEventListener("click", () => {
+    st.items.push({ name: "New idea", impact: 3, effort: 3 }); tkSave(); draw();
+  });
+  draw();
+}
+
+function renderTkNps(container){
+  container.innerHTML = `
+    <h4>NPS Calculator</h4>
+    <p class="tk-sub">Net Promoter Score — Promoters (9–10) minus Detractors (0–6), as a % of total responses.</p>
+    <div class="tk-row">
+      <div class="tk-field"><label>Input method</label>
+        <select id="tkNpsMode"><option value="raw">Paste raw scores (0–10)</option><option value="counts">Enter counts manually</option></select>
+      </div>
+    </div>
+    <div id="tkNpsRawWrap">
+      <div class="tk-field"><label>Scores — one per line, or comma-separated</label><textarea id="tkNpsRaw" placeholder="9, 10, 6, 8, 3, 10, 7..." style="min-height:110px;"></textarea></div>
+    </div>
+    <div class="tk-row" id="tkNpsCountsWrap" style="display:none;">
+      <div class="tk-field"><label>Promoters (9–10)</label><input type="number" id="tkNpsPromoters" placeholder="60"></div>
+      <div class="tk-field"><label>Passives (7–8)</label><input type="number" id="tkNpsPassives" placeholder="25"></div>
+      <div class="tk-field"><label>Detractors (0–6)</label><input type="number" id="tkNpsDetractors" placeholder="15"></div>
+    </div>
+    <div class="tk-result"><div class="tk-result-big" id="tkNpsResult">—</div><div class="tk-result-label" id="tkNpsSub">NPS</div></div>
+    <div id="tkNpsBreakdown" style="font-size:12px;color:var(--text-dim);margin-top:10px;"></div>
+  `;
+  const mode = container.querySelector("#tkNpsMode");
+  const rawWrap = container.querySelector("#tkNpsRawWrap");
+  const countsWrap = container.querySelector("#tkNpsCountsWrap");
+  const rawInput = container.querySelector("#tkNpsRaw");
+  const pIn = container.querySelector("#tkNpsPromoters"), paIn = container.querySelector("#tkNpsPassives"), dIn = container.querySelector("#tkNpsDetractors");
+  const result = container.querySelector("#tkNpsResult"), sub = container.querySelector("#tkNpsSub"), breakdown = container.querySelector("#tkNpsBreakdown");
+
+  function showResult(promoters, passives, detractors){
+    const total = promoters + passives + detractors;
+    if(total === 0){ result.textContent = "—"; sub.textContent = "NPS"; breakdown.textContent = ""; return; }
+    const pctP = (promoters/total)*100, pctPa = (passives/total)*100, pctD = (detractors/total)*100;
+    const nps = Math.round(pctP - pctD);
+    result.textContent = (nps > 0 ? "+" : "") + nps;
+    result.style.color = nps >= 50 ? "var(--video-color)" : nps >= 0 ? "var(--text)" : "var(--danger)";
+    sub.textContent = `NPS · ${total} response${total===1?"":"s"}`;
+    breakdown.innerHTML = `Promoters: <b style="color:var(--text);">${pctP.toFixed(1)}%</b> (${promoters}) &nbsp;·&nbsp; Passives: <b style="color:var(--text);">${pctPa.toFixed(1)}%</b> (${passives}) &nbsp;·&nbsp; Detractors: <b style="color:var(--text);">${pctD.toFixed(1)}%</b> (${detractors})`;
+  }
+
+  function updFromRaw(){
+    const scores = rawInput.value.split(/[\n,]/).map(s => parseFloat(s.trim())).filter(n => !isNaN(n) && n >= 0 && n <= 10);
+    const promoters = scores.filter(s => s >= 9).length;
+    const passives = scores.filter(s => s >= 7 && s <= 8).length;
+    const detractors = scores.filter(s => s <= 6).length;
+    showResult(promoters, passives, detractors);
+  }
+  function updFromCounts(){
+    showResult(parseFloat(pIn.value)||0, parseFloat(paIn.value)||0, parseFloat(dIn.value)||0);
+  }
+
+  mode.addEventListener("change", () => {
+    const isRaw = mode.value === "raw";
+    rawWrap.style.display = isRaw ? "" : "none";
+    countsWrap.style.display = isRaw ? "none" : "flex";
+    isRaw ? updFromRaw() : updFromCounts();
+  });
+  rawInput.addEventListener("input", updFromRaw);
+  [pIn,paIn,dIn].forEach(el => el.addEventListener("input", updFromCounts));
+}
+
+function renderTkChurnRate(container){
+  container.innerHTML = `
+    <h4>Churn Rate Calculator</h4>
+    <p class="tk-sub">Customers lost over a period, as a % of where you started — plus retention rate and estimated customer lifetime.</p>
+    <div class="tk-row">
+      <div class="tk-field"><label>Customers at start of period</label><input type="number" id="tkChurnStart" placeholder="500"></div>
+      <div class="tk-field"><label>Customers lost (churned)</label><input type="number" id="tkChurnLost" placeholder="25"></div>
+      <div class="tk-field"><label>Period length (optional)</label><input type="text" id="tkChurnPeriod" placeholder="e.g. month, quarter"></div>
+    </div>
+    <div class="tk-result"><div class="tk-result-big" id="tkChurnResult">—</div><div class="tk-result-label">Churn rate</div></div>
+    <div class="tk-result" style="margin-top:12px;"><div class="tk-result-big" id="tkChurnRetention">—</div><div class="tk-result-label">Retention rate</div></div>
+    <div id="tkChurnLifetime" style="font-size:12px;color:var(--text-dim);margin-top:10px;"></div>
+  `;
+  const startI = container.querySelector("#tkChurnStart");
+  const lostI = container.querySelector("#tkChurnLost");
+  const periodI = container.querySelector("#tkChurnPeriod");
+  const result = container.querySelector("#tkChurnResult");
+  const retention = container.querySelector("#tkChurnRetention");
+  const lifetime = container.querySelector("#tkChurnLifetime");
+  const upd = () => {
+    const start = parseFloat(startI.value), lost = parseFloat(lostI.value);
+    if(isNaN(start) || isNaN(lost) || start <= 0){
+      result.textContent = "—"; retention.textContent = "—"; lifetime.textContent = ""; return;
+    }
+    const churnPct = (lost / start) * 100;
+    const retentionPct = 100 - churnPct;
+    result.textContent = churnPct.toFixed(1) + "%";
+    result.style.color = churnPct > 10 ? "var(--danger)" : churnPct > 5 ? "var(--ppt-color)" : "var(--video-color)";
+    retention.textContent = retentionPct.toFixed(1) + "%";
+    const period = periodI.value.trim() || "period";
+    if(churnPct > 0){
+      const avgLifetime = 100 / churnPct;
+      lifetime.textContent = `At this rate, estimated average customer lifetime ≈ ${avgLifetime.toFixed(1)} ${period}${avgLifetime===1?"":"s"}.`;
+    }else{
+      lifetime.textContent = "";
+    }
+  };
+  [startI, lostI, periodI].forEach(el => el.addEventListener("input", upd));
+}
+
+function resolveCssVarsInSvg(svgString){
+  const rootStyle = getComputedStyle(document.documentElement);
+  return svgString.replace(/var\((--[a-zA-Z0-9-]+)\)/g, (match, varName) => {
+    const val = rootStyle.getPropertyValue(varName).trim();
+    return val || match;
+  });
+}
+
+function exportSvgAsPng(svgEl, filename){
+  if(!svgEl){ alert("Nothing to export yet — fill in the fields above first."); return; }
+  const scale = 2;
+  const vb = (svgEl.getAttribute("viewBox") || "0 0 440 200").split(/\s+/).map(Number);
+  const w = vb[2] || 440, h = vb[3] || 200;
+  let svgString = new XMLSerializer().serializeToString(svgEl);
+  if(!/xmlns=/.test(svgString)) svgString = svgString.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+  svgString = resolveCssVarsInSvg(svgString);
+  const canvas = document.createElement("canvas");
+  canvas.width = w * scale; canvas.height = h * scale;
+  const ctx = canvas.getContext("2d");
+  const img = new Image();
+  const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  img.onload = () => {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    canvas.toBlob((pngBlob) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(pngBlob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }, "image/png");
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); alert("Couldn't export this chart as PNG."); };
+  img.src = url;
+}
+
+function renderTkProcessCapability(container){
+  container.innerHTML = `
+    <h4>Process Capability (Cp / Cpk)</h4>
+    <p class="tk-sub">Can this process actually meet spec limits? Cp assumes centering; Cpk accounts for off-center processes.</p>
+    <div class="tk-row">
+      <div class="tk-field"><label>Lower spec limit (LSL)</label><input type="number" id="tkCapLsl" placeholder="90"></div>
+      <div class="tk-field"><label>Upper spec limit (USL)</label><input type="number" id="tkCapUsl" placeholder="110"></div>
+    </div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Process mean</label><input type="number" id="tkCapMean" placeholder="101"></div>
+      <div class="tk-field"><label>Process std. deviation</label><input type="number" id="tkCapSigma" placeholder="3"></div>
+    </div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Cp</label><div class="tk-result" style="margin-top:0;"><div class="tk-result-big" id="tkCapCp" style="font-size:18px;">—</div></div></div>
+      <div class="tk-field"><label>Cpk</label><div class="tk-result" style="margin-top:0;"><div class="tk-result-big" id="tkCapCpk" style="font-size:18px;">—</div></div></div>
+    </div>
+    <div id="tkCapVerdict" style="font-size:12.5px;color:var(--text-dim);margin:8px 0 14px;"></div>
+    <div id="tkCapChart" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px;"></div>
+    <button id="tkCapPngBtn" style="margin-top:10px;">⬇ Export chart (PNG)</button>
+  `;
+  const lslI = container.querySelector("#tkCapLsl"), uslI = container.querySelector("#tkCapUsl");
+  const meanI = container.querySelector("#tkCapMean"), sigmaI = container.querySelector("#tkCapSigma");
+  const cpEl = container.querySelector("#tkCapCp"), cpkEl = container.querySelector("#tkCapCpk");
+  const verdict = container.querySelector("#tkCapVerdict");
+  const chart = container.querySelector("#tkCapChart");
+
+  function normalPdf(x, mean, sigma){
+    return (1/(sigma*Math.sqrt(2*Math.PI))) * Math.exp(-0.5*Math.pow((x-mean)/sigma, 2));
+  }
+
+  function drawChart(lsl, usl, mean, sigma){
+    const W = 440, H = 170, pad = 10;
+    const xMin = Math.min(lsl, mean - 4*sigma), xMax = Math.max(usl, mean + 4*sigma);
+    const toX = (x) => pad + ((x - xMin)/(xMax - xMin)) * (W - pad*2);
+    const samples = 80;
+    let maxY = 0;
+    const pts = [];
+    for(let i=0;i<=samples;i++){
+      const x = xMin + (i/samples)*(xMax-xMin);
+      const y = normalPdf(x, mean, sigma);
+      pts.push([x,y]);
+      if(y > maxY) maxY = y;
+    }
+    const toY = (y) => (H - pad) - (y/maxY) * (H - pad*2);
+    const pathD = pts.map(([x,y],i) => `${i===0?"M":"L"}${toX(x).toFixed(1)},${toY(y).toFixed(1)}`).join(" ");
+    const lslX = toX(lsl), uslX = toX(usl);
+    const belowLsl = pts.filter(([x]) => x <= lsl);
+    const aboveUsl = pts.filter(([x]) => x >= usl);
+    const areaPath = (subset, anchorX) => subset.length ? `M${anchorX.toFixed(1)},${H-pad} ` + subset.map(([x,y]) => `L${toX(x).toFixed(1)},${toY(y).toFixed(1)}`).join(" ") + ` L${toX(subset[subset.length-1][0]).toFixed(1)},${H-pad} Z` : "";
+    chart.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
+        <path d="${areaPath(belowLsl, toX(xMin))}" fill="var(--danger)" opacity=".35"></path>
+        <path d="${areaPath(aboveUsl, toX(xMax))}" fill="var(--danger)" opacity=".35"></path>
+        <path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="2"></path>
+        <line x1="${lslX}" y1="${pad}" x2="${lslX}" y2="${H-pad}" stroke="var(--danger)" stroke-width="1.2" stroke-dasharray="3,3"></line>
+        <line x1="${uslX}" y1="${pad}" x2="${uslX}" y2="${H-pad}" stroke="var(--danger)" stroke-width="1.2" stroke-dasharray="3,3"></line>
+        <line x1="${toX(mean)}" y1="${pad}" x2="${toX(mean)}" y2="${H-pad}" stroke="var(--text-dim)" stroke-width="1" stroke-dasharray="2,2"></line>
+        <text x="${lslX}" y="${H-1}" font-size="9" fill="var(--danger)" text-anchor="middle">LSL</text>
+        <text x="${uslX}" y="${H-1}" font-size="9" fill="var(--danger)" text-anchor="middle">USL</text>
+        <text x="${toX(mean)}" y="${H-1}" font-size="9" fill="var(--text-dim)" text-anchor="middle">mean</text>
+      </svg>
+    `;
+  }
+
+  const upd = () => {
+    const lsl = parseFloat(lslI.value), usl = parseFloat(uslI.value);
+    const mean = parseFloat(meanI.value), sigma = parseFloat(sigmaI.value);
+    if([lsl,usl,mean,sigma].some(isNaN) || sigma <= 0 || usl <= lsl){
+      cpEl.textContent = "—"; cpkEl.textContent = "—"; verdict.textContent = ""; chart.innerHTML = ""; return;
+    }
+    const cp = (usl - lsl) / (6*sigma);
+    const cpu = (usl - mean) / (3*sigma);
+    const cpl = (mean - lsl) / (3*sigma);
+    const cpk = Math.min(cpu, cpl);
+    cpEl.textContent = cp.toFixed(2);
+    cpkEl.textContent = cpk.toFixed(2);
+    const cpkColor = cpk >= 1.33 ? "var(--video-color)" : cpk >= 1.0 ? "var(--ppt-color)" : "var(--danger)";
+    cpkEl.style.color = cpkColor;
+    const cpkVerdict = cpk >= 1.33 ? "Capable — process comfortably meets spec limits."
+      : cpk >= 1.0 ? "Marginally capable — some risk of defects near the spec limits."
+      : "Not capable — process is likely producing defects outside spec limits.";
+    verdict.innerHTML = `<b style="color:${cpkColor};">Inference:</b> ${cpkVerdict}`;
+    drawChart(lsl, usl, mean, sigma);
+  };
+  [lslI, uslI, meanI, sigmaI].forEach(el => el.addEventListener("input", upd));
+  container.querySelector("#tkCapPngBtn").addEventListener("click", () => {
+    exportSvgAsPng(chart.querySelector("svg"), "process-capability-" + new Date().toISOString().slice(0,10) + ".png");
+  });
+}
+
+function renderTkControlChart(container){
+  container.innerHTML = `
+    <h4>Control Chart Limits</h4>
+    <p class="tk-sub">Paste sample values (one per line, or comma-separated) to get center line, UCL/LCL, and a quick run chart.</p>
+    <div class="tk-field"><label>Sample values</label><textarea id="tkCcValues" placeholder="101, 99, 102, 98, 103, 100, 97, 104..." style="min-height:90px;"></textarea></div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Center line (mean)</label><div class="tk-result" style="margin-top:0;"><div class="tk-result-big" id="tkCcMean" style="font-size:16px;">—</div></div></div>
+      <div class="tk-field"><label>UCL (+3σ)</label><div class="tk-result" style="margin-top:0;"><div class="tk-result-big" id="tkCcUcl" style="font-size:16px;color:var(--danger);">—</div></div></div>
+      <div class="tk-field"><label>LCL (−3σ)</label><div class="tk-result" style="margin-top:0;"><div class="tk-result-big" id="tkCcLcl" style="font-size:16px;color:var(--danger);">—</div></div></div>
+    </div>
+    <div id="tkCcNote" style="font-size:12.5px;color:var(--text-dim);margin:8px 0 14px;"></div>
+    <div id="tkCcChart" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px;"></div>
+    <button id="tkCcPngBtn" style="margin-top:10px;">⬇ Export chart (PNG)</button>
+  `;
+  const valuesI = container.querySelector("#tkCcValues");
+  const meanEl = container.querySelector("#tkCcMean"), uclEl = container.querySelector("#tkCcUcl"), lclEl = container.querySelector("#tkCcLcl");
+  const note = container.querySelector("#tkCcNote");
+  const chart = container.querySelector("#tkCcChart");
+
+  const upd = () => {
+    const values = valuesI.value.split(/[\n,]/).map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+    if(values.length < 2){
+      meanEl.textContent = "—"; uclEl.textContent = "—"; lclEl.textContent = "—"; note.textContent = ""; chart.innerHTML = ""; return;
+    }
+    const n = values.length;
+    const mean = values.reduce((a,b)=>a+b,0) / n;
+    const variance = values.reduce((sum,v) => sum + Math.pow(v-mean,2), 0) / (n-1);
+    const sigma = Math.sqrt(variance);
+    const ucl = mean + 3*sigma, lcl = mean - 3*sigma;
+    meanEl.textContent = mean.toFixed(2);
+    uclEl.textContent = ucl.toFixed(2);
+    lclEl.textContent = lcl.toFixed(2);
+    const outOfControl = values.filter(v => v > ucl || v < lcl).length;
+    note.innerHTML = outOfControl > 0
+      ? `<b style="color:var(--danger);">Inference:</b> ${outOfControl} of ${n} point${n===1?"":"s"} fall outside the control limits (flagged red below). This suggests special-cause variation — investigate what was different when those points occurred.`
+      : `<b style="color:var(--video-color);">Inference:</b> All ${n} points fall within control limits. The process appears to be in statistical control — only common-cause (routine) variation is present.`;
+
+    const W = 440, H = 170, pad = 14;
+    const yMin = Math.min(lcl, ...values), yMax = Math.max(ucl, ...values);
+    const yRange = (yMax - yMin) || 1;
+    const toX = (i) => pad + (i/(n-1 || 1)) * (W - pad*2);
+    const toY = (v) => (H - pad) - ((v - yMin)/yRange) * (H - pad*2);
+    const linePath = values.map((v,i) => `${i===0?"M":"L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
+    const dots = values.map((v,i) => `<circle cx="${toX(i).toFixed(1)}" cy="${toY(v).toFixed(1)}" r="3.2" fill="${(v>ucl||v<lcl)?"var(--danger)":"var(--accent)"}"></circle>`).join("");
+    chart.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
+        <line x1="${pad}" y1="${toY(mean)}" x2="${W-pad}" y2="${toY(mean)}" stroke="var(--text-dim)" stroke-width="1"></line>
+        <line x1="${pad}" y1="${toY(ucl)}" x2="${W-pad}" y2="${toY(ucl)}" stroke="var(--danger)" stroke-width="1" stroke-dasharray="4,3"></line>
+        <line x1="${pad}" y1="${toY(lcl)}" x2="${W-pad}" y2="${toY(lcl)}" stroke="var(--danger)" stroke-width="1" stroke-dasharray="4,3"></line>
+        <path d="${linePath}" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity=".6"></path>
+        ${dots}
+        <text x="${W-pad}" y="${toY(ucl)-4}" font-size="9" fill="var(--danger)" text-anchor="end">UCL</text>
+        <text x="${W-pad}" y="${toY(lcl)+11}" font-size="9" fill="var(--danger)" text-anchor="end">LCL</text>
+        <text x="${W-pad}" y="${toY(mean)-4}" font-size="9" fill="var(--text-dim)" text-anchor="end">CL</text>
+      </svg>
+    `;
+  };
+  valuesI.addEventListener("input", upd);
+  container.querySelector("#tkCcPngBtn").addEventListener("click", () => {
+    exportSvgAsPng(chart.querySelector("svg"), "control-chart-" + new Date().toISOString().slice(0,10) + ".png");
+  });
+}
+
+const Z_SCORES = { "90": 1.645, "95": 1.96, "99": 2.576 };
+
+function renderTkSampleSize(container){
+  container.innerHTML = `
+    <h4>Sample Size Calculator</h4>
+    <p class="tk-sub">How many responses you need before trusting a survey or study result.</p>
+    <div class="tk-row">
+      <div class="tk-field"><label>Population size (optional)</label><input type="number" id="tkSsPop" placeholder="e.g. 5000 — leave blank if very large/unknown"></div>
+      <div class="tk-field"><label>Confidence level</label>
+        <select id="tkSsConf"><option value="90">90%</option><option value="95" selected>95%</option><option value="99">99%</option></select>
+      </div>
+    </div>
+    <div class="tk-row">
+      <div class="tk-field"><label>Margin of error (%)</label><input type="number" id="tkSsMoe" placeholder="5"></div>
+      <div class="tk-field"><label>Expected response split (%, optional)</label><input type="number" id="tkSsProp" placeholder="50"></div>
+    </div>
+    <div class="tk-result"><div class="tk-result-big" id="tkSsResult">—</div><div class="tk-result-label">Required sample size</div></div>
+    <div id="tkSsInference" style="font-size:12.5px;color:var(--text-dim);margin-top:12px;"></div>
+  `;
+  const popI = container.querySelector("#tkSsPop"), confI = container.querySelector("#tkSsConf");
+  const moeI = container.querySelector("#tkSsMoe"), propI = container.querySelector("#tkSsProp");
+  const result = container.querySelector("#tkSsResult");
+  const inference = container.querySelector("#tkSsInference");
+  const upd = () => {
+    const z = Z_SCORES[confI.value];
+    const moe = (parseFloat(moeI.value) || 5) / 100;
+    const p = (parseFloat(propI.value) || 50) / 100;
+    if(moe <= 0){ result.textContent = "—"; inference.textContent = ""; return; }
+    const n0 = (z*z * p*(1-p)) / (moe*moe);
+    const pop = parseFloat(popI.value);
+    const n = Math.ceil((!isNaN(pop) && pop > 0) ? n0 / (1 + (n0-1)/pop) : n0);
+    result.textContent = n.toLocaleString() + " responses";
+    inference.innerHTML = `<b style="color:var(--text);">Inference:</b> Collecting fewer than ${n.toLocaleString()} responses means your result may not hold within ±${(moe*100).toFixed(0)}% at ${confI.value}% confidence — treat conclusions from a smaller sample with caution.`;
+  };
+  [popI, moeI, propI].forEach(el => el.addEventListener("input", upd));
+  confI.addEventListener("change", upd);
+  upd();
+}
+
+function renderTkConfidenceInterval(container){
+  container.innerHTML = `
+    <h4>Confidence Interval Calculator</h4>
+    <p class="tk-sub">The margin of error around a survey result, given your sample size.</p>
+    <div class="tk-row">
+      <div class="tk-field"><label>Sample size</label><input type="number" id="tkCiN" placeholder="200"></div>
+      <div class="tk-field"><label>Observed result (%)</label><input type="number" id="tkCiP" placeholder="68"></div>
+      <div class="tk-field"><label>Confidence level</label>
+        <select id="tkCiConf"><option value="90">90%</option><option value="95" selected>95%</option><option value="99">99%</option></select>
+      </div>
+    </div>
+    <div class="tk-result"><div class="tk-result-big" id="tkCiResult">—</div><div class="tk-result-label" id="tkCiSub">Result ± margin of error</div></div>
+    <div id="tkCiInference" style="font-size:12.5px;color:var(--text-dim);margin-top:12px;"></div>
+  `;
+  const nI = container.querySelector("#tkCiN"), pI = container.querySelector("#tkCiP"), confI = container.querySelector("#tkCiConf");
+  const result = container.querySelector("#tkCiResult"), sub = container.querySelector("#tkCiSub");
+  const inference = container.querySelector("#tkCiInference");
+  const upd = () => {
+    const n = parseFloat(nI.value), pPct = parseFloat(pI.value);
+    if(isNaN(n) || isNaN(pPct) || n <= 0){ result.textContent = "—"; sub.textContent = "Result ± margin of error"; inference.textContent = ""; return; }
+    const p = pPct/100;
+    const z = Z_SCORES[confI.value];
+    const moe = z * Math.sqrt((p*(1-p))/n) * 100;
+    result.textContent = `${pPct.toFixed(1)}% ± ${moe.toFixed(1)}%`;
+    sub.textContent = `True value likely between ${(pPct-moe).toFixed(1)}% and ${(pPct+moe).toFixed(1)}%`;
+    const moeColor = moe <= 5 ? "var(--video-color)" : moe <= 10 ? "var(--ppt-color)" : "var(--danger)";
+    inference.innerHTML = `<b style="color:${moeColor};">Inference:</b> With ${n.toLocaleString()} responses, you can be ${confI.value}% confident the true value falls between ${(pPct-moe).toFixed(1)}% and ${(pPct+moe).toFixed(1)}%.` + (moe > 10 ? " That's a wide range — consider collecting more responses before relying on this result." : "");
+  };
+  [nI, pI].forEach(el => el.addEventListener("input", upd));
+  confI.addEventListener("change", upd);
+}
+
+function renderTkPareto(container){
+  container.innerHTML = `
+    <h4>Pareto Chart Generator</h4>
+    <p class="tk-sub">Paste categories and their counts — auto-sorted by frequency, with a cumulative % line (the "80/20" view).</p>
+    <div class="tk-field"><label>Category: count — one per line</label><textarea id="tkParetoInput" placeholder="Late delivery: 45
+Wrong item: 30
+Damaged: 12
+Missing parts: 8
+Other: 5" style="min-height:110px;"></textarea></div>
+    <div id="tkParetoSummary" style="font-size:12px;color:var(--text-dim);margin:8px 0;"></div>
+    <div id="tkParetoChart" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px;"></div>
+    <button id="tkParetoPngBtn" style="margin:10px 0;">⬇ Export chart (PNG)</button>
+    <div id="tkParetoTable" style="margin-top:12px;"></div>
+  `;
+  const input = container.querySelector("#tkParetoInput");
+  const summary = container.querySelector("#tkParetoSummary");
+  const chart = container.querySelector("#tkParetoChart");
+  const table = container.querySelector("#tkParetoTable");
+
+  function parseLine(line){
+    let m = line.match(/^(.*?)[,:]\s*([\d.]+)\s*$/);
+    if(m) return { label: m[1].trim(), count: parseFloat(m[2]) };
+    m = line.match(/^(.*\S)\s+([\d.]+)\s*$/);
+    if(m) return { label: m[1].trim(), count: parseFloat(m[2]) };
+    return null;
+  }
+
+  const upd = () => {
+    const lines = input.value.split("\n").map(l => l.trim()).filter(Boolean);
+    const items = lines.map(parseLine).filter(it => it && !isNaN(it.count) && it.count >= 0);
+    if(items.length === 0){
+      summary.textContent = ""; chart.innerHTML = ""; table.innerHTML = "";
+      return;
+    }
+    items.sort((a,b) => b.count - a.count);
+    const total = items.reduce((s,it) => s + it.count, 0);
+    let running = 0;
+    const rows = items.map(it => {
+      running += it.count;
+      return { ...it, pct: total ? (it.count/total)*100 : 0, cumPct: total ? (running/total)*100 : 0 };
+    });
+    const cutoffIdx = rows.findIndex(r => r.cumPct >= 80);
+    summary.innerHTML = `${items.length} categories, ${total.toLocaleString()} total.` + (cutoffIdx > -1 ? ` <b style="color:var(--text);">Inference:</b> the top ${cutoffIdx+1} categor${cutoffIdx+1===1?"y accounts":"ies account"} for ~80% of the total — focus improvement effort there first.` : "");
+
+    const W = 460, H = 220, pad = 8, bottomPad = 46, leftPad = 10;
+    const maxCount = Math.max(...rows.map(r => r.count));
+    const barAreaW = W - leftPad - pad;
+    const barW = (barAreaW / rows.length) * 0.65;
+    const gap = (barAreaW / rows.length);
+    const toBarY = (c) => (H - bottomPad) - (c/maxCount) * (H - bottomPad - pad);
+    const toLineY = (pct) => (H - bottomPad) - (pct/100) * (H - bottomPad - pad);
+
+    const bars = rows.map((r,i) => {
+      const x = leftPad + i*gap + (gap-barW)/2;
+      const y = toBarY(r.count);
+      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${(H-bottomPad-y).toFixed(1)}" fill="var(--accent)" opacity=".85"></rect>
+        <text x="${(x+barW/2).toFixed(1)}" y="${H-bottomPad+14}" font-size="8.5" fill="var(--text-dim)" text-anchor="middle">${escapeHtml(r.label.length>10?r.label.slice(0,9)+"…":r.label)}</text>`;
+    }).join("");
+    const linePts = rows.map((r,i) => `${leftPad + i*gap + gap/2},${toLineY(r.cumPct).toFixed(1)}`).join(" ");
+    const dots = rows.map((r,i) => `<circle cx="${(leftPad + i*gap + gap/2).toFixed(1)}" cy="${toLineY(r.cumPct).toFixed(1)}" r="2.6" fill="var(--ppt-color)"></circle>`).join("");
+
+    chart.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
+        ${bars}
+        <line x1="${leftPad}" y1="${toLineY(80).toFixed(1)}" x2="${W-pad}" y2="${toLineY(80).toFixed(1)}" stroke="var(--danger)" stroke-width="1" stroke-dasharray="4,3"></line>
+        <text x="${W-pad}" y="${toLineY(80)-4}" font-size="8.5" fill="var(--danger)" text-anchor="end">80%</text>
+        <polyline points="${linePts}" fill="none" stroke="var(--ppt-color)" stroke-width="1.6"></polyline>
+        ${dots}
+      </svg>
+    `;
+
+    table.innerHTML = `<table class="tk-table" style="width:100%;">
+      <thead><tr><th style="text-align:left;">Category</th><th>Count</th><th>% of total</th><th>Cumulative %</th></tr></thead>
+      <tbody>${rows.map(r => `<tr>
+        <td style="text-align:left;">${escapeHtml(r.label)}</td>
+        <td>${r.count.toLocaleString()}</td>
+        <td>${r.pct.toFixed(1)}%</td>
+        <td>${r.cumPct.toFixed(1)}%</td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+  };
+  input.addEventListener("input", upd);
+  container.querySelector("#tkParetoPngBtn").addEventListener("click", () => {
+    exportSvgAsPng(chart.querySelector("svg"), "pareto-chart-" + new Date().toISOString().slice(0,10) + ".png");
+  });
+}
+
+function renderTkBoxPlot(container){
+  tkState.boxplot = tkState.boxplot || { groups: [
+    { name: "Group A", data: "" },
+    { name: "Group B", data: "" }
+  ]};
+  const st = tkState.boxplot;
+
+  function percentile(sorted, p){
+    if(sorted.length === 1) return sorted[0];
+    const idx = (p/100) * (sorted.length - 1);
+    const lo = Math.floor(idx), hi = Math.ceil(idx);
+    if(lo === hi) return sorted[lo];
+    return sorted[lo] + (sorted[hi]-sorted[lo]) * (idx-lo);
+  }
+
+  function stats(values){
+    const sorted = values.slice().sort((a,b)=>a-b);
+    const q1 = percentile(sorted, 25);
+    const median = percentile(sorted, 50);
+    const q3 = percentile(sorted, 75);
+    const iqr = q3 - q1;
+    const lowerFence = q1 - 1.5*iqr, upperFence = q3 + 1.5*iqr;
+    const inRange = sorted.filter(v => v >= lowerFence && v <= upperFence);
+    const whiskerLow = inRange.length ? Math.min(...inRange) : sorted[0];
+    const whiskerHigh = inRange.length ? Math.max(...inRange) : sorted[sorted.length-1];
+    const outliers = sorted.filter(v => v < lowerFence || v > upperFence);
+    return { q1, median, q3, whiskerLow, whiskerHigh, outliers, n: sorted.length };
+  }
+
+  function drawFields(){
+    const wrap = container.querySelector("#tkBoxGroups");
+    wrap.innerHTML = st.groups.map((g,i) => `
+      <div class="tk-row" style="align-items:flex-start;">
+        <div class="tk-field" style="max-width:140px;"><label>Group name</label><input type="text" data-name="${i}" value="${escapeHtml(g.name)}"></div>
+        <div class="tk-field" style="flex:2;"><label>Values (comma or newline separated)</label><textarea data-data="${i}" style="min-height:50px;">${escapeHtml(g.data)}</textarea></div>
+        <button class="tk-del-btn" data-rmv="${i}" style="margin-top:22px;" title="Remove group">&times;</button>
+      </div>
+    `).join("");
+    wrap.querySelectorAll("[data-name]").forEach(inp => inp.addEventListener("input", () => { st.groups[+inp.dataset.name].name = inp.value; tkSave(); drawChart(); }));
+    wrap.querySelectorAll("[data-data]").forEach(ta => ta.addEventListener("input", () => { st.groups[+ta.dataset.data].data = ta.value; tkSave(); drawChart(); }));
+    wrap.querySelectorAll("[data-rmv]").forEach(btn => btn.addEventListener("click", () => { st.groups.splice(+btn.dataset.rmv,1); tkSave(); drawFields(); drawChart(); }));
+  }
+
+  function drawChart(){
+    const chart = container.querySelector("#tkBoxChart");
+    const groupStats = st.groups.map(g => {
+      const values = g.data.split(/[\n,]/).map(s=>parseFloat(s.trim())).filter(n=>!isNaN(n));
+      return values.length >= 2 ? { name: g.name || "Group", ...stats(values) } : null;
+    }).filter(Boolean);
+
+    if(groupStats.length === 0){
+      chart.innerHTML = `<div class="notes-empty">Enter at least 2 values per group to draw a box plot.</div>`;
+      return;
+    }
+
+    const allVals = groupStats.flatMap(g => [g.whiskerLow, g.whiskerHigh, ...g.outliers]);
+    const yMin = Math.min(...allVals), yMax = Math.max(...allVals);
+    const range = (yMax - yMin) || 1;
+    const padTop = 16, padBottom = 28, padSide = 16;
+    const W = 460, H = 240;
+    const toY = (v) => (H - padBottom) - ((v - yMin)/range) * (H - padBottom - padTop);
+    const n = groupStats.length;
+    const slotW = (W - padSide*2) / n;
+    const boxW = Math.min(60, slotW * 0.45);
+
+    const svgParts = groupStats.map((g, i) => {
+      const cx = padSide + slotW*i + slotW/2;
+      const outlierDots = g.outliers.map(v => `<circle cx="${cx}" cy="${toY(v).toFixed(1)}" r="2.6" fill="var(--danger)"></circle>`).join("");
+      return `
+        <line x1="${cx}" y1="${toY(g.whiskerLow).toFixed(1)}" x2="${cx}" y2="${toY(g.q1).toFixed(1)}" stroke="var(--text-dim)" stroke-width="1.2"></line>
+        <line x1="${cx}" y1="${toY(g.q3).toFixed(1)}" x2="${cx}" y2="${toY(g.whiskerHigh).toFixed(1)}" stroke="var(--text-dim)" stroke-width="1.2"></line>
+        <line x1="${cx-boxW/4}" y1="${toY(g.whiskerLow).toFixed(1)}" x2="${cx+boxW/4}" y2="${toY(g.whiskerLow).toFixed(1)}" stroke="var(--text-dim)" stroke-width="1.2"></line>
+        <line x1="${cx-boxW/4}" y1="${toY(g.whiskerHigh).toFixed(1)}" x2="${cx+boxW/4}" y2="${toY(g.whiskerHigh).toFixed(1)}" stroke="var(--text-dim)" stroke-width="1.2"></line>
+        <rect x="${(cx-boxW/2).toFixed(1)}" y="${toY(g.q3).toFixed(1)}" width="${boxW.toFixed(1)}" height="${(toY(g.q1)-toY(g.q3)).toFixed(1)}" fill="var(--accent)" opacity=".3" stroke="var(--accent)" stroke-width="1.3"></rect>
+        <line x1="${(cx-boxW/2).toFixed(1)}" y1="${toY(g.median).toFixed(1)}" x2="${(cx+boxW/2).toFixed(1)}" y2="${toY(g.median).toFixed(1)}" stroke="var(--accent)" stroke-width="2"></line>
+        ${outlierDots}
+        <text x="${cx}" y="${H-8}" font-size="10" fill="var(--text-dim)" text-anchor="middle">${escapeHtml(g.name.length>12?g.name.slice(0,11)+"…":g.name)}</text>
+      `;
+    }).join("");
+
+    chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">${svgParts}</svg>`;
+
+    const summary = container.querySelector("#tkBoxSummary");
+    let html = groupStats.map(g =>
+      `<div style="margin-bottom:4px;"><b style="color:var(--text);">${escapeHtml(g.name)}</b> (n=${g.n}): median ${g.median.toFixed(2)}, Q1 ${g.q1.toFixed(2)}, Q3 ${g.q3.toFixed(2)}${g.outliers.length ? `, ${g.outliers.length} outlier${g.outliers.length===1?"":"s"}` : ""}</div>`
+    ).join("");
+    if(groupStats.length >= 2){
+      const byMedian = groupStats.slice().sort((a,b) => b.median - a.median);
+      const highest = byMedian[0], lowest = byMedian[byMedian.length-1];
+      const byIqr = groupStats.slice().sort((a,b) => (b.q3-b.q1) - (a.q3-a.q1));
+      const mostSpread = byIqr[0], leastSpread = byIqr[byIqr.length-1];
+      html += `<div style="margin-top:8px;"><b style="color:var(--text);">Inference:</b> ${escapeHtml(highest.name)} has the highest median (${highest.median.toFixed(2)}), while ${escapeHtml(lowest.name)} has the lowest (${lowest.median.toFixed(2)}).` +
+        (mostSpread.name !== leastSpread.name ? ` ${escapeHtml(mostSpread.name)} shows the widest spread (IQR ${(mostSpread.q3-mostSpread.q1).toFixed(2)}), suggesting more variability than ${escapeHtml(leastSpread.name)} (IQR ${(leastSpread.q3-leastSpread.q1).toFixed(2)}).` : "") +
+        `</div>`;
+    }
+    summary.innerHTML = html;
+  }
+
+  container.innerHTML = `
+    <h4>Box Plot Generator</h4>
+    <p class="tk-sub">Compare the spread and median of one or more groups — min/Q1/median/Q3/max, with outliers flagged.</p>
+    <div id="tkBoxGroups"></div>
+    <button id="tkBoxAddGroup" style="margin:8px 0 14px;">+ Add group</button>
+    <div id="tkBoxChart" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px;"></div>
+    <button id="tkBoxPngBtn" style="margin-top:10px;">⬇ Export chart (PNG)</button>
+    <div id="tkBoxSummary" style="font-size:12px;color:var(--text-dim);margin-top:12px;"></div>
+  `;
+
+  container.querySelector("#tkBoxAddGroup").addEventListener("click", () => {
+    if(st.groups.length < 8){
+      st.groups.push({ name: "Group " + String.fromCharCode(65+st.groups.length), data: "" });
+      tkSave(); drawFields(); drawChart();
+    }
+  });
+  container.querySelector("#tkBoxPngBtn").addEventListener("click", () => {
+    exportSvgAsPng(container.querySelector("#tkBoxChart svg"), "box-plot-" + new Date().toISOString().slice(0,10) + ".png");
+  });
+
+  drawFields();
+  drawChart();
+}
+
+function renderTkLinearRegression(container){
+  container.innerHTML = `
+    <h4>Linear Regression Calculator</h4>
+    <p class="tk-sub">Paste paired X, Y data to find the best-fit line and how well X predicts Y.</p>
+    <div class="tk-field"><label>Pairs — one per line, as "x, y"</label><textarea id="tkLrInput" placeholder="1, 2.1
+2, 4.3
+3, 5.8
+4, 8.1
+5, 9.9" style="min-height:110px;"></textarea></div>
+    <div class="tk-result"><div class="tk-result-big" id="tkLrEquation" style="font-size:16px;">—</div><div class="tk-result-label">Best-fit line</div></div>
+    <div class="tk-row" style="margin-top:12px;">
+      <div class="tk-field"><label>R² (fit quality)</label><div class="tk-result" style="margin-top:0;"><div class="tk-result-big" id="tkLrR2" style="font-size:16px;">—</div></div></div>
+      <div class="tk-field"><label>Correlation (r)</label><div class="tk-result" style="margin-top:0;"><div class="tk-result-big" id="tkLrR" style="font-size:16px;">—</div></div></div>
+    </div>
+    <div id="tkLrInference" style="font-size:12.5px;color:var(--text-dim);margin:8px 0 14px;"></div>
+    <div id="tkLrChart" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px;"></div>
+    <button id="tkLrPngBtn" style="margin-top:10px;">⬇ Export chart (PNG)</button>
+  `;
+  const input = container.querySelector("#tkLrInput");
+  const eqEl = container.querySelector("#tkLrEquation"), r2El = container.querySelector("#tkLrR2"), rEl = container.querySelector("#tkLrR");
+  const inference = container.querySelector("#tkLrInference");
+  const chart = container.querySelector("#tkLrChart");
+
+  const upd = () => {
+    const pairs = input.value.split("\n").map(l => {
+      const parts = l.split(/[,\s]+/).map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+      return parts.length >= 2 ? [parts[0], parts[1]] : null;
+    }).filter(Boolean);
+
+    if(pairs.length < 2){
+      eqEl.textContent = "—"; r2El.textContent = "—"; rEl.textContent = "—"; inference.textContent = ""; chart.innerHTML = "";
+      return;
+    }
+    const n = pairs.length;
+    const xs = pairs.map(p=>p[0]), ys = pairs.map(p=>p[1]);
+    const meanX = xs.reduce((a,b)=>a+b,0)/n, meanY = ys.reduce((a,b)=>a+b,0)/n;
+    let sumXY=0, sumXX=0, sumYY=0;
+    for(let i=0;i<n;i++){
+      sumXY += (xs[i]-meanX)*(ys[i]-meanY);
+      sumXX += (xs[i]-meanX)**2;
+      sumYY += (ys[i]-meanY)**2;
+    }
+    if(sumXX === 0){ eqEl.textContent = "—"; inference.textContent = "All X values are identical — can't fit a line."; return; }
+    const slope = sumXY/sumXX;
+    const intercept = meanY - slope*meanX;
+    const r = sumXY / Math.sqrt(sumXX*sumYY || 1);
+    const r2 = r*r;
+    eqEl.textContent = `y = ${intercept.toFixed(3)} + ${slope.toFixed(3)}x`;
+    r2El.textContent = r2.toFixed(3);
+    rEl.textContent = r.toFixed(3);
+
+    const absR = Math.abs(r);
+    const strength = absR >= 0.8 ? "strong" : absR >= 0.5 ? "moderate" : absR >= 0.2 ? "weak" : "very weak / no";
+    const direction = r > 0 ? "positive" : r < 0 ? "negative" : "no";
+    const color = absR >= 0.8 ? "var(--video-color)" : absR >= 0.5 ? "var(--ppt-color)" : "var(--danger)";
+    inference.innerHTML = `<b style="color:${color};">Inference:</b> A ${strength} ${direction} relationship (R² = ${r2.toFixed(2)}, meaning X explains about ${(r2*100).toFixed(0)}% of the variation in Y).` +
+      (absR < 0.5 ? " X alone may not reliably predict Y — consider other factors." : " X is a reasonably useful predictor of Y.");
+
+    const W = 440, H = 220, pad = 24;
+    const xMin = Math.min(...xs), xMax = Math.max(...xs);
+    const yMin = Math.min(...ys), yMax = Math.max(...ys);
+    const xRange = (xMax-xMin) || 1, yRange = (yMax-yMin) || 1;
+    const toX = (x) => pad + ((x-xMin)/xRange) * (W-pad*2);
+    const toY = (y) => (H-pad) - ((y-yMin)/yRange) * (H-pad*2);
+    const dots = pairs.map(([x,y]) => `<circle cx="${toX(x).toFixed(1)}" cy="${toY(y).toFixed(1)}" r="3" fill="var(--accent)"></circle>`).join("");
+    const lineY1 = slope*xMin + intercept, lineY2 = slope*xMax + intercept;
+    chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
+      <line x1="${toX(xMin).toFixed(1)}" y1="${toY(lineY1).toFixed(1)}" x2="${toX(xMax).toFixed(1)}" y2="${toY(lineY2).toFixed(1)}" stroke="var(--ppt-color)" stroke-width="1.8"></line>
+      ${dots}
+    </svg>`;
+  };
+  input.addEventListener("input", upd);
+  container.querySelector("#tkLrPngBtn").addEventListener("click", () => {
+    exportSvgAsPng(chart.querySelector("svg"), "regression-chart-" + new Date().toISOString().slice(0,10) + ".png");
+  });
+}
+
+function renderTkWeightedAverage(container){
+  tkState.weightedAvg = tkState.weightedAvg || { items: [
+    { value: "", weight: "" }, { value: "", weight: "" }, { value: "", weight: "" }
+  ]};
+  const st = tkState.weightedAvg;
+
+  function draw(){
+    const wrap = container.querySelector("#tkWaRows");
+    wrap.innerHTML = `<table class="tk-table" style="width:100%;">
+      <thead><tr><th style="text-align:left;">Label (optional)</th><th>Value</th><th>Weight</th><th></th></tr></thead>
+      <tbody>${st.items.map((it,i) => `
+        <tr>
+          <td style="text-align:left;"><input type="text" data-label="${i}" value="${escapeHtml(it.label||"")}" style="width:110px;text-align:left;"></td>
+          <td><input type="number" data-value="${i}" value="${it.value}" style="width:70px;"></td>
+          <td><input type="number" data-weight="${i}" value="${it.weight}" style="width:70px;"></td>
+          <td><button class="tk-del-btn" data-rmv="${i}">&times;</button></td>
+        </tr>`).join("")}
+      </tbody>
+    </table>`;
+    wrap.querySelectorAll("[data-label]").forEach(inp => inp.addEventListener("input", () => { st.items[+inp.dataset.label].label = inp.value; tkSave(); }));
+    wrap.querySelectorAll("[data-value]").forEach(inp => inp.addEventListener("input", () => { st.items[+inp.dataset.value].value = inp.value; tkSave(); compute(); }));
+    wrap.querySelectorAll("[data-weight]").forEach(inp => inp.addEventListener("input", () => { st.items[+inp.dataset.weight].weight = inp.value; tkSave(); compute(); }));
+    wrap.querySelectorAll("[data-rmv]").forEach(btn => btn.addEventListener("click", () => { st.items.splice(+btn.dataset.rmv,1); tkSave(); draw(); compute(); }));
+  }
+
+  function compute(){
+    const result = container.querySelector("#tkWaResult"), sub = container.querySelector("#tkWaSub"), inference = container.querySelector("#tkWaInference");
+    const rows = st.items.map(it => ({ value: parseFloat(it.value), weight: parseFloat(it.weight) })).filter(r => !isNaN(r.value) && !isNaN(r.weight) && r.weight >= 0);
+    if(rows.length === 0){ result.textContent = "—"; sub.textContent = "Weighted average"; inference.textContent = ""; return; }
+    const totalWeight = rows.reduce((s,r)=>s+r.weight, 0);
+    if(totalWeight === 0){ result.textContent = "—"; inference.textContent = "Total weight is zero — enter at least one positive weight."; return; }
+    const weightedAvg = rows.reduce((s,r)=>s+r.value*r.weight, 0) / totalWeight;
+    const plainAvg = rows.reduce((s,r)=>s+r.value, 0) / rows.length;
+    result.textContent = weightedAvg.toFixed(3);
+    sub.textContent = "Weighted average";
+    const diff = weightedAvg - plainAvg;
+    inference.innerHTML = `<b style="color:var(--text);">Inference:</b> The weighted average (${weightedAvg.toFixed(2)}) ${Math.abs(diff) < 0.001 ? "matches" : diff > 0 ? "is higher than" : "is lower than"} the plain, unweighted average (${plainAvg.toFixed(2)})${Math.abs(diff) >= 0.001 ? ` by ${Math.abs(diff).toFixed(2)}` : ""} — showing how much the weighting shifts the result.`;
+  }
+
+  container.innerHTML = `
+    <h4>Weighted Average Calculator</h4>
+    <p class="tk-sub">Some values count more than others — enter each value with its weight (e.g. importance, votes, or sample size).</p>
+    <div id="tkWaRows"></div>
+    <button id="tkWaAddRow" style="margin:10px 0 14px;">+ Add row</button>
+    <div class="tk-result"><div class="tk-result-big" id="tkWaResult">—</div><div class="tk-result-label" id="tkWaSub">Weighted average</div></div>
+    <div id="tkWaInference" style="font-size:12.5px;color:var(--text-dim);margin-top:10px;"></div>
+  `;
+  container.querySelector("#tkWaAddRow").addEventListener("click", () => {
+    if(st.items.length < 12){ st.items.push({ value: "", weight: "" }); tkSave(); draw(); }
+  });
+  draw();
+  compute();
+}
+
+// ---- Reporting ----
+function renderTkExecSummary(container){
+  tkState.execSummary = tkState.execSummary || {
+    title: "", period: "", status: "green", objective: "",
+    accomplishments: "", metrics: [{ label: "", value: "" }],
+    risks: "", nextSteps: "", preparedBy: ""
+  };
+  const st = tkState.execSummary;
+
+  function drawMetricRows(){
+    const wrap = container.querySelector("#tkExecMetrics");
+    wrap.innerHTML = st.metrics.map((m,i) => `
+      <div class="tk-row" style="margin-bottom:6px;">
+        <div class="tk-field"><input type="text" data-mlabel="${i}" value="${escapeHtml(m.label)}" placeholder="e.g. NPS"></div>
+        <div class="tk-field"><input type="text" data-mvalue="${i}" value="${escapeHtml(m.value)}" placeholder="e.g. 42 (+6 vs last month)"></div>
+        <button class="tk-del-btn" data-mrmv="${i}">&times;</button>
+      </div>
+    `).join("");
+    wrap.querySelectorAll("[data-mlabel]").forEach(inp => inp.addEventListener("input", () => { st.metrics[+inp.dataset.mlabel].label = inp.value; tkSave(); buildOutput(); }));
+    wrap.querySelectorAll("[data-mvalue]").forEach(inp => inp.addEventListener("input", () => { st.metrics[+inp.dataset.mvalue].value = inp.value; tkSave(); buildOutput(); }));
+    wrap.querySelectorAll("[data-mrmv]").forEach(btn => btn.addEventListener("click", () => { st.metrics.splice(+btn.dataset.mrmv,1); tkSave(); drawMetricRows(); buildOutput(); }));
+  }
+
+  function linesToBullets(text){
+    return text.split("\n").map(l => l.trim()).filter(Boolean).map(l => `- ${l}`).join("\n");
+  }
+
+  function buildOutput(){
+    const statusLabel = { green: "GREEN", amber: "AMBER", red: "RED" }[st.status] || "GREEN";
+    const metricLines = st.metrics.filter(m => m.label.trim() || m.value.trim())
+      .map(m => `- ${m.label.trim() || "Metric"}: ${m.value.trim() || "—"}`).join("\n");
+
+    let out = `EXECUTIVE SUMMARY — ${st.title.trim() || "[Project Name]"}\n`;
+    out += `Period: ${st.period.trim() || "[Period]"}\n`;
+    out += `Status: ${statusLabel}\n\n`;
+    if(st.objective.trim()) out += `OBJECTIVE\n${st.objective.trim()}\n\n`;
+    if(st.accomplishments.trim()) out += `KEY ACCOMPLISHMENTS\n${linesToBullets(st.accomplishments)}\n\n`;
+    if(metricLines) out += `KEY METRICS\n${metricLines}\n\n`;
+    if(st.risks.trim()) out += `RISKS & ISSUES\n${linesToBullets(st.risks)}\n\n`;
+    if(st.nextSteps.trim()) out += `NEXT STEPS\n${linesToBullets(st.nextSteps)}\n\n`;
+    if(st.preparedBy.trim()) out += `Prepared by: ${st.preparedBy.trim()}`;
+
+    container.querySelector("#tkExecOutput").textContent = out.trim();
+  }
+
+  container.innerHTML = `
+    <h4>Executive Summary Builder</h4>
+    <p class="tk-sub">Fill in the fields — a clean, formatted summary builds itself below, ready to copy into an email or Teams update.</p>
+    <div class="tk-row">
+      <div class="tk-field"><label>Project / initiative name</label><input type="text" id="tkExecTitle" placeholder="e.g. CX Intelligence Suite"></div>
+      <div class="tk-field"><label>Period</label><input type="text" id="tkExecPeriod" placeholder="e.g. Week of Oct 7, or September 2026"></div>
+      <div class="tk-field"><label>Overall status</label>
+        <select id="tkExecStatus"><option value="green">🟢 Green</option><option value="amber">🟠 Amber</option><option value="red">🔴 Red</option></select>
+      </div>
+    </div>
+    <div class="tk-field"><label>Objective</label><textarea id="tkExecObjective" placeholder="One or two sentences on what this initiative is trying to achieve."></textarea></div>
+    <div class="tk-field"><label>Key accomplishments (one per line)</label><textarea id="tkExecAccomplish" placeholder="Completed pilot rollout to 3 teams
+Reduced cycle time by 18%"></textarea></div>
+    <label style="font-size:11.5px;color:var(--text-dim);display:block;margin:4px 0 2px;">Key metrics (optional)</label>
+    <div id="tkExecMetrics"></div>
+    <button id="tkExecAddMetric" style="margin-bottom:12px;">+ Add metric</button>
+    <div class="tk-field"><label>Risks &amp; issues (one per line)</label><textarea id="tkExecRisks" placeholder="Vendor delivery delayed by 2 weeks"></textarea></div>
+    <div class="tk-field"><label>Next steps (one per line)</label><textarea id="tkExecNext" placeholder="Finalize rollout plan for remaining teams by Oct 20"></textarea></div>
+    <div class="tk-field"><label>Prepared by (optional)</label><input type="text" id="tkExecBy" placeholder="e.g. Your name"></div>
+
+    <div class="tk-section-title" style="margin-top:18px;">Generated summary</div>
+    <pre id="tkExecOutput" style="white-space:pre-wrap;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12.5px;font-family:inherit;color:var(--text);margin-top:6px;"></pre>
+    <div class="tk-row" style="margin-top:8px;">
+      <button class="primary" id="tkExecCopyBtn">⧉ Copy to clipboard</button>
+      <button id="tkExecSlideBtn">⬇ Export as PPT slide (PNG)</button>
+    </div>
+    <div id="tkExecCopyMsg" style="font-size:12px;color:var(--video-color);margin-top:6px;min-height:14px;"></div>
+  `;
+
+  const titleI = container.querySelector("#tkExecTitle"), periodI = container.querySelector("#tkExecPeriod"), statusI = container.querySelector("#tkExecStatus");
+  const objI = container.querySelector("#tkExecObjective"), accI = container.querySelector("#tkExecAccomplish");
+  const risksI = container.querySelector("#tkExecRisks"), nextI = container.querySelector("#tkExecNext"), byI = container.querySelector("#tkExecBy");
+
+  titleI.value = st.title; periodI.value = st.period; statusI.value = st.status;
+  objI.value = st.objective; accI.value = st.accomplishments; risksI.value = st.risks; nextI.value = st.nextSteps; byI.value = st.preparedBy;
+
+  [[titleI,"title"],[periodI,"period"],[objI,"objective"],[accI,"accomplishments"],[risksI,"risks"],[nextI,"nextSteps"],[byI,"preparedBy"]].forEach(([el,key]) => {
+    el.addEventListener("input", () => { st[key] = el.value; tkSave(); buildOutput(); });
+  });
+  statusI.addEventListener("change", () => { st.status = statusI.value; tkSave(); buildOutput(); });
+
+  container.querySelector("#tkExecAddMetric").addEventListener("click", () => {
+    if(st.metrics.length < 10){ st.metrics.push({ label: "", value: "" }); tkSave(); drawMetricRows(); buildOutput(); }
+  });
+
+  container.querySelector("#tkExecCopyBtn").addEventListener("click", () => {
+    const text = container.querySelector("#tkExecOutput").textContent;
+    const msg = container.querySelector("#tkExecCopyMsg");
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(() => {
+        msg.textContent = "✓ Copied to clipboard";
+        setTimeout(() => { if(msg.textContent === "✓ Copied to clipboard") msg.textContent = ""; }, 2500);
+      }).catch(() => prompt("Copy this summary:", text));
+    }else{
+      prompt("Copy this summary:", text);
+    }
+  });
+
+  container.querySelector("#tkExecSlideBtn").addEventListener("click", () => exportExecSlide(st));
+
+  drawMetricRows();
+  buildOutput();
+}
+
+function exportExecSlide(st){
+  const W = 1280, H = 720;
+  const statusColors = { green: "#2f9e55", amber: "#d89a2e", red: "#c23f38" };
+  const statusColor = statusColors[st.status] || statusColors.green;
+  const statusLabel = { green:"GREEN", amber:"AMBER", red:"RED" }[st.status] || "GREEN";
+
+  const measureCanvas = document.createElement("canvas");
+  const mctx = measureCanvas.getContext("2d");
+  function wrapText(text, font, maxWidth){
+    mctx.font = font;
+    const words = text.split(" ");
+    let lines = [], current = "";
+    words.forEach(w => {
+      const test = current ? current+" "+w : w;
+      if(mctx.measureText(test).width > maxWidth && current){ lines.push(current); current = w; }
+      else current = test;
+    });
+    if(current) lines.push(current);
+    return lines;
+  }
+  function splitLines(text){ return text.split("\n").map(s=>s.trim()).filter(Boolean); }
+
+  function bulletColumn(items, x, yStart, colWidth, maxItems){
+    const shown = items.slice(0, maxItems);
+    const extra = Math.max(0, items.length - maxItems);
+    let y = yStart, svg = "";
+    shown.forEach(item => {
+      const lines = wrapText(item, "15px Arial", colWidth - 26);
+      lines.forEach((line, idx) => {
+        svg += `<text x="${x + (idx===0?18:26)}" y="${y}" font-size="15" fill="#333333">${idx===0?"•  ":""}${escapeHtml(line)}</text>`;
+        y += 21;
+      });
+      y += 5;
+    });
+    if(extra > 0){ svg += `<text x="${x+18}" y="${y}" font-size="13" fill="#999999" font-style="italic">+${extra} more</text>`; y += 20; }
+    return { svg, endY: y };
+  }
+
+  const metrics = st.metrics.filter(m => m.label.trim() || m.value.trim()).slice(0,4);
+  const accItems = splitLines(st.accomplishments);
+  const riskItems = splitLines(st.risks);
+  const nextItems = splitLines(st.nextSteps);
+
+  let svg = "";
+  // Background
+  svg += `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff"></rect>`;
+  // Top accent bar
+  svg += `<rect x="0" y="0" width="${W}" height="10" fill="${statusColor}"></rect>`;
+  // Title
+  svg += `<text x="56" y="76" font-size="34" font-weight="bold" fill="#1b2028" font-family="Arial">${escapeHtml(st.title.trim() || "Project Name")}</text>`;
+  svg += `<text x="56" y="104" font-size="15" fill="#6b7280" font-family="Arial">${escapeHtml(st.period.trim() || "Reporting period")}</text>`;
+  // Status badge
+  svg += `<rect x="${W-186}" y="42" width="130" height="36" rx="18" fill="${statusColor}"></rect>`;
+  svg += `<text x="${W-121}" y="65" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle" font-family="Arial">${statusLabel}</text>`;
+  // Divider
+  svg += `<line x1="56" y1="126" x2="${W-56}" y2="126" stroke="#e2e4e8" stroke-width="1.5"></line>`;
+
+  let cursorY = 158;
+  // Objective
+  if(st.objective.trim()){
+    const lines = wrapText(st.objective.trim(), "15px Arial", W-112);
+    lines.slice(0,3).forEach(line => { svg += `<text x="56" y="${cursorY}" font-size="15" fill="#444444" font-family="Arial">${escapeHtml(line)}</text>`; cursorY += 21; });
+    cursorY += 14;
+  }
+
+  // Metric cards
+  if(metrics.length > 0){
+    const cardW = (W-112 - (metrics.length-1)*16) / metrics.length;
+    metrics.forEach((m,i) => {
+      const x = 56 + i*(cardW+16);
+      svg += `<rect x="${x}" y="${cursorY}" width="${cardW}" height="70" rx="8" fill="#f3f4f6" stroke="#e2e4e8"></rect>`;
+      svg += `<text x="${x+cardW/2}" y="${cursorY+32}" font-size="20" font-weight="bold" fill="#1b2028" text-anchor="middle" font-family="Arial">${escapeHtml((m.value||"—").slice(0,16))}</text>`;
+      svg += `<text x="${x+cardW/2}" y="${cursorY+54}" font-size="12.5" fill="#6b7280" text-anchor="middle" font-family="Arial">${escapeHtml((m.label||"Metric").slice(0,22))}</text>`;
+    });
+    cursorY += 96;
+  }
+
+  // Two columns: Accomplishments | Risks
+  const colGap = 32, colW = (W - 112 - colGap) / 2;
+  const colX1 = 56, colX2 = 56 + colW + colGap;
+  const colTopY = cursorY;
+  svg += `<text x="${colX1}" y="${colTopY}" font-size="13.5" font-weight="bold" fill="#1b2028" font-family="Arial">KEY ACCOMPLISHMENTS</text>`;
+  svg += `<text x="${colX2}" y="${colTopY}" font-size="13.5" font-weight="bold" fill="#1b2028" font-family="Arial">RISKS &amp; ISSUES</text>`;
+  const accResult = bulletColumn(accItems, colX1, colTopY+26, colW, 5);
+  const riskResult = bulletColumn(riskItems, colX2, colTopY+26, colW, 5);
+  svg += accResult.svg + riskResult.svg;
+
+  // Next steps strip at bottom
+  const nextY = H - 110;
+  svg += `<line x1="56" y1="${nextY-18}" x2="${W-56}" y2="${nextY-18}" stroke="#e2e4e8" stroke-width="1.5"></line>`;
+  svg += `<text x="56" y="${nextY}" font-size="13.5" font-weight="bold" fill="#1b2028" font-family="Arial">NEXT STEPS</text>`;
+  let nx = 56, ny = nextY + 24;
+  nextItems.slice(0,4).forEach(item => {
+    svg += `<text x="${nx}" y="${ny}" font-size="14" fill="#333333" font-family="Arial">→ ${escapeHtml(item.length>70?item.slice(0,69)+"…":item)}</text>`;
+    ny += 22;
+  });
+
+  // Footer
+  if(st.preparedBy.trim()){
+    svg += `<text x="56" y="${H-16}" font-size="11.5" fill="#9aa0ab" font-family="Arial">Prepared by: ${escapeHtml(st.preparedBy.trim())}</text>`;
+  }
+
+  const fullSvg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  const temp = document.createElement("div");
+  temp.style.position = "fixed"; temp.style.left = "-9999px";
+  temp.innerHTML = fullSvg;
+  document.body.appendChild(temp);
+  exportSvgAsPng(temp.querySelector("svg"), "executive-summary-slide-" + new Date().toISOString().slice(0,10) + ".png");
+  setTimeout(() => temp.remove(), 1000);
+}
+
+function renderTkOnePager(container){
+  tkState.onePager = tkState.onePager || { title: "", problem: "", solution: "", impact: "", preparedBy: "" };
+  const st = tkState.onePager;
+
+  function linesToBullets(text){
+    return text.split("\n").map(l => l.trim()).filter(Boolean).map(l => `- ${l}`).join("\n");
+  }
+
+  function buildOutput(){
+    let out = `ONE-PAGER — ${st.title.trim() || "[Initiative Name]"}\n\n`;
+    out += `PROBLEM STATEMENT\n${st.problem.trim() ? linesToBullets(st.problem) : "[not yet filled in]"}\n\n`;
+    out += `PROPOSED SOLUTION\n${st.solution.trim() ? linesToBullets(st.solution) : "[not yet filled in]"}\n\n`;
+    out += `BUSINESS IMPACT\n${st.impact.trim() ? linesToBullets(st.impact) : "[not yet filled in]"}\n\n`;
+    if(st.preparedBy.trim()) out += `Prepared by: ${st.preparedBy.trim()}`;
+    container.querySelector("#tkOnePagerOutput").textContent = out.trim();
+  }
+
+  container.innerHTML = `
+    <h4>One-Pager Builder</h4>
+    <p class="tk-sub">Problem, Solution, Impact — the fastest way to pitch an idea or get a quick decision.</p>
+    <div class="tk-field"><label>Initiative / idea name</label><input type="text" id="tkOpTitle" placeholder="e.g. Automated Invoice Reconciliation"></div>
+    <div class="tk-field"><label>Problem statement (one point per line)</label><textarea id="tkOpProblem" placeholder="Manual reconciliation takes 3 days/month per analyst
+High error rate leads to repeated rework"></textarea></div>
+    <div class="tk-field"><label>Proposed solution (one point per line)</label><textarea id="tkOpSolution" placeholder="Build a rules-based matching bot for standard invoices
+Route exceptions only to analysts"></textarea></div>
+    <div class="tk-field"><label>Business impact (one point per line)</label><textarea id="tkOpImpact" placeholder="Saves ~120 analyst-hours per month
+Reduces error rate from 8% to under 1%"></textarea></div>
+    <div class="tk-field"><label>Prepared by (optional)</label><input type="text" id="tkOpBy" placeholder="e.g. Your name"></div>
+
+    <div class="tk-section-title" style="margin-top:18px;">Generated one-pager</div>
+    <pre id="tkOnePagerOutput" style="white-space:pre-wrap;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12.5px;font-family:inherit;color:var(--text);margin-top:6px;"></pre>
+    <div class="tk-row" style="margin-top:8px;">
+      <button class="primary" id="tkOpCopyBtn">⧉ Copy to clipboard</button>
+      <button id="tkOpSlideBtn">⬇ Export as PPT slide (PNG)</button>
+    </div>
+    <div id="tkOpCopyMsg" style="font-size:12px;color:var(--video-color);margin-top:6px;min-height:14px;"></div>
+  `;
+
+  const titleI = container.querySelector("#tkOpTitle"), problemI = container.querySelector("#tkOpProblem");
+  const solutionI = container.querySelector("#tkOpSolution"), impactI = container.querySelector("#tkOpImpact"), byI = container.querySelector("#tkOpBy");
+  titleI.value = st.title; problemI.value = st.problem; solutionI.value = st.solution; impactI.value = st.impact; byI.value = st.preparedBy;
+
+  [[titleI,"title"],[problemI,"problem"],[solutionI,"solution"],[impactI,"impact"],[byI,"preparedBy"]].forEach(([el,key]) => {
+    el.addEventListener("input", () => { st[key] = el.value; tkSave(); buildOutput(); });
+  });
+
+  container.querySelector("#tkOpCopyBtn").addEventListener("click", () => {
+    const text = container.querySelector("#tkOnePagerOutput").textContent;
+    const msg = container.querySelector("#tkOpCopyMsg");
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(() => {
+        msg.textContent = "✓ Copied to clipboard";
+        setTimeout(() => { if(msg.textContent === "✓ Copied to clipboard") msg.textContent = ""; }, 2500);
+      }).catch(() => prompt("Copy this one-pager:", text));
+    }else{
+      prompt("Copy this one-pager:", text);
+    }
+  });
+
+  container.querySelector("#tkOpSlideBtn").addEventListener("click", () => exportOnePagerSlide(st));
+
+  buildOutput();
+}
+
+function exportOnePagerSlide(st){
+  const W = 1280, H = 720;
+  const measureCanvas = document.createElement("canvas");
+  const mctx = measureCanvas.getContext("2d");
+  function wrapText(text, font, maxWidth){
+    mctx.font = font;
+    const words = text.split(" ");
+    let lines = [], current = "";
+    words.forEach(w => {
+      const test = current ? current+" "+w : w;
+      if(mctx.measureText(test).width > maxWidth && current){ lines.push(current); current = w; }
+      else current = test;
+    });
+    if(current) lines.push(current);
+    return lines;
+  }
+  function splitLines(text){ return text.split("\n").map(s=>s.trim()).filter(Boolean); }
+
+  function section(label, items, y, h, accent){
+    const padX = 56;
+    let svg = `<rect x="${padX}" y="${y}" width="6" height="${h}" fill="${accent}"></rect>`;
+    svg += `<text x="${padX+22}" y="${y+26}" font-size="16" font-weight="bold" fill="${accent}" font-family="Arial">${label}</text>`;
+    let ty = y + 54;
+    const maxLines = Math.floor((h-54)/22);
+    let lineCount = 0;
+    const shown = [];
+    for(const item of items){
+      const wrapped = wrapText(item, "15px Arial", W - padX*2 - 40);
+      if(lineCount + wrapped.length > maxLines) break;
+      shown.push(wrapped);
+      lineCount += wrapped.length;
+    }
+    const extra = items.length - shown.length;
+    shown.forEach(wrapped => {
+      wrapped.forEach((line, idx) => {
+        svg += `<text x="${padX + 22 + (idx===0?0:18)}" y="${ty}" font-size="15" fill="#333333" font-family="Arial">${idx===0?"•  ":""}${escapeHtml(line)}</text>`;
+        ty += 22;
+      });
+    });
+    if(extra > 0 && ty < y+h-10){ svg += `<text x="${padX+22}" y="${ty}" font-size="12.5" fill="#999999" font-style="italic" font-family="Arial">+${extra} more</text>`; }
+    return svg;
+  }
+
+  let svg = "";
+  svg += `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff"></rect>`;
+  svg += `<rect x="0" y="0" width="${W}" height="10" fill="#4f8cff"></rect>`;
+  svg += `<text x="56" y="76" font-size="32" font-weight="bold" fill="#1b2028" font-family="Arial">${escapeHtml(st.title.trim() || "Initiative Name")}</text>`;
+  svg += `<text x="56" y="100" font-size="14" fill="#9aa0ab" font-family="Arial">One-Pager</text>`;
+  svg += `<line x1="56" y1="120" x2="${W-56}" y2="120" stroke="#e2e4e8" stroke-width="1.5"></line>`;
+
+  const secTop = 150, secH = 170, secGap = 18;
+  svg += section("PROBLEM STATEMENT", splitLines(st.problem), secTop, secH, "#c23f38");
+  svg += section("PROPOSED SOLUTION", splitLines(st.solution), secTop + secH + secGap, secH, "#4f8cff");
+  svg += section("BUSINESS IMPACT", splitLines(st.impact), secTop + (secH+secGap)*2, secH, "#2f9e55");
+
+  if(st.preparedBy.trim()){
+    svg += `<text x="56" y="${H-16}" font-size="11.5" fill="#9aa0ab" font-family="Arial">Prepared by: ${escapeHtml(st.preparedBy.trim())}</text>`;
+  }
+
+  const fullSvg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  const temp = document.createElement("div");
+  temp.style.position = "fixed"; temp.style.left = "-9999px";
+  temp.innerHTML = fullSvg;
+  document.body.appendChild(temp);
+  exportSvgAsPng(temp.querySelector("svg"), "one-pager-slide-" + new Date().toISOString().slice(0,10) + ".png");
+  setTimeout(() => temp.remove(), 1000);
 }
 
 // ---- Date & Time ----
@@ -4370,6 +5947,23 @@ const TOOLKIT_CATS = [
     { key:"roi", name:"ROI Calculator", render: renderTkRoi },
     { key:"breakeven", name:"Breakeven Calculator", render: renderTkBreakeven },
     { key:"meetingcost", name:"Meeting Cost Calculator", render: renderTkMeetingCost },
+    { key:"improvement", name:"Improvement Calculator", render: renderTkImprovement },
+    { key:"copq", name:"Cost of Poor Quality", render: renderTkCopq },
+    { key:"effortimpact", name:"Effort vs Impact", render: renderTkEffortImpact },
+    { key:"nps", name:"NPS Calculator", render: renderTkNps },
+    { key:"churnrate", name:"Churn Rate Calculator", render: renderTkChurnRate },
+  ]},
+  { label: "Statistical Tools", tools: [
+    { key:"dpmo", name:"DPMO Calculator", render: renderTkDpmo },
+    { key:"sigmalevel", name:"Sigma Level Calculator", render: renderTkSigmaLevel },
+    { key:"processcap", name:"Process Capability (Cp/Cpk)", render: renderTkProcessCapability },
+    { key:"controlchart", name:"Control Chart Limits", render: renderTkControlChart },
+    { key:"samplesize", name:"Sample Size Calculator", render: renderTkSampleSize },
+    { key:"confinterval", name:"Confidence Interval Calculator", render: renderTkConfidenceInterval },
+    { key:"pareto", name:"Pareto Chart Generator", render: renderTkPareto },
+    { key:"boxplot", name:"Box Plot Generator", render: renderTkBoxPlot },
+    { key:"linregression", name:"Linear Regression Calculator", render: renderTkLinearRegression },
+    { key:"weightedavg", name:"Weighted Average Calculator", render: renderTkWeightedAverage },
   ]},
   { label: "Date & Time", tools: [
     { key:"datecalc", name:"Date Calculator", render: renderTkDateCalc },
@@ -4392,6 +5986,10 @@ const TOOLKIT_CATS = [
   { label: "Skill Mapping", tools: [
     { key:"skillMapping", name:"Skill Mapping (WIP)", render: renderTkWorkInProgress },
   ]},
+  { label: "Reporting", tools: [
+    { key:"execsummary", name:"Executive Summary Builder", render: renderTkExecSummary },
+    { key:"onepager", name:"One-Pager Builder", render: renderTkOnePager },
+  ]},
   { label: "Facilitation & Governance", tools: [
     { key:"swot", name:"SWOT Canvas", render: renderTkSwot },
     { key:"raci", name:"RACI Matrix", render: renderTkRaci },
@@ -4401,11 +5999,23 @@ const TOOLKIT_CATS = [
 
 let tkActiveTool = "calc";
 let tkActiveInterval = null;
+let tkNavSearchTerm = "";
 function tkClearInterval(){ if(tkActiveInterval){ clearInterval(tkActiveInterval); tkActiveInterval = null; } }
 
 function renderToolkitNav(){
   const nav = document.getElementById("toolkitNav");
-  nav.innerHTML = TOOLKIT_CATS.map(cat => `
+  const term = tkNavSearchTerm.trim().toLowerCase();
+  const filteredCats = term
+    ? TOOLKIT_CATS.map(cat => ({ ...cat, tools: cat.tools.filter(t => t.name.toLowerCase().includes(term) || cat.label.toLowerCase().includes(term)) }))
+        .filter(cat => cat.tools.length > 0)
+    : TOOLKIT_CATS;
+
+  if(filteredCats.length === 0){
+    nav.innerHTML = `<div class="toolkit-nav-empty">No tools match "${escapeHtml(tkNavSearchTerm)}".</div>`;
+    return;
+  }
+
+  nav.innerHTML = filteredCats.map(cat => `
     <div class="toolkit-cat-label">${cat.label}</div>
     ${cat.tools.map(t => `<button class="toolkit-nav-item${t.key===tkActiveTool?" active":""}" data-tool="${t.key}">${t.name}</button>`).join("")}
   `).join("");
@@ -4461,6 +6071,8 @@ function selectToolkitTool(key){
 }
 function openToolkit(){
   document.getElementById("toolkitOverlay").style.display = "flex";
+  tkNavSearchTerm = "";
+  document.getElementById("toolkitSearch").value = "";
   renderToolkitNav();
   selectToolkitTool(tkActiveTool);
 }
@@ -4475,6 +6087,10 @@ document.getElementById("toolkitClose").addEventListener("click", closeToolkit);
 document.getElementById("toolkitOverlay").addEventListener("click", (e) => {
   if(e.target.id === "toolkitOverlay") closeToolkit();
 });
+document.getElementById("toolkitSearch").addEventListener("input", (e) => {
+  tkNavSearchTerm = e.target.value;
+  renderToolkitNav();
+});
 
 tkLoad();
 
@@ -4484,12 +6100,46 @@ render();
 updatePanelUI();
 tryRestoreLinkedFile();
 
-setTimeout(() => {
+function offerImportIfEmpty(){
+  const hasProjects = state.projects && state.projects.length > 0;
+  const hasToolkitData = tkState && Object.keys(tkState).some(k => {
+    const v = tkState[k];
+    if(Array.isArray(v)) return v.length > 0;
+    if(v && typeof v === "object") return Object.keys(v).length > 0;
+    return !!v;
+  });
+  if(hasProjects || hasToolkitData) return;
+
+  openModal(`
+    <h3>Nothing here yet</h3>
+    <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">This looks like a fresh start — no projects or Toolkit data found. If you have a backup file, you can bring it in now.</div>
+    <div class="modal-actions">
+      <button id="emptyStartFresh">Start fresh</button>
+      <button class="primary" id="emptyImportNow">Import a file</button>
+    </div>
+  `, (root) => {
+    root.querySelector("#emptyStartFresh").addEventListener("click", closeModal);
+    root.querySelector("#emptyImportNow").addEventListener("click", () => {
+      closeModal();
+      document.getElementById("importFile").click();
+    });
+  });
+}
+
+function playSplashSequence(){
   const splash = document.getElementById("splashScreen");
+  const content = document.getElementById("splashContent");
+  const proceedBtn = document.getElementById("splashProceedBtn");
   if(!splash) return;
-  splash.classList.add("hide");
-  setTimeout(() => splash.remove(), 600);
-}, 2100);
+  splash.style.display = "flex";
+
+  setTimeout(() => { content.classList.add("show"); }, 1800);
+
+  proceedBtn.addEventListener("click", () => {
+    splash.classList.add("hide");
+    setTimeout(() => { splash.remove(); offerImportIfEmpty(); }, 600);
+  });
+}
 </script>
 </body>
 </html>
